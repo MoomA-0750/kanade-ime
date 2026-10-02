@@ -13,6 +13,7 @@ class DictionaryCandidateSource(
     private val segmenter: Segmenter,
     private val symbols: SymbolTable = SymbolTable(emptyMap()),
     private val emoji: SymbolTable = SymbolTable(emptyMap()),
+    private val dates: DateCandidates = DateCandidates(),
 ) : CandidateSource {
     /** 設定画面で編集されたら差し替える。ラティスにも入れる */
     var userDictionary: UserDictionary
@@ -54,8 +55,10 @@ class DictionaryCandidateSource(
     override fun segmentCandidates(reading: String, n: Int): List<String> {
         val lattice = converter.convert(reading, maxOf(n, LATTICE_CANDIDATES)).map { it.text }
         val base = userDictionary.lookup(reading) + lattice.take(SYMBOL_POSITION) + reading + CharWidth.toKatakana(reading) +
-            symbols.lookup(reading) + emoji.lookup(reading) + lattice.drop(SYMBOL_POSITION) + converter.exactWords(reading)
-        return base.flatMap { listOf(it) + widthVariant(it) }.distinct()
+            dates.lookup(reading) + symbols.lookup(reading) + emoji.lookup(reading) + lattice.drop(SYMBOL_POSITION) + converter.exactWords(reading)
+        // 日付・時刻には全角/半角の別の形を足さない（数字が多く、候補が倍に膨らむため）
+        val dateSet = dates.lookup(reading).toSet()
+        return base.flatMap { listOf(it) + if (it in dateSet) emptyList() else widthVariant(it) }.distinct()
     }
 
     /** 候補の窓で右に出す説明 */
@@ -63,6 +66,7 @@ class DictionaryCandidateSource(
         candidate in userDictionary.lookup(reading) -> "ユーザー辞書"
         candidate == reading && reading.any { it in '\u3041'..'\u3096' } -> "ひらがな"
         candidate == CharWidth.toKatakana(reading) && candidate != reading -> "カタカナ"
+        candidate in dates.lookup(reading) -> if (reading in TIME_READINGS) "時刻" else "日付"
         candidate in emoji.lookup(reading) -> "絵文字"
         candidate in symbols.lookup(reading) || CharWidth.toHalfWidthAscii(candidate) in symbols.lookup(reading) ||
             CharWidth.toFullWidthAscii(candidate) in symbols.lookup(reading) -> when {
@@ -80,6 +84,8 @@ class DictionaryCandidateSource(
 
     private companion object {
         const val SYMBOL_POSITION = 3
+
+        val TIME_READINGS = setOf("いま", "じこく", "げんざいじこく")
 
         /** 文節の候補でラティスから取る数（同じ読みの辞書の語は、これとは別に全部足す） */
         const val LATTICE_CANDIDATES = 30
