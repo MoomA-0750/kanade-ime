@@ -1,7 +1,12 @@
+import java.util.zip.GZIPOutputStream
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
+/** ネイティブをビルドする ABI。既定は arm64 だけ（APK を小さくする） */
+val kanadeAbis = (findProperty("kanade.abis") as String? ?: "arm64-v8a").split(',').map { it.trim() }
 
 // 辞書（Mozc から変換）と zenz のモデルは、リポジトリに入れずビルド時にそろえて assets に入れる。
 // 取得物は .cache/ に置き、2回目以降は取得も変換もしない
@@ -26,6 +31,15 @@ val prepareKanadeAssets by tasks.registering(JavaExec::class) {
         rootProject.file("docs/USAGE.md").copyTo(File(out, "usage.md"), overwrite = true)
         // 音声認識の速さを端末で測るための見本（to-fu の Windows の音声合成で作った 8.8 秒の日本語）
         rootProject.file("eval/voice-sample-ja.wav").copyTo(File(out, "voice-sample-ja.wav"), overwrite = true)
+        // 辞書と接続行列はよく縮む（37MB→16MB、14MB→2MB）ので gzip で入れ、初回にアプリ内へ展開して mmap する。
+        // 拡張子を .gz にすると AGP が assets をまとめるときに勝手に展開してしまうので、.kgz にする
+        for (name in listOf("system.kdic", "connection.kcon")) {
+            val src = File(out, name)
+            GZIPOutputStream(File(out, "$name.kgz").outputStream().buffered(), 1 shl 16).use { gz ->
+                src.inputStream().use { it.copyTo(gz) }
+            }
+            src.delete()
+        }
     }
 }
 
@@ -41,8 +55,8 @@ android {
         versionCode = 2
         versionName = "0.2.0"
         ndk {
-            // 実機（Fold 7）と、to-fu のエミュレータ
-            abiFilters += listOf("arm64-v8a", "x86_64")
+            // 既定は実機（Fold 7）の arm64 だけ。to-fu のエミュレータで試すときは -Pkanade.abis=arm64-v8a,x86_64
+            abiFilters += kanadeAbis
         }
         externalNativeBuild {
             cmake {
@@ -64,7 +78,7 @@ android {
 
     androidResources {
         // 圧縮せずに入れ、辞書は APK から直接 mmap する
-        noCompress += listOf("kdic", "kcon", "kpos", "gguf")
+        noCompress += listOf("kpos", "gguf", "kgz")
     }
 
     buildTypes {

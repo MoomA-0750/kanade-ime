@@ -12,7 +12,8 @@ android {
     defaultConfig {
         minSdk = 29
         ndk {
-            abiFilters += listOf("arm64-v8a", "x86_64")
+            // app と同じ。エミュレータで試すときは -Pkanade.abis=arm64-v8a,x86_64
+            abiFilters += (findProperty("kanade.abis") as String? ?: "arm64-v8a").split(',').map { it.trim() }
         }
         externalNativeBuild {
             cmake {

@@ -26,7 +26,7 @@ object ConversionResources {
     @Synchronized
     fun converter(context: Context): KanaKanjiConverter = converter ?: run {
         val app = context.applicationContext
-        KanaKanjiConverter(SystemDictionary(mapAsset(app, "system.kdic")), ConnectionMatrix(mapAsset(app, "connection.kcon")))
+        KanaKanjiConverter(SystemDictionary(mapExtracted(app, "system.kdic")), ConnectionMatrix(mapExtracted(app, "connection.kcon")))
             .also { converter = it }
     }
 
@@ -49,6 +49,27 @@ object ConversionResources {
             val threads = Runtime.getRuntime().availableProcessors().coerceIn(1, 4)
             ZenzModel.open(model.absolutePath, threads = threads)
         }.getOrNull().also { zenz = it }
+    }
+
+    /**
+     * gzip で入れた asset（`name.kgz`）をアプリ内へ展開して mmap する。展開は APK を入れ直したとき（更新時刻が変わったとき）だけ。
+     * 古い版の展開先は消す
+     */
+    private fun mapExtracted(context: Context, name: String): MappedByteBuffer {
+        val updated = context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime
+        val root = File(context.noBackupFilesDir, "assets")
+        val dir = File(root, updated.toString())
+        val file = File(dir, name)
+        if (!file.exists()) {
+            root.listFiles()?.filter { it != dir }?.forEach { it.deleteRecursively() }
+            dir.mkdirs()
+            val tmp = File(dir, "$name.part")
+            java.util.zip.GZIPInputStream(context.assets.open("$name.kgz"), 1 shl 16).use { input ->
+                tmp.outputStream().use { input.copyTo(it, 1 shl 16) }
+            }
+            tmp.renameTo(file)
+        }
+        FileInputStream(file).channel.use { ch -> return ch.map(FileChannel.MapMode.READ_ONLY, 0, ch.size()) }
     }
 
     private fun mapAsset(context: Context, name: String): MappedByteBuffer {

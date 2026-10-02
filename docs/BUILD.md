@@ -14,6 +14,7 @@ export JAVA_HOME=~/.local/opt/jdk-21.0.12.1+1
 ./gradlew :app:assembleDebug    # app/build/outputs/apk/debug/app-debug.apk
 ```
 
+- 既定のネイティブは arm64-v8a（実機）だけ。to-fu のエミュレータ（x86_64）で試すときは `./gradlew :app:assembleDebug -Pkanade.abis=arm64-v8a,x86_64`
 - 初回の `assembleDebug` は、Mozc の辞書（約 130MB）と zenz のモデル（21MB）を `.cache/` へ取得し、辞書を変換してから assets に入れる（`prepareKanadeAssets`）。2回目以降は取得も変換もしない
 - ネイティブ（llama.cpp）のビルドは ABI ごとに数分かかる
 
@@ -43,7 +44,7 @@ $D whisper .cache/models/ggml-small-q5_1.bin .cache/host-whisper/libkanade_whisp
 ## エミュレータでの確認（to-fu）
 
 作業機は VM で KVM がないので、to-fu（Windows）の Android Studio のエミュレータ（Pixel_10_Pro_Fold、Android 16、x86_64）を ssh 越しに使う。
-Kanade は今のところネイティブコードがないので x86_64 でそのまま動く（zenz を入れたら x86_64 向けの .so も要る）。
+ネイティブ（zenz・whisper）は x86_64 向けも要るので、`-Pkanade.abis=arm64-v8a,x86_64` を付けてビルドする。
 
 - to-fu の ssh の既定シェルは PowerShell。ssh を閉じると子プロセスが止まるので、エミュレータと `adb nodaemon server` は ssh をつないだまま（バックグラウンドで）動かす
 
