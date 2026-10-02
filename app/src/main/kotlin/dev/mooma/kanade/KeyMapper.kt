@@ -33,6 +33,11 @@ class KeyMapper(var triggers: Set<ToggleTrigger>) {
 
         if (KeyEvent.isModifierKey(code) || code == KeyEvent.KEYCODE_CAPS_LOCK) return null
 
+        // Ctrl+U/I/O/P/T は F6〜F10 と同じ（MS-IME と同じ割り当て）。未確定がなければエンジンがアプリへ渡す
+        if (event.isCtrlPressed && !event.isAltPressed && !event.isMetaPressed && !event.isShiftPressed) {
+            CTRL_WIDTH[code]?.let { return KeyInput.ConvertWidth(it) }
+        }
+
         // Ctrl・Alt・Meta と一緒に押されたキーはショートカットとしてアプリへ渡す
         if (event.isCtrlPressed || event.isAltPressed || event.isMetaPressed) return KeyInput.Other
 
@@ -67,4 +72,14 @@ class KeyMapper(var triggers: Set<ToggleTrigger>) {
     }
 
     fun consumesRightAlt() = ToggleTrigger.RIGHT_ALT_TAP in triggers
+
+    private companion object {
+        val CTRL_WIDTH = mapOf(
+            KeyEvent.KEYCODE_U to WidthTarget.HIRAGANA,
+            KeyEvent.KEYCODE_I to WidthTarget.KATAKANA,
+            KeyEvent.KEYCODE_O to WidthTarget.HALF_KATAKANA,
+            KeyEvent.KEYCODE_P to WidthTarget.FULL_ALNUM,
+            KeyEvent.KEYCODE_T to WidthTarget.HALF_ALNUM,
+        )
+    }
 }

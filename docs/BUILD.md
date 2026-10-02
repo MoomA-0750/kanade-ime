@@ -27,4 +27,5 @@ scripts/emu.sh adb shell ime set dev.mooma.kanade/.KanadeInputMethodService
 ```
 
 - キーは `adb shell input keyevent KEYCODE_HENKAN` / `input text nihongo` / `input keycombination KEYCODE_CTRL_LEFT KEYCODE_SPACE` で送れる。IME に届いたキーは `adb shell run-as dev.mooma.kanade cat files/keylog.txt`
+- APK を入れ直すと既定の入力方法が Gboard に戻ることがある。`ime set` し直す。`am start -S` で Kanade のパッケージを止めると IME も止まり、やはり Gboard に戻る
 - 起動が長く続いたエミュレータは `input_method` などのサービスが消えた状態になることがある（`cmd: Can't find service`）。`adb emu kill` して起動し直す。起動直後は SystemUI の ANR が出ることがあり、`am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS` で閉じる

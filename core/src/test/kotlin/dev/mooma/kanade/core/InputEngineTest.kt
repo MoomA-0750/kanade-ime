@@ -82,6 +82,8 @@ class InputEngineTest {
         assertFalse(e.handle(KeyInput.Enter).consumed)
         assertFalse(e.handle(KeyInput.Space).consumed)
         assertFalse(e.handle(KeyInput.Other).consumed)
+        // Ctrl+I などはアプリのショートカット（斜体など）として通す
+        assertFalse(e.handle(KeyInput.ConvertWidth(WidthTarget.KATAKANA)).consumed)
     }
 
     @Test
