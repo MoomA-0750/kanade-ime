@@ -77,7 +77,12 @@ class KanadeSettings(context: Context) {
         get() = prefs.getBoolean(KEY_LAST_MODE, false)
         set(value) = prefs.edit().putBoolean(KEY_LAST_MODE, value).apply()
 
-    fun engineSettings() = EngineSettings(fullWidthSymbols = fullWidthSymbols, liveConversion = liveConversion)
+    /** 句読点の組み合わせ（「、。」「，．」「、．」「，。」） */
+    var punctuation: String
+        get() = prefs.getString(KEY_PUNCTUATION, "、。") ?: "、。"
+        set(value) = prefs.edit().putString(KEY_PUNCTUATION, value).apply()
+
+    fun engineSettings() = EngineSettings(fullWidthSymbols = fullWidthSymbols, liveConversion = liveConversion, punctuation = punctuation)
 
     private companion object {
         const val KEY_TRIGGERS = "toggle_triggers"
@@ -85,6 +90,7 @@ class KanadeSettings(context: Context) {
         const val KEY_KEYLOG = "key_log"
         const val KEY_LAST_MODE = "last_japanese"
         const val KEY_LIVE = "live_conversion"
+        const val KEY_PUNCTUATION = "punctuation"
         const val KEY_VOICE_MODEL = "voice_model"
         const val KEY_LEARNING = "learning"
         const val KEY_ZENZ_SMALL = "zenz_small"

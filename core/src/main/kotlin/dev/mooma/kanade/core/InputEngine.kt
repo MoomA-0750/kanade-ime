@@ -91,6 +91,8 @@ data class EngineSettings(
     val liveConversion: Boolean = true,
     /** 辞書から取る候補の数 */
     val candidateCount: Int = 10,
+    /** 句読点（「,」「.」で入るもの）。「、。」「，．」「、．」「，。」 */
+    val punctuation: String = "、。",
 )
 
 /** 文節（読みと、いま選んでいる表記） */
@@ -612,8 +614,11 @@ class InputEngine(
             return
         }
         flushPending()
-        val text = PUNCTUATION[c]
-            ?: if (settings.fullWidthSymbols) CharWidth.toFullWidthAscii(c.toString()) else c.toString()
+        val text = when (c) {
+            ',' -> settings.punctuation.getOrElse(0) { '、' }.toString()
+            '.' -> settings.punctuation.getOrElse(1) { '。' }.toString()
+            else -> PUNCTUATION[c]
+        } ?: if (settings.fullWidthSymbols) CharWidth.toFullWidthAscii(c.toString()) else c.toString()
         insertUnits(listOf(KanaUnit(text, c.toString())))
     }
 

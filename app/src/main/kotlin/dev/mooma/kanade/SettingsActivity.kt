@@ -82,6 +82,18 @@ class SettingsActivity : Activity() {
             setOnCheckedChangeListener { _, checked -> settings.fullWidthSymbols = checked }
         })
 
+        root.addView(note("句読点（, と . で入るもの）"))
+        root.addView(android.widget.RadioGroup(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            for (style in listOf("、。", "，．", "、．", "，。")) {
+                addView(android.widget.RadioButton(this@SettingsActivity).apply {
+                    id = View.generateViewId()
+                    text = style
+                    isChecked = settings.punctuation == style
+                    setOnCheckedChangeListener { _, checked -> if (checked) settings.punctuation = style }
+                })
+            }
+        })
         root.addView(CheckBox(this).apply {
             text = "ライブ変換（打つたびに変換結果を出す）"
             isChecked = settings.liveConversion

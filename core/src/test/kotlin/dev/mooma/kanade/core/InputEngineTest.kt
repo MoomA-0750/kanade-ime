@@ -133,4 +133,11 @@ class InputEngineTest {
         assertEquals("ｋａｎ", conv("kan", WidthTarget.FULL_ALNUM))
         assertEquals("がっこう", conv("gakkou", WidthTarget.HIRAGANA))
     }
+
+    @Test
+    fun punctuationStyle() {
+        val e = InputEngine(EngineSettings(punctuation = "，．")).apply { handle(KeyInput.SetJapanese(true)) }
+        e.type("a,i.")
+        assertEquals(ImeCommand.Commit("あ，い．"), e.commitAll().single())
+    }
 }
