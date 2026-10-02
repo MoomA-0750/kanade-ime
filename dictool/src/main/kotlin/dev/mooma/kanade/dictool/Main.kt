@@ -44,6 +44,7 @@ fun main(args: Array<String>) {
         "eval" -> evaluate(File(args[1]), File(args[2]))
         "convert" -> convert(File(args[1]), args.drop(2))
         "zenz" -> zenzTry(File(args[1]), File(args[2]), File(args[3]), args.drop(4))
+        "eval-context" -> evaluateContext(File(args[1]), File(args[2]), File(args[3]), File(args[4]))
         "whisper" -> whisperTry(File(args[1]), File(args[2]), args.drop(3).map(::File))
         "eval-zenz" -> evaluateZenz(File(args[1]), File(args[2]), File(args[3]), File(args[4]), args.getOrNull(5)?.toInt() ?: 10, args.getOrNull(6)?.toFloat() ?: 1.0f)
         else -> {
@@ -58,6 +59,7 @@ fun main(args: Array<String>) {
                   convert <outDir> <かな...>     変換を試す
                   zenz <outDir> <gguf> <libkanade_zenz.so> <かな...>        zenz の並べ替えと生成を試す
                   eval-zenz <outDir> <tsv> <gguf> <libkanade_zenz.so> [topK] zenz ありで評価する
+                  eval-context <outDir> <tsv> <gguf> <libkanade_zenz.so>   左の文脈ありとなしで並べ替えを比べる
                   whisper <ggml> <libkanade_whisper.so> <wav...>           音声認識を試す（16kHz・モノラル・16bit の wav）
                 """.trimIndent()
             )
@@ -339,5 +341,34 @@ fun whisperTry(model: File, lib: File, wavs: List<File>) {
             println("${wav.name}（${"%.1f".format(n / 16000.0)}秒の音声）: ${"%.0f".format((System.nanoTime() - t) / 1e6)}ms")
             println("  $text")
         }
+    }
+}
+
+/** 左の文脈で正解が変わる文（eval/context.tsv）で、zenz に文脈を渡したときと渡さないときを比べる */
+fun evaluateContext(outDir: File, tsv: File, model: File, lib: File) {
+    val converter = loadConverter(outDir)
+    val cases = tsv.readLines().filter { it.isNotBlank() && !it.startsWith("#") }.map { it.split('\t') }
+    openZenz(model, lib).use { zenz ->
+        val reranker = Reranker(zenz)
+        var dictHit = 0
+        var noCtx = 0
+        var withCtx = 0
+        for ((context, reading, answer) in cases) {
+            val answers = answer.split('|')
+            val dict = converter.convert(reading, 100).map { it.text }
+            val a = reranker.rerank("", reading, dict)!!.candidates.firstOrNull()
+            val b = reranker.rerank(context, reading, dict)!!.candidates.firstOrNull()
+            if (dict.firstOrNull() in answers) dictHit++
+            if (a in answers) noCtx++
+            if (b in answers) withCtx++
+            val mark = when {
+                a !in answers && b in answers -> "文脈で直った"
+                a in answers && b !in answers -> "文脈で悪化"
+                b in answers -> "正"
+                else -> "誤"
+            }
+            println("$mark\t$context｜$reading\t文脈なし $a\t文脈あり $b")
+        }
+        println("件数 ${cases.size}: 辞書だけ $dictHit、zenz 文脈なし $noCtx、zenz 文脈あり $withCtx")
     }
 }
