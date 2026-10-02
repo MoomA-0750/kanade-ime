@@ -22,26 +22,15 @@ class TextStore(context: Context, name: String, private val default: String) {
     fun version(): Long = if (file.exists()) file.lastModified() else 0L
 
     companion object {
+        /** 初めて開いたときの中身（例として数件。説明は設定画面と docs/USAGE.md に書く） */
         fun userDictionary(context: Context) = TextStore(
             context, "user_dictionary.txt",
-            """
-            # ユーザー辞書。1行に「よみ 語」（よみはひらがな、最初の空白で区切る）。# で始まる行は無視する
-            # 登録した語は変換で優先され、候補の先頭に出る
-            # かなで かなで
-            """.trimIndent() + "\n",
+            "かなで Kanade\nでっくす DeX\n",
         )
 
         fun snippets(context: Context) = TextStore(
             context, "snippets.txt",
-            """
-            # スニペット。1行に「キー 出力」（最初の空白で区切る）。# で始まる行は無視する
-            # キーは打つ文字そのもの（日本語入力中でも、かなや全角になる前の文字で見る）。打ち終わった瞬間に置き換わる
-            # 出力の中の \n は改行
-            # @@ you@example.com
-            -> →
-            <- ←
-            => ⇒
-            """.trimIndent() + "\n",
+            "-> →\n<- ←\n=> ⇒\n",
         )
     }
 }

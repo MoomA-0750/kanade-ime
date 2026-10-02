@@ -123,6 +123,12 @@ class KanaKanjiConverter(
         return results
     }
 
+    /** [reading] とちょうど同じ読みの辞書の語（コストの小さい順）。候補を全部出すときに使う */
+    fun exactWords(reading: String): List<String> {
+        val hit = dictionary.prefixSearch(reading, 0, reading.length).lastOrNull { it.first == reading.length } ?: return emptyList()
+        return dictionary.entriesOf(hit.second).map { dictionary.surface(it, reading) }.distinct()
+    }
+
     companion object {
         /** ユーザー辞書の語のコスト。Mozc の一般名詞（多くは 3000〜8000）より十分小さくする */
         const val USER_WORD_COST = 1000

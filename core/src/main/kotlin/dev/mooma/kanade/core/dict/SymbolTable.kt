@@ -2,7 +2,7 @@ package dev.mooma.kanade.core.dict
 
 /**
  * 読み→記号・絵文字（「やじるし」→「→←↑↓⇒」、「ぷらす」→「＋」、「えがお」→「😀」など）。
- * Mozc の symbol.tsv と emoji_data.tsv から作る。文節の候補の後ろに足す（Mozc の SymbolRewriter と同じく、1位にはしない）。
+ * Mozc の symbol.tsv（記号）と emoji_data.tsv（絵文字）から、別々の表として作る。文節の候補の後ろに足す（Mozc の SymbolRewriter と同じく、1位にはしない）。
  * 形式（UTF-8 の行）: `読み<TAB>記号<TAB>記号…`
  */
 class SymbolTable(private val map: Map<String, List<String>>) {
@@ -25,28 +25,23 @@ class SymbolTable(private val map: Map<String, List<String>>) {
             },
         )
 
-        /**
-         * Mozc の symbol.tsv（品詞 文字 読み… の TSV、読みは空白区切り）と emoji_data.tsv（符号 文字 読み… ）から作る。
-         * 読みはひらがなと長音だけのものを使う（「->」のような英数の読みは使わない）
-         */
-        fun fromMozc(symbolTsv: List<String>, emojiTsv: List<String>): SymbolTable {
+        /** Mozc の symbol.tsv（品詞 文字 読み… の TSV、読みは空白区切り。1行目は見出し）から作る */
+        fun fromMozcSymbols(symbolTsv: List<String>): SymbolTable = build(symbolTsv.drop(1))
+
+        /** Mozc の emoji_data.tsv（符号 文字 読み…）から作る */
+        fun fromMozcEmoji(emojiTsv: List<String>): SymbolTable = build(emojiTsv.filter { !it.startsWith("#") })
+
+        /** 2列目が文字、3列目が空白区切りの読み。読みはひらがなと長音だけのものを使う（「->」のような英数の読みは使わない） */
+        private fun build(lines: List<String>): SymbolTable {
             val map = LinkedHashMap<String, MutableList<String>>()
-            fun add(char: String, readings: String) {
-                if (char.isBlank()) return
-                for (r in readings.split(' ')) {
-                    if (r.isEmpty() || !r.all { it in 'ぁ'..'ゖ' || it == 'ー' }) continue
+            for (line in lines) {
+                val f = line.split('\t')
+                if (f.size < 3 || f[1].isBlank()) continue
+                for (r in f[2].split(' ')) {
+                    if (r.isEmpty() || !r.all { it in '\u3041'..'\u3096' || it == 'ー' }) continue
                     val list = map.getOrPut(r) { ArrayList() }
-                    if (char !in list && list.size < MAX_PER_READING) list += char
+                    if (f[1] !in list && list.size < MAX_PER_READING) list += f[1]
                 }
-            }
-            for (line in symbolTsv.drop(1)) {
-                val f = line.split('\t')
-                if (f.size >= 3) add(f[1], f[2])
-            }
-            for (line in emojiTsv) {
-                if (line.startsWith("#")) continue
-                val f = line.split('\t')
-                if (f.size >= 3) add(f[1], f[2])
             }
             return SymbolTable(map)
         }

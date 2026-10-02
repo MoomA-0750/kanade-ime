@@ -53,7 +53,9 @@ class CandidateBar(context: Context, private val onSelect: (Int) -> Unit = {}) :
     }
 
     private var shown: List<String> = emptyList()
-    private val rows = ArrayList<TextView>()
+    private val rows = ArrayList<LinearLayout>()
+    private val texts = ArrayList<TextView>()
+    private val labelViews = ArrayList<TextView>()
 
     init {
         orientation = VERTICAL
@@ -71,16 +73,19 @@ class CandidateBar(context: Context, private val onSelect: (Int) -> Unit = {}) :
     }
 
     /** 候補の一覧。数字は選んでいる候補がいる頁（9件ずつ）にだけ付ける（数字キーで選べるもの） */
-    fun showCandidates(candidates: List<String>, selected: Int, preview: String? = null) {
+    fun showCandidates(candidates: List<String>, selected: Int, preview: String? = null, labels: List<String?> = emptyList()) {
         showPreviewLine(preview)
         if (candidates != shown) rebuild(candidates)
         val pageStart = selected / PAGE * PAGE
         for ((i, row) in rows.withIndex()) {
             val n = i - pageStart
-            val label = if (n in 0 until PAGE) "${n + 1}" else " "
-            row.text = "$label  ${candidates[i]}"
+            val number = if (n in 0 until PAGE) "${n + 1}" else " "
+            texts[i].text = "$number  ${candidates[i]}"
+            texts[i].setTypeface(null, if (i == selected) Typeface.BOLD else Typeface.NORMAL)
+            val label = labels.getOrNull(i)
+            labelViews[i].text = label.orEmpty()
+            labelViews[i].visibility = if (label == null) View.GONE else View.VISIBLE
             row.setBackgroundColor(if (i == selected) selectedBg else Color.TRANSPARENT)
-            row.setTypeface(null, if (i == selected) Typeface.BOLD else Typeface.NORMAL)
         }
         scroll.visibility = View.VISIBLE
         footer.visibility = View.VISIBLE
@@ -95,9 +100,9 @@ class CandidateBar(context: Context, private val onSelect: (Int) -> Unit = {}) :
         }
     }
 
-    /** 未確定文字列の代わりに、入力中の文字だけを出す */
-    fun showPreview(text: String) {
-        showPreviewLine(text)
+    /** 未確定文字列の代わりに、入力中の文字だけを出す。[cursor] が文字列の途中ならそこに縦線を入れる */
+    fun showPreview(text: String, cursor: Int = -1) {
+        showPreviewLine(if (cursor in 0 until text.length) text.substring(0, cursor) + "│" + text.substring(cursor) else text)
         scroll.visibility = View.GONE
         footer.visibility = View.GONE
     }
@@ -111,18 +116,34 @@ class CandidateBar(context: Context, private val onSelect: (Int) -> Unit = {}) :
         shown = candidates
         list.removeAllViews()
         rows.clear()
+        texts.clear()
+        labelViews.clear()
         for (i in candidates.indices) {
-            val row = TextView(context).apply {
+            val text = TextView(context).apply {
                 setTextColor(fg)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
                 isSingleLine = true
                 ellipsize = TextUtils.TruncateAt.END
-                setPadding(dp(12), dp(5), dp(16), dp(5))
-                minHeight = rowHeight()
+            }
+            // 候補の説明（「ユーザー辞書」「全角」など）は右に小さく出す
+            val label = TextView(context).apply {
+                setTextColor(dim)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                isSingleLine = true
+                setPadding(dp(16), 0, 0, 0)
+            }
+            val row = LinearLayout(context).apply {
+                orientation = HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(12), dp(5), dp(12), dp(5))
+                minimumHeight = rowHeight()
                 setOnClickListener { onSelect(i) }
+                addView(text, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
+                addView(label, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
             }
             rows += row
+            texts += text
+            labelViews += label
             list.addView(row, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         }
     }

@@ -15,9 +15,14 @@ sealed interface KeyInput {
     /** 上下の矢印。変換中は候補の選択を動かす */
     data object Up : KeyInput
     data object Down : KeyInput
-    /** 左右の矢印。変換中は文節を移る */
+    /** 左右の矢印。入力中は未確定文字列の中でカーソルを動かし、変換中は文節を移る */
     data object Left : KeyInput
     data object Right : KeyInput
+    /** Home・End。入力中は未確定文字列の先頭・末尾へ */
+    data object Home : KeyInput
+    data object End : KeyInput
+    /** Delete（カーソルの後ろの1文字を消す） */
+    data object DeleteForward : KeyInput
     /** Shift+左右。文節の区切りを縮める・伸ばす（入力中なら変換を始めてから） */
     data object ShiftLeft : KeyInput
     data object ShiftRight : KeyInput
@@ -39,11 +44,23 @@ sealed interface ImeCommand {
      * 未確定文字列を置き換える（空文字なら未確定を消す）。
      * 変換中は [segmentLengths] に文節ごとの長さ、[focused] に選んでいる文節が入る（見た目の下線用）
      */
-    data class SetComposing(val text: String, val segmentLengths: List<Int> = emptyList(), val focused: Int = -1) : ImeCommand
+    data class SetComposing(
+        val text: String,
+        val segmentLengths: List<Int> = emptyList(),
+        val focused: Int = -1,
+        /** 未確定文字列の中のカーソルの位置（先頭からの文字数）。-1 なら末尾 */
+        val cursor: Int = -1,
+    ) : ImeCommand
     data class Commit(val text: String) : ImeCommand
     data class ModeChanged(val japanese: Boolean) : ImeCommand
     /** 候補の一覧を出す（変換中）。[selected] は選択中の位置、[anchorOffset] は選んでいる文節が未確定文字列の何文字目からか */
-    data class ShowCandidates(val candidates: List<String>, val selected: Int, val anchorOffset: Int = 0) : ImeCommand
+    data class ShowCandidates(
+        val candidates: List<String>,
+        val selected: Int,
+        val anchorOffset: Int = 0,
+        /** 候補ごとの説明（「ユーザー辞書」「全角」など）。[candidates] と同じ長さか空 */
+        val labels: List<String?> = emptyList(),
+    ) : ImeCommand
     /**
      * 直接入力中のスニペット: カーソルの前が [expected] なら消して [replacement] を入れる。
      * 違っていたら（カーソルを動かしたなど）、打った文字 [typed] をそのまま入れる
@@ -87,6 +104,9 @@ interface CandidateSource {
 
     /** [reading] に登録されたユーザー辞書の語。候補の先頭に固定し、言語モデルの並べ替えで下げない */
     fun pinned(reading: String): List<String> = emptyList()
+
+    /** 候補の窓で候補の右に出す説明（「ユーザー辞書」「半角」など）。なければ null */
+    fun labelFor(reading: String, candidate: String): String? = null
 }
 
 /**
@@ -111,6 +131,12 @@ class InputEngine(
 
     private val romaji = RomajiConverter()
     private val units = mutableListOf<KanaUnit>()
+
+    /** 未確定文字列の中のカーソル（その前にある単位の数）。綴りの途中（romaji.pending）はここにある */
+    private var caret = 0
+
+    /** カーソルが未確定文字列の途中にある（そのあいだはライブ変換せず、かなで出す） */
+    private val caretInside: Boolean get() = caret < units.size
 
     /** ライブ変換の候補（文全体。[candidatesFor] の読みに対するもの）。並べ替えが届いたら差し替わる */
     private var conversions: List<Conversion> = emptyList()
@@ -149,9 +175,15 @@ class InputEngine(
     val composingText: String
         get() {
             if (isConverting) return segs.joinToString("") { it.surface }
+            if (caretInside) return textBeforeCaret() + units.drop(caret).joinToString("") { it.text }
             if (showReading || !settings.liveConversion) return reading + romaji.pending
             return (bestFor(reading) ?: reading) + romaji.pending
         }
+
+    /** 未確定文字列の中のカーソルの位置（文字数）。末尾なら -1 */
+    private val composingCursor: Int get() = if (caretInside && !isConverting) textBeforeCaret().length else -1
+
+    private fun textBeforeCaret() = units.take(caret).joinToString("") { it.text } + romaji.pending
 
     fun handle(input: KeyInput): EngineResult = when (input) {
         is KeyInput.SetJapanese -> setMode(input.on)
@@ -214,6 +246,7 @@ class InputEngine(
     /** 未確定を捨てる（入力欄が閉じられたとき） */
     fun reset() {
         units.clear()
+        caret = 0
         romaji.clear()
         conversions = emptyList()
         pinned = emptyList()
@@ -248,11 +281,16 @@ class InputEngine(
             is KeyInput.Text -> {
                 showReading = false
                 typeChar(input.char)
-                expandSnippet()?.let { return EngineResult(it, consumed = true) }
+                if (!caretInside) expandSnippet()?.let { return EngineResult(it, consumed = true) }
             }
             KeyInput.Backspace -> {
                 showReading = false
                 deleteLast()
+            }
+            KeyInput.DeleteForward -> deleteForward()
+            KeyInput.Left, KeyInput.Right, KeyInput.Home, KeyInput.End -> {
+                moveCaret(input)
+                showReading = false
             }
             KeyInput.Enter -> return EngineResult(commitAll(), consumed = true)
             KeyInput.Escape -> {
@@ -271,17 +309,51 @@ class InputEngine(
             }
             is KeyInput.ConvertWidth -> convertWidth(input.target)
             is KeyInput.SelectCandidate -> return EngineResult(emptyList(), consumed = true)
-            // 入力中の左右（未確定文字列の中でのカーソル移動）はまだ持たないので、確定してアプリへ渡す
-            KeyInput.Left, KeyInput.Right, KeyInput.Other -> return EngineResult(commitAll(), consumed = false)
+            KeyInput.Other -> return EngineResult(commitAll(), consumed = false)
             is KeyInput.SetJapanese, KeyInput.ToggleJapanese -> error("handled above")
         }
         if (!isComposing) {
             commands += ImeCommand.SetComposing("")
             return EngineResult(commands, consumed = true)
         }
-        if (!showReading) commands += refreshCandidates()
-        commands += ImeCommand.SetComposing(composingText)
+        if (!showReading && !caretInside) commands += refreshCandidates()
+        commands += ImeCommand.SetComposing(composingText, cursor = composingCursor)
         return EngineResult(commands, consumed = true)
+    }
+
+    /** 入力中のカーソル移動。綴りの途中は確定させ、単位を1文字ずつに分けて文字単位で動かす */
+    private fun moveCaret(input: KeyInput) {
+        flushPending()
+        splitUnits()
+        caret = when (input) {
+            KeyInput.Left -> caret - 1
+            KeyInput.Right -> caret + 1
+            KeyInput.Home -> 0
+            else -> units.size
+        }.coerceIn(0, units.size)
+    }
+
+    /** 「きゃ」のような複数文字の単位を1文字ずつに分ける（綴りは逆引きで作り直す） */
+    private fun splitUnits() {
+        if (units.all { it.text.length <= 1 }) return
+        val before = units.take(caret).sumOf { it.text.length }
+        val split = units.flatMap { u ->
+            if (u.text.length <= 1) listOf(u) else u.text.map { KanaUnit(it.toString(), RomajiTable.reverse[it.toString()] ?: it.toString()) }
+        }
+        units.clear()
+        units += split
+        caret = before
+    }
+
+    private fun deleteForward() {
+        if (romaji.pending.isNotEmpty() || caret >= units.size) return
+        val u = units[caret]
+        if (u.text.length > 1) {
+            val rest = u.text.drop(1)
+            units[caret] = KanaUnit(rest, rest.map { RomajiTable.reverse[it.toString()] ?: it.toString() }.joinToString(""))
+        } else {
+            units.removeAt(caret)
+        }
     }
 
     private fun handleConverting(input: KeyInput): EngineResult {
@@ -328,6 +400,8 @@ class InputEngine(
             }
             KeyInput.ShiftLeft -> commands += resize(-1)
             KeyInput.ShiftRight -> commands += resize(+1)
+            // 変換中の Home・End・Delete は何もしない
+            KeyInput.Home, KeyInput.End, KeyInput.DeleteForward -> {}
             KeyInput.Enter -> return EngineResult(commitAll(), consumed = true)
             KeyInput.Escape, KeyInput.Backspace -> {
                 stopConverting(commands)
@@ -352,7 +426,11 @@ class InputEngine(
         val seg = segs[focus]
         return listOf(
             ImeCommand.SetComposing(composingText, segs.map { it.surface.length }, focus),
-            ImeCommand.ShowCandidates(seg.candidates, seg.selected, segs.take(focus).sumOf { it.surface.length }),
+            ImeCommand.ShowCandidates(
+                seg.candidates, seg.selected, segs.take(focus).sumOf { it.surface.length },
+                candidateSource?.let { src -> seg.candidates.map { src.labelFor(seg.reading, it) } }
+                    ?.takeIf { labels -> labels.any { it != null } }.orEmpty(),
+            ),
         )
     }
 
@@ -366,6 +444,8 @@ class InputEngine(
         segs.clear()
         for (s in conv.segments) segs += newSeg(s.reading, s.surface, source)
         focus = 0
+        // 変換をやめて戻ったときは末尾から
+        caret = units.size
         showReading = false
         commands += requestSegmentRerank()
         return commands
@@ -453,6 +533,7 @@ class InputEngine(
         }
         romaji.dropLast(fromPending)
         repeat(unitCount) { units.removeAt(units.lastIndex) }
+        caret = units.size
         val commands = mutableListOf<ImeCommand>()
         candidatesFor = null
         if (isComposing) commands += commitAll() else reset()
@@ -463,29 +544,38 @@ class InputEngine(
 
     private fun bestFor(r: String): String? = if (r == candidatesFor) candidates.firstOrNull() else null
 
+    /** 単位をカーソルの位置に入れ、カーソルをその後ろへ */
+    private fun insertUnits(list: List<KanaUnit>) {
+        units.addAll(caret, list)
+        caret += list.size
+    }
+
     private fun flushPending() {
-        units += romaji.flush()
+        insertUnits(romaji.flush())
     }
 
     private fun typeChar(c: Char) {
         val romajiInput = c in 'a'..'z' || (c == '\'' && romaji.pending == "n")
         if (romajiInput) {
-            units += romaji.feed(c)
+            insertUnits(romaji.feed(c))
             return
         }
         flushPending()
         val text = PUNCTUATION[c]
             ?: if (settings.fullWidthSymbols) CharWidth.toFullWidthAscii(c.toString()) else c.toString()
-        units += KanaUnit(text, c.toString())
+        insertUnits(listOf(KanaUnit(text, c.toString())))
     }
 
+    /** カーソルの前の1文字（綴りの途中なら1字）を消す */
     private fun deleteLast() {
         if (romaji.deleteLast()) return
-        val last = units.removeLastOrNull() ?: return
+        if (caret == 0) return
+        val last = units.removeAt(caret - 1)
+        caret--
         if (last.text.length > 1) {
             // 「きゃ」の「ゃ」だけ消したときなど。残りの綴りは逆引きで作り直す
             val rest = last.text.dropLast(1)
-            units += KanaUnit(rest, rest.map { RomajiTable.reverse[it.toString()] ?: it.toString() }.joinToString(""))
+            insertUnits(listOf(KanaUnit(rest, rest.map { RomajiTable.reverse[it.toString()] ?: it.toString() }.joinToString(""))))
         }
     }
 
@@ -502,6 +592,7 @@ class InputEngine(
         }
         units.clear()
         units += KanaUnit(text, raw)
+        caret = units.size
         showReading = true
     }
 

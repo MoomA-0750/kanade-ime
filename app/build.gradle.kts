@@ -19,8 +19,11 @@ val prepareKanadeAssets by tasks.registering(JavaExec::class) {
     args("assets", cache.absolutePath, out.absolutePath)
     outputs.dir(out)
     inputs.property("dictool", dictool.file("src/main/kotlin/dev/mooma/kanade/dictool/Main.kt").readText().hashCode())
+    inputs.file(rootProject.file("docs/USAGE.md"))
+    inputs.file(rootProject.file("eval/daily.tsv"))
     doLast {
         rootProject.file("eval/daily.tsv").copyTo(File(out, "eval-daily.tsv"), overwrite = true)
+        rootProject.file("docs/USAGE.md").copyTo(File(out, "usage.md"), overwrite = true)
     }
 }
 

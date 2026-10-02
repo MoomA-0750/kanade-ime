@@ -13,6 +13,7 @@ Samsung DeX で使うための、物理キーボード専用の Android 日本�
 
 - [docs/PLAN.md](docs/PLAN.md) — 方針・決定事項・段階計画・未決事項（最初に読む）
 - [STATUS.md](STATUS.md) — 現在の進み具合と次の一手
+- [docs/USAGE.md](docs/USAGE.md) — 使い方（キー操作、ユーザー辞書、スニペット）
 - [docs/BUILD.md](docs/BUILD.md) — ビルドとエミュレータでの確認の手順
 
 リポジトリはローカルのみ。GitHub へは本人の確認なしに push しない。

@@ -58,6 +58,9 @@ class KanadeInputMethodService : InputMethodService() {
     /** 日本語オン/オフの「あ」「A」（重ねる窓） */
     private var modeIndicator: ModeIndicator? = null
 
+    /** アプリから最後に知らされた未確定文字列の先頭の位置（カーソルを未確定文字列の途中に置くのに使う） */
+    private var composingStart = -1
+
     /** 未確定文字列をアプリに出さず、帯に出すアプリを使っている */
     private var previewInBar = false
 
@@ -147,6 +150,7 @@ class KanadeInputMethodService : InputMethodService() {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         // クリックなどで未確定文字列が外から確定・消去されたら、こちらの状態も捨てる
         // （帯に出しているときはアプリに未確定文字列がないので、この判定はしない）
+        composingStart = candidatesStart
         if (!previewInBar && engine.isComposing && candidatesStart == -1 && candidatesEnd == -1) {
             engine.reset()
             hideBar()
@@ -200,13 +204,14 @@ class KanadeInputMethodService : InputMethodService() {
                 is ImeCommand.SetComposing ->
                     if (previewInBar) {
                         if (!engine.isConverting) {
-                            if (command.text.isEmpty()) hideBar() else showBar { it.showPreview(command.text) }
+                            if (command.text.isEmpty()) hideBar() else showBar { it.showPreview(command.text, command.cursor) }
                         }
                     } else if (command.text.isEmpty()) {
                         ic?.setComposingText("", 1)
                         ic?.finishComposingText()
                     } else {
                         ic?.setComposingText(styled(command), 1)
+                        if (command.cursor >= 0 && ic != null) placeCursorInComposing(ic, command.text.length, command.cursor)
                     }
                 is ImeCommand.Commit -> {
                     ic?.commitText(command.text, 1)
@@ -218,7 +223,7 @@ class KanadeInputMethodService : InputMethodService() {
                     showModeIndicator(command.japanese)
                 }
                 is ImeCommand.ShowCandidates -> showBar(command.anchorOffset) {
-                    it.showCandidates(command.candidates, command.selected, if (previewInBar) engine.composingText else null)
+                    it.showCandidates(command.candidates, command.selected, if (previewInBar) engine.composingText else null, command.labels)
                 }
                 ImeCommand.HideCandidates -> if (previewInBar && engine.isComposing) {
                     showBar { it.showPreview(engine.composingText) }
@@ -253,6 +258,19 @@ class KanadeInputMethodService : InputMethodService() {
             }.getOrNull() ?: return@execute
             main.post { apply(engine.onReranked(request.id, ranked.candidates)) }
         }
+    }
+
+    /**
+     * 未確定文字列の途中にカーソルを置く。setComposingText はカーソルを未確定文字列の外にしか置けないので、
+     * 未確定文字列の先頭の位置を知って setSelection する（先頭が分からなければ、アプリの文字列から求める）
+     */
+    private fun placeCursorInComposing(ic: android.view.inputmethod.InputConnection, length: Int, cursor: Int) {
+        var start = composingStart
+        if (start < 0) {
+            val extracted = ic.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0) ?: return
+            start = extracted.startOffset + extracted.selectionEnd - length
+        }
+        ic.setSelection(start + cursor, start + cursor)
     }
 
     /** 変換中は文節ごとに下線を引き、選んでいる文節に色を付ける */

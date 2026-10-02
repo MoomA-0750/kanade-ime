@@ -26,12 +26,18 @@ class SettingsActivity : Activity() {
         super.onCreate(savedInstanceState)
         settings = KanadeSettings(this)
         keyLog = KeyLog(this)
+        val prefs = getSharedPreferences("kanade_ui", MODE_PRIVATE)
 
         val pad = (16 * resources.displayMetrics.density).toInt()
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(pad, pad, pad, pad)
         }
+
+        root.addView(Button(this).apply {
+            text = "使い方を見る"
+            setOnClickListener { showUsage() }
+        })
 
         root.addView(heading("有効化"))
         root.addView(Button(this).apply {
@@ -89,12 +95,21 @@ class SettingsActivity : Activity() {
         })
 
         root.addView(heading("ユーザー辞書"))
-        root.addView(note("1行に「よみ 語」（よみはひらがな）。登録した語は変換で優先され、候補の先頭に出る（macOS のユーザ辞書と同じ）"))
-        addPairEditor(root, TextStore.userDictionary(this)) { dev.mooma.kanade.core.dict.UserDictionary.parse(it).size }
+        root.addView(note(
+            "読み（ひらがな）と語を登録する。登録した語は変換で優先され、候補の先頭に「ユーザー辞書」と付いて出る（macOS のユーザ辞書と同じ）。" +
+                "文の途中でも、その読みの部分に使われやすくなる。\n" +
+                "テキストで編集するときは1行に「よみ 語」（最初の空白で区切る）。# で始まる行は無視される。"
+        ))
+        root.addView(PairEditor(this, TextStore.userDictionary(this), "よみ（ひらがな）", "語", prefs, "user_dictionary_text_mode"))
 
         root.addView(heading("スニペット"))
-        root.addView(note("1行に「キー 出力」。キーを打ち終わった瞬間に出力へ置き換わる（日本語入力中も直接入力中も）。キーは打つ文字そのもの（@@ や -> など）。出力の中の \\n は改行"))
-        addPairEditor(root, TextStore.snippets(this)) { dev.mooma.kanade.core.dict.Snippets.parse(it).size }
+        root.addView(note(
+            "キーと出力を登録する。キーを打ち終わった瞬間に出力へ置き換わる（例: @@ → メールアドレス、-> → →）。日本語入力中も直接入力中も効く。\n" +
+                "キーは打つ文字そのもの（日本語入力中でも、かなや全角になる前の文字で見る）。英字だけのキーは、日本語入力中のローマ字にも反応するので、記号を含むキーがおすすめ。" +
+                "長いキーが優先される（-> と --> があれば --> ）。\n" +
+                "テキストで編集するときは1行に「キー 出力」（最初の空白で区切る）。出力の中の \\n は改行。# で始まる行は無視される。"
+        ))
+        root.addView(PairEditor(this, TextStore.snippets(this), "キー（打つ文字）", "出力", prefs, "snippets_text_mode"))
 
         root.addView(heading("試し打ち"))
         root.addView(EditText(this).apply { hint = "ここで入力を試す" })
@@ -167,33 +182,23 @@ class SettingsActivity : Activity() {
         overlayStatus.text = if (OverlayBar.permitted(this)) "許可済み（重ねる窓に出す）" else "未許可（IME の窓に出す）"
     }
 
-    /** 「キー 値」の行を編集する欄と保存ボタン */
-    private fun addPairEditor(root: LinearLayout, store: TextStore, count: (String) -> Int) {
-        val edit = EditText(this).apply {
-            setText(store.read())
-            typeface = Typeface.MONOSPACE
-            textSize = 14f
-            minLines = 5
-            gravity = android.view.Gravity.TOP or android.view.Gravity.START
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
-                android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+    /** 使い方（docs/USAGE.md を assets に入れたもの）を出す。表の罫線などの記号は読みやすく省く */
+    private fun showUsage() {
+        val raw = runCatching { assets.open("usage.md").bufferedReader().readText() }.getOrDefault("（使い方が見つからない）")
+        val text = raw.lines().filter { !it.startsWith("|---") && it != "```" }.joinToString("\n") { line ->
+            line.removePrefix("## ").removePrefix("# ").replace("**", "").replace("`", "")
+                .let { if (it.startsWith("|")) it.trim('|').split('|').joinToString("  ") { c -> c.trim() } else it }
         }
-        root.addView(edit)
-        val status = TextView(this).apply {
-            textSize = 13f
-            text = "${count(edit.text.toString())} 件"
-        }
-        root.addView(LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            addView(Button(this@SettingsActivity).apply {
-                text = "保存"
-                setOnClickListener {
-                    store.write(edit.text.toString())
-                    status.text = "${count(edit.text.toString())} 件（保存した。次の入力から使われる）"
-                }
+        val pad = (16 * resources.displayMetrics.density).toInt()
+        val view = ScrollView(this).apply {
+            addView(TextView(this@SettingsActivity).apply {
+                this.text = text
+                textSize = 14f
+                setTextIsSelectable(true)
+                setPadding(pad, pad, pad, pad)
             })
-            addView(status)
-        })
+        }
+        android.app.AlertDialog.Builder(this).setTitle("Kanade の使い方").setView(view).setPositiveButton("閉じる", null).show()
     }
 
     /** 重い処理を別スレッドで動かし、結果を UI スレッドで受け取る */

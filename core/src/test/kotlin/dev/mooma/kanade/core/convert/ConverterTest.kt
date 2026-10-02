@@ -9,6 +9,7 @@ import java.nio.ByteBuffer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ConverterTest {
     // 品詞: 0=文頭文末、1=名詞、2=助詞
@@ -110,20 +111,42 @@ class ConverterTest {
 
     @Test
     fun symbolsAreAppendedToSegmentCandidates() {
-        val symbols = dev.mooma.kanade.core.dict.SymbolTable.fromMozc(
+        val symbols = dev.mooma.kanade.core.dict.SymbolTable.fromMozcSymbols(
             listOf("POS\tCHAR\tReading", "記号\t→\tやじるし みぎや ->", "記号\t←\tやじるし ひだりや <-"),
-            listOf("# comment", "1F600\t😀\tえがお かお"),
         )
+        val emoji = dev.mooma.kanade.core.dict.SymbolTable.fromMozcEmoji(listOf("# comment", "1F600\t😀\tえがお かお"))
         assertEquals(listOf("→", "←"), symbols.lookup("やじるし"))
         assertEquals(emptyList(), symbols.lookup("->"))
-        assertEquals(listOf("😀"), symbols.lookup("えがお"))
+        assertEquals(listOf("😀"), emoji.lookup("えがお"))
         assertEquals(symbols.lookup("やじるし"), dev.mooma.kanade.core.dict.SymbolTable.parse(symbols.write()).lookup("やじるし"))
         val source = DictionaryCandidateSource(
             KanaKanjiConverter(dictionary(), connection(), unknownPosId = 1),
             Segmenter(dev.mooma.kanade.core.dict.PosTable(ByteArray(3))),
             symbols,
         )
-        assertEquals(listOf("→", "←"), source.segmentCandidates("やじるし", 5).takeLast(2))
+        assertEquals(listOf("→", "←"), source.segmentCandidates("やじるし", 5).filter { it in listOf("→", "←") })
+        assertEquals("記号", source.labelFor("やじるし", "→"))
+        assertEquals("ひらがな", source.labelFor("やじるし", "やじるし"))
+        assertEquals("カタカナ", source.labelFor("やじるし", "ヤジルシ"))
+    }
+
+    @Test
+    fun allWordsOfTheReadingAreCandidates() {
+        val c = KanaKanjiConverter(dictionary(), connection(), unknownPosId = 1)
+        assertEquals(listOf("橋", "箸", "端"), c.exactWords("はし"))
+        val source = DictionaryCandidateSource(c, Segmenter(dev.mooma.kanade.core.dict.PosTable(ByteArray(3))))
+        assertTrue(source.segmentCandidates("はし", 1).containsAll(listOf("橋", "箸", "端")))
+    }
+
+    @Test
+    fun widthLabels() {
+        val source = DictionaryCandidateSource(
+            KanaKanjiConverter(dictionary(), connection(), unknownPosId = 1),
+            Segmenter(dev.mooma.kanade.core.dict.PosTable(ByteArray(3))),
+        )
+        assertEquals("全角", source.labelFor("！", "！"))
+        assertEquals("半角", source.labelFor("！", "!"))
+        assertEquals(listOf("！", "!"), source.segmentCandidates("！", 3).filter { it == "！" || it == "!" })
     }
 
     @Test

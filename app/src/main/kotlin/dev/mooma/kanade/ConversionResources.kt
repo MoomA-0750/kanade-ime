@@ -33,8 +33,10 @@ object ConversionResources {
     /** 入力エンジンに渡す候補の出どころ（辞書とラティス、文節分け） */
     fun candidateSource(context: Context): DictionaryCandidateSource {
         val app = context.applicationContext
-        val symbols = SymbolTable.parse(app.assets.open("symbol.ksym").bufferedReader().readText())
-        return DictionaryCandidateSource(converter(app), Segmenter(PosTable.read(mapAsset(app, "pos.kpos"))), symbols)
+        fun table(name: String) = SymbolTable.parse(app.assets.open(name).bufferedReader().readText())
+        return DictionaryCandidateSource(
+            converter(app), Segmenter(PosTable.read(mapAsset(app, "pos.kpos"))), table("symbol.ksym"), table("emoji.ksym"),
+        )
     }
 
     /** zenz を読む。重いので UI スレッドから呼ばないこと。失敗したら null（辞書だけで変換する） */
