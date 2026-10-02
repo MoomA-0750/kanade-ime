@@ -58,6 +58,36 @@ Samsung DeX で使う、物理キーボード最適化に全振りした Android
 
 決めたら、理由とともにこの文書へ追記する。
 
+#### 段階0の決定（2026-10-02、CC が仮決定）
+
+調査の詳細と出典は [RESEARCH-stage0.md](RESEARCH-stage0.md)。
+
+**方式Bを採る。辞書とラティスは Kotlin で自前に持ち、zenz は llama.cpp（azooKey フォーク）を NDK でビルドして JNI で呼ぶ。**
+
+| 部品 | 決定 |
+|---|---|
+| 辞書 | Mozc OSS 辞書（`src/data/dictionary_oss`）。ビルド時に自前の LOUDS 形式へ変換し、APK に同梱する。アプリ内のライセンス表示に IPAdic・ICOT の文面を入れる |
+| ラティス・探索 | Kotlin で LOUDS トライ＋ビタビ（N-best）。UI なしで JVM の単体テストを回せる純 Kotlin モジュールにする |
+| zenz | azooKey フォークの llama.cpp を submodule にし、CMake で arm64-v8a 向けに静的リンク。CPU 推論、4スレッド |
+| モデル | zenz-v3.2-xsmall（Q5_K_M、21MB、Apache-2.0）から始め、精度が足りなければ small（74MB）へ。リポジトリには入れず取得手順を書く |
+| zenz の使い方 | まず「辞書の N-best 上位を zenz で採点し、元の順位と混ぜる」と「貪欲生成の1候補を足す」。左文脈は `getTextBeforeCursor` で40文字。要求に番号を振り、古い推論は取り消す。発展形として Zenzai の制約付き再探索を Kotlin へ移植する |
+| 参考実装 | Sumire（KazumaProject/JapaneseKeyboard、MIT）の LOUDS・ビタビ・`zenz_bridge.cpp`。依存はせず、必要な部分を読んで書くか、出典と MIT 表示を残して取り込む |
+
+理由:
+
+- **Kotlin で完結する**。方式Aは Swift ランタイムと Foundation（ICU 込み）だけで arm64 の .so が約86MB 増え、ツールチェーン（Swift 6.4 SDK、Fedora 向けは fedora41/ubi9 のみ）も1系統増える。エンジンは Sendable でなく、Kotlin の別スレッドから呼ぶと落ちる既知の問題もある
+- **同じ構成が Sumire で実証済み**（MIT）。LOUDS・ビタビ・zenz の JNI・物理キーボードの設定まで揃っていて、読める参考がある
+- **設計上の約束に合う**。変換ロジックを UI なしでテストでき、エンジン（ネイティブ）は zenz の推論だけに絞れる
+- **Mozc 本体（`libmozc.so`）は採らない**。ビルドは可能だが JNI のクラス名が Google のパッケージに固定、protobuf の SessionHandler 丸ごとで、zenz をラティスに差し込むには C++ 改造が要る
+- 辞書を Mozc にしたのは、IME 用のコストと接続行列が揃い、形式が素直なテキストだから。azooKey の辞書（Apache-2.0、語彙が新しい）は形式の一部が未文書なので、語彙を足したくなったら後で検討する
+
+見直す条件: 変換品質が辞書＋zenz の並べ替えでは明らかに足りず、Zenzai の制約付き再探索の移植も重いと分かったとき。そのときは方式A（先例: ku6si0/azookey-android）を再検討する。
+
+未確定のまま進めること:
+
+- zenz-v3.2 の Apache-2.0 は HuggingFace のタグ表記でしか確認できていない。公開しないうちは問題にならないが、公開前に作者の表明を確かめる
+- Android 実機での zenz の速度は未知。段階2で Fold 7 で測る
+
 ### 段階1: 最小の IME（Kotlin）
 
 - ローマ字→かな、物理キー処理、画面 UI なし
