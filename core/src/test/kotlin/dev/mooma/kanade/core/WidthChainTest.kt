@@ -22,13 +22,28 @@ class WidthChainTest {
             WidthTarget.FULL_ALNUM to "ｋａｎｊｉ",
             WidthTarget.HALF_ALNUM to "kanji",
         )
+        val alnum = setOf(WidthTarget.FULL_ALNUM, WidthTarget.HALF_ALNUM)
+        // 英字のあとの半角カナ（F8）は半角英字になる
+        fun want(prev: WidthTarget?, t: WidthTarget) =
+            if (t == WidthTarget.HALF_KATAKANA && prev in alnum) expected[WidthTarget.HALF_ALNUM] else expected[t]
         for (a in targets) for (b in targets) for (c in targets) {
             val e = engine()
             "kanji".forEach { e.handle(KeyInput.Text(it)) }
-            assertEquals(expected[a], e.conv(a), "$a")
-            assertEquals(expected[b], e.conv(b), "$a→$b")
-            assertEquals(expected[c], e.conv(c), "$a→$b→$c")
+            assertEquals(want(null, a), e.conv(a), "$a")
+            val bActual = if (b == WidthTarget.HALF_KATAKANA && a in alnum) WidthTarget.HALF_ALNUM else b
+            assertEquals(want(a, b), e.conv(b), "$a→$b")
+            assertEquals(want(bActual, c), e.conv(c), "$a→$b→$c")
         }
+    }
+
+    @Test
+    fun fullWidthAlnumThenHalfWidthGivesHalfWidthAlnum() {
+        val e = engine()
+        "kanji".forEach { e.handle(KeyInput.Text(it)) }
+        assertEquals("ｋａｎｊｉ", e.conv(WidthTarget.FULL_ALNUM))
+        assertEquals("kanji", e.conv(WidthTarget.HALF_KATAKANA))
+        assertEquals("かんじ", e.conv(WidthTarget.HIRAGANA))
+        assertEquals("ｶﾝｼﾞ", e.conv(WidthTarget.HALF_KATAKANA))
     }
 
     @Test

@@ -123,6 +123,11 @@ class KanadeInputMethodService : InputMethodService() {
         }
         engine.resetDirectTyped()
         previewInBar = attribute?.packageName in settings.previewInBarPackages
+        // アプリごとの挙動（カーソルが出ないなど）を調べるため、入力欄の情報を記録する
+        log(
+            "start-input pkg=${attribute?.packageName} restarting=$restarting type=0x${Integer.toHexString(attribute?.inputType ?: 0)} " +
+                "ime=0x${Integer.toHexString(attribute?.imeOptions ?: 0)} sel=${attribute?.initialSelStart},${attribute?.initialSelEnd}",
+        )
         if (!restarting) {
             engine.reset()
             hideBar()
@@ -137,7 +142,13 @@ class KanadeInputMethodService : InputMethodService() {
     /** カーソルの位置（重ねる窓を置く場所） */
     private val anchor = CursorAnchor()
 
+    override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
+        super.onStartInputView(info, restarting)
+        log("start-input-view pkg=${info?.packageName} restarting=$restarting")
+    }
+
     override fun onFinishInput() {
+        log("finish-input")
         engine.reset()
         hideBar()
         super.onFinishInput()
@@ -151,6 +162,7 @@ class KanadeInputMethodService : InputMethodService() {
         // クリックなどで未確定文字列が外から確定・消去されたら、こちらの状態も捨てる
         // （帯に出しているときはアプリに未確定文字列がないので、この判定はしない）
         composingStart = candidatesStart
+        log("selection old=$oldSelStart,$oldSelEnd new=$newSelStart,$newSelEnd composing=$candidatesStart,$candidatesEnd")
         if (!previewInBar && engine.isComposing && candidatesStart == -1 && candidatesEnd == -1) {
             engine.reset()
             hideBar()

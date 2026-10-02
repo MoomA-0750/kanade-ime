@@ -171,6 +171,9 @@ class InputEngine(
      */
     private var widthBase: Pair<String, String>? = null
 
+    /** 直前の F6〜F10 の変換先（英字のときの F8 を半角英字にするため） */
+    private var lastWidth: WidthTarget? = null
+
     val isComposing: Boolean get() = units.isNotEmpty() || romaji.pending.isNotEmpty()
     val isConverting: Boolean get() = segs.isNotEmpty()
 
@@ -595,8 +598,16 @@ class InputEngine(
     private fun convertWidth(target: WidthTarget) {
         flushPending()
         val base = widthBase ?: (reading to units.joinToString("") { it.raw })
+        if (widthBase == null) lastWidth = null
         widthBase = base
         val (kana, raw) = base
+        // MS-IME と同じく、英字（全角・半角）にしたあとの F8（Ctrl+O）は半角カナではなく半角英字
+        val target = if (target == WidthTarget.HALF_KATAKANA && (lastWidth == WidthTarget.FULL_ALNUM || lastWidth == WidthTarget.HALF_ALNUM)) {
+            WidthTarget.HALF_ALNUM
+        } else {
+            target
+        }
+        lastWidth = target
         val text = when (target) {
             WidthTarget.HIRAGANA -> CharWidth.toHiragana(kana)
             WidthTarget.KATAKANA -> CharWidth.toKatakana(kana)
