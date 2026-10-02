@@ -1,5 +1,7 @@
 package dev.mooma.kanade.core
 
+import dev.mooma.kanade.core.dict.Snippets
+
 /** Android のキーイベントから独立した入力。どの物理キーがどれになるかは IME 側が決める */
 sealed interface KeyInput {
     /** 印字できる文字（Shift などの修飾はキー配列側で反映済み） */
@@ -42,6 +44,11 @@ sealed interface ImeCommand {
     data class ModeChanged(val japanese: Boolean) : ImeCommand
     /** 候補の一覧を出す（変換中）。[selected] は選択中の位置、[anchorOffset] は選んでいる文節が未確定文字列の何文字目からか */
     data class ShowCandidates(val candidates: List<String>, val selected: Int, val anchorOffset: Int = 0) : ImeCommand
+    /**
+     * 直接入力中のスニペット: カーソルの前が [expected] なら消して [replacement] を入れる。
+     * 違っていたら（カーソルを動かしたなど）、打った文字 [typed] をそのまま入れる
+     */
+    data class ReplaceBeforeCursor(val expected: String, val typed: Char, val replacement: String) : ImeCommand
     data object HideCandidates : ImeCommand
     /**
      * 言語モデルでの並べ替えを頼む。IME は裏で計算し、終わったら [InputEngine.onReranked] に [id] とともに返す。
@@ -77,6 +84,9 @@ interface CandidateSource {
 
     /** [reading] を1文節としたときの候補（よい順。ひらがな・カタカナも含める） */
     fun segmentCandidates(reading: String, n: Int): List<String>
+
+    /** [reading] に登録されたユーザー辞書の語。候補の先頭に固定し、言語モデルの並べ替えで下げない */
+    fun pinned(reading: String): List<String> = emptyList()
 }
 
 /**
@@ -93,17 +103,26 @@ class InputEngine(
     /** 未確定の直前にある確定済みの文（言語モデルの文脈）。IME が入力の始まりに入れ、確定のたびにこちらでも足す */
     var leftContext: String = ""
 
+    /** スニペット（打った文字の末尾がキーになった瞬間に置き換える） */
+    var snippets: Snippets = Snippets.EMPTY
+
+    /** 直接入力（日本語オフ）で続けて打った文字。スニペットのキーを見るため。文字以外のキーで捨てる */
+    private val directTyped = StringBuilder()
+
     private val romaji = RomajiConverter()
     private val units = mutableListOf<KanaUnit>()
 
     /** ライブ変換の候補（文全体。[candidatesFor] の読みに対するもの）。並べ替えが届いたら差し替わる */
     private var conversions: List<Conversion> = emptyList()
+
+    /** ユーザー辞書・スニペットで固定する候補（[candidates] の先頭にいる） */
+    private var pinned: List<String> = emptyList()
     private var candidates: List<String> = emptyList()
     private var candidatesFor: String? = null
     private var requestId = 0L
 
     /** 変換中の文節。空なら変換中ではない */
-    private class Seg(val reading: String, var candidates: List<String>) {
+    private class Seg(val reading: String, var candidates: List<String>, val pinned: List<String> = emptyList()) {
         var selected = 0
         var reranked = false
         val surface: String get() = candidates[selected]
@@ -137,7 +156,25 @@ class InputEngine(
     fun handle(input: KeyInput): EngineResult = when (input) {
         is KeyInput.SetJapanese -> setMode(input.on)
         KeyInput.ToggleJapanese -> setMode(!japanese)
-        else -> if (japanese) handleJapanese(input) else pass()
+        else -> if (japanese) handleJapanese(input) else handleDirect(input)
+    }
+
+    /** 入力欄が変わったなど、直接入力の打鍵の並びが途切れたとき */
+    fun resetDirectTyped() {
+        directTyped.clear()
+    }
+
+    /** 日本語オフ: キーはアプリへそのまま渡し、スニペットのキーが打ち終わったときだけ置き換える */
+    private fun handleDirect(input: KeyInput): EngineResult {
+        if (input !is KeyInput.Text) {
+            directTyped.clear()
+            return pass()
+        }
+        directTyped.append(input.char)
+        if (directTyped.length > MAX_TYPED) directTyped.delete(0, directTyped.length - MAX_TYPED)
+        val (key, output) = snippets.matchSuffix(directTyped) ?: return pass()
+        directTyped.clear()
+        return EngineResult(listOf(ImeCommand.ReplaceBeforeCursor(key.dropLast(1), input.char, output)), consumed = true)
     }
 
     /** 並べ替えの結果。古い要求の結果なら何もしない */
@@ -151,13 +188,13 @@ class InputEngine(
             if (mapped.isEmpty()) return emptyList()
             val current = seg.surface
             val moved = seg.selected != 0
-            seg.candidates = (mapped + seg.candidates).distinct()
+            seg.candidates = (seg.pinned + mapped + seg.candidates).distinct()
             seg.selected = if (moved) seg.candidates.indexOf(current).coerceAtLeast(0) else 0
             seg.reranked = true
             return conversionView()
         }
         if (isConverting) return emptyList()
-        candidates = ranked
+        candidates = (pinned + ranked).distinct()
         return listOf(ImeCommand.SetComposing(composingText))
     }
 
@@ -179,6 +216,7 @@ class InputEngine(
         units.clear()
         romaji.clear()
         conversions = emptyList()
+        pinned = emptyList()
         candidates = emptyList()
         candidatesFor = null
         segs.clear()
@@ -210,6 +248,7 @@ class InputEngine(
             is KeyInput.Text -> {
                 showReading = false
                 typeChar(input.char)
+                expandSnippet()?.let { return EngineResult(it, consumed = true) }
             }
             KeyInput.Backspace -> {
                 showReading = false
@@ -272,6 +311,7 @@ class InputEngine(
                     // 変換中に文字を打ったら、いまの変換を確定して次の入力を始める
                     commands += commitAll()
                     typeChar(input.char)
+                    expandSnippet()?.let { return EngineResult(commands + it, consumed = true) }
                     commands += refreshCandidates()
                     commands += ImeCommand.SetComposing(composingText)
                     return EngineResult(commands, consumed = true)
@@ -342,7 +382,8 @@ class InputEngine(
         val head = all.substring(start, start + newLen)
         val rest = all.substring(start + newLen)
         while (segs.size > focus) segs.removeAt(segs.lastIndex)
-        segs += Seg(head, source.segmentCandidates(head, settings.candidateCount).ifEmpty { listOf(head) })
+        val headPinned = source.pinned(head)
+        segs += Seg(head, (headPinned + source.segmentCandidates(head, settings.candidateCount)).distinct().ifEmpty { listOf(head) }, headPinned)
         if (rest.isNotEmpty()) {
             val conv = source.convert(rest, 1).firstOrNull() ?: Conversion(listOf(Segment(rest, rest)))
             for (s in conv.segments) segs += newSeg(s.reading, s.surface, source)
@@ -350,8 +391,10 @@ class InputEngine(
         return requestSegmentRerank()
     }
 
-    private fun newSeg(reading: String, surface: String, source: CandidateSource): Seg =
-        Seg(reading, (listOf(surface) + source.segmentCandidates(reading, settings.candidateCount)).distinct())
+    private fun newSeg(reading: String, surface: String, source: CandidateSource): Seg {
+        val pinned = source.pinned(reading)
+        return Seg(reading, (pinned + surface + source.segmentCandidates(reading, settings.candidateCount)).distinct(), pinned)
+    }
 
     /** 選んでいる文節の候補を、前後の文節を付けた文として言語モデルに並べ替えてもらう */
     private fun requestSegmentRerank(): List<ImeCommand> {
@@ -381,10 +424,41 @@ class InputEngine(
         if (r == candidatesFor) return emptyList()
         candidatesFor = r
         conversions = if (r.isEmpty()) emptyList() else source.convert(r, settings.candidateCount)
-        candidates = conversions.map { it.text }.ifEmpty { if (r.isEmpty()) emptyList() else listOf(r) }
+        pinned = if (r.isEmpty()) emptyList() else source.pinned(r)
+        val fromDictionary = conversions.map { it.text }.ifEmpty { if (r.isEmpty()) emptyList() else listOf(r) }
+        candidates = (pinned + fromDictionary).distinct()
         requestId++
-        if (candidates.size < 2) return emptyList()
-        return listOf(ImeCommand.RequestRerank(requestId, leftContext, r, candidates))
+        if (fromDictionary.size < 2) return emptyList()
+        return listOf(ImeCommand.RequestRerank(requestId, leftContext, r, fromDictionary))
+    }
+
+    /**
+     * 打った文字（綴りの途中を含む）の末尾がスニペットのキーなら、キーの分を未確定から外し、
+     * それより前の未確定を（いま見えている形で）確定してから出力を確定する。置き換えたら操作の列を返す
+     */
+    private fun expandSnippet(): List<ImeCommand>? {
+        if (snippets.size == 0) return null
+        val typed = units.joinToString("") { it.raw } + romaji.pending
+        val (key, output) = snippets.matchSuffix(typed) ?: return null
+        // キーの文字が、綴りの途中と末尾の単位にちょうど収まるか確かめる（単位の途中で切れるなら置き換えない）
+        var rest = key.length
+        val fromPending = minOf(rest, romaji.pending.length)
+        rest -= fromPending
+        var unitCount = 0
+        while (rest > 0) {
+            val u = units.getOrNull(units.size - 1 - unitCount) ?: return null
+            if (u.raw.length > rest) return null
+            rest -= u.raw.length
+            unitCount++
+        }
+        romaji.dropLast(fromPending)
+        repeat(unitCount) { units.removeAt(units.lastIndex) }
+        val commands = mutableListOf<ImeCommand>()
+        candidatesFor = null
+        if (isComposing) commands += commitAll() else reset()
+        commands += ImeCommand.Commit(output)
+        leftContext = (leftContext + output).takeLast(MAX_CONTEXT)
+        return commands
     }
 
     private fun bestFor(r: String): String? = if (r == candidatesFor) candidates.firstOrNull() else null
@@ -439,6 +513,9 @@ class InputEngine(
 
         /** 候補を数字で選ぶときの1頁の件数 */
         const val PAGE = 9
+
+        /** 直接入力で覚えておく打鍵の数（スニペットのキーの長さの上限） */
+        private const val MAX_TYPED = 64
 
         private val PUNCTUATION = mapOf(
             '-' to "ー", ',' to "、", '.' to "。", '[' to "「", ']' to "」", '/' to "・", '~' to "〜",

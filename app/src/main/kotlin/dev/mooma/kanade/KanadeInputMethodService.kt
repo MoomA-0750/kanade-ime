@@ -17,6 +17,8 @@ import dev.mooma.kanade.core.ImeCommand
 import dev.mooma.kanade.core.InputEngine
 import dev.mooma.kanade.core.KeyInput
 import dev.mooma.kanade.core.convert.Reranker
+import dev.mooma.kanade.core.dict.Snippets
+import dev.mooma.kanade.core.dict.UserDictionary
 import dev.mooma.kanade.zenz.ZenzModel
 import java.util.concurrent.Executors
 
@@ -30,6 +32,12 @@ class KanadeInputMethodService : InputMethodService() {
     private lateinit var keyLog: KeyLog
     private val engine = InputEngine()
     private val mapper = KeyMapper(emptySet())
+
+    private var candidateSource: dev.mooma.kanade.core.convert.DictionaryCandidateSource? = null
+    private lateinit var userDictionaryStore: TextStore
+    private var userDictionaryVersion = -1L
+    private lateinit var snippetStore: TextStore
+    private var snippetVersion = -1L
 
     /** onKeyDown で止めたキーは、対応する onKeyUp も止める */
     private val consumedDown = HashSet<Int>()
@@ -57,7 +65,10 @@ class KanadeInputMethodService : InputMethodService() {
         super.onCreate()
         settings = KanadeSettings(this)
         keyLog = KeyLog(this)
-        engine.candidateSource = ConversionResources.candidateSource(this)
+        candidateSource = ConversionResources.candidateSource(this)
+        engine.candidateSource = candidateSource
+        userDictionaryStore = TextStore.userDictionary(this)
+        snippetStore = TextStore.snippets(this)
         zenzThread.execute { zenz = ConversionResources.zenz(this) }
         // 前回のモードを引き継ぐ
         if (settings.lastJapanese) engine.handle(KeyInput.SetJapanese(true))
@@ -96,6 +107,18 @@ class KanadeInputMethodService : InputMethodService() {
         )
         engine.settings = settings.engineSettings()
         mapper.triggers = settings.toggleTriggers
+        // 設定画面でユーザー辞書・スニペットが変わっていたら読み直す
+        val v = userDictionaryStore.version()
+        if (v != userDictionaryVersion) {
+            userDictionaryVersion = v
+            candidateSource?.userDictionary = UserDictionary.parse(userDictionaryStore.read())
+        }
+        val sv = snippetStore.version()
+        if (sv != snippetVersion) {
+            snippetVersion = sv
+            engine.snippets = Snippets.parse(snippetStore.read())
+        }
+        engine.resetDirectTyped()
         previewInBar = attribute?.packageName in settings.previewInBarPackages
         if (!restarting) {
             engine.reset()
@@ -203,6 +226,16 @@ class KanadeInputMethodService : InputMethodService() {
                     hideBar()
                 }
                 is ImeCommand.RequestRerank -> requestRerank(command)
+                is ImeCommand.ReplaceBeforeCursor -> {
+                    // 直接入力のスニペット。カーソルの前が本当にキーのときだけ消す（カーソルを動かしていたら、打った文字だけ入れる）
+                    val before = ic?.getTextBeforeCursor(command.expected.length, 0)?.toString()
+                    if (before == command.expected) {
+                        ic?.deleteSurroundingText(command.expected.length, 0)
+                        ic?.commitText(command.replacement, 1)
+                    } else {
+                        ic?.commitText(command.typed.toString(), 1)
+                    }
+                }
             }
         }
         ic?.endBatchEdit()

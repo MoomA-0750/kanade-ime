@@ -20,6 +20,21 @@ object CharWidth {
         )
     }
 
+    /** 全角英数・記号（！〜～と全角スペース）を半角に。それ以外はそのまま */
+    fun toHalfWidthAscii(s: String): String = buildString {
+        for (c in s) append(
+            when (c) {
+                '\u3000' -> ' '
+                in '\uFF01'..'\uFF5E' -> c - 0xFEE0
+                else -> c
+            }
+        )
+    }
+
+    fun hasFullWidthAscii(s: String) = s.any { it in '\uFF01'..'\uFF5E' }
+
+    fun hasHalfWidthAscii(s: String) = s.any { it in '!'..'~' }
+
     fun toHalfWidthKatakana(s: String): String = buildString {
         for (c in toKatakana(s)) {
             val h = HALF_KATAKANA[c]

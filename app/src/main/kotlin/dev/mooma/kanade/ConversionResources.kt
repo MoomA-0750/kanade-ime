@@ -31,7 +31,7 @@ object ConversionResources {
     }
 
     /** 入力エンジンに渡す候補の出どころ（辞書とラティス、文節分け） */
-    fun candidateSource(context: Context): CandidateSource {
+    fun candidateSource(context: Context): DictionaryCandidateSource {
         val app = context.applicationContext
         val symbols = SymbolTable.parse(app.assets.open("symbol.ksym").bufferedReader().readText())
         return DictionaryCandidateSource(converter(app), Segmenter(PosTable.read(mapAsset(app, "pos.kpos"))), symbols)

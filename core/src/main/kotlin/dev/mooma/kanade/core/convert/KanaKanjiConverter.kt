@@ -2,6 +2,7 @@ package dev.mooma.kanade.core.convert
 
 import dev.mooma.kanade.core.dict.ConnectionMatrix
 import dev.mooma.kanade.core.dict.SystemDictionary
+import dev.mooma.kanade.core.dict.UserDictionary
 import java.util.PriorityQueue
 
 /** 変換結果の1語（ラティス上の1ノード） */
@@ -23,6 +24,8 @@ class KanaKanjiConverter(
     private val unknownPosId: Int = 1851,
     private val unknownCost: Int = 12000,
 ) {
+    /** ユーザー辞書。名詞,一般として、システム辞書の語より強く優先するコストで入れる */
+    @Volatile var userDictionary: UserDictionary = UserDictionary.EMPTY
     private class Node(
         val begin: Int,
         val end: Int,
@@ -54,6 +57,16 @@ class KanaKanjiConverter(
                     endAt[pos + l] += node
                 }
                 if (l == 1) hasSingle = true
+            }
+            val user = userDictionary
+            for (l in 1..minOf(user.maxReadingLength, len - pos)) {
+                val reading = input.substring(pos, pos + l)
+                for (surface in user.lookup(reading)) {
+                    val node = Node(pos, pos + l, Word(reading, surface, unknownPosId, unknownPosId, USER_WORD_COST))
+                    beginAt[pos] += node
+                    endAt[pos + l] += node
+                    if (l == 1) hasSingle = true
+                }
             }
             if (!hasSingle) {
                 val c = input.substring(pos, pos + 1)
@@ -108,5 +121,10 @@ class KanaKanjiConverter(
             }
         }
         return results
+    }
+
+    companion object {
+        /** ユーザー辞書の語のコスト。Mozc の一般名詞（多くは 3000〜8000）より十分小さくする */
+        const val USER_WORD_COST = 1000
     }
 }

@@ -55,6 +55,11 @@ class RomajiConverter {
         return true
     }
 
+    /** 綴りの途中の末尾 [n] 文字を消す（スニペットに置き換えるとき） */
+    fun dropLast(n: Int) {
+        pending = pending.dropLast(n)
+    }
+
     fun clear() {
         pending = ""
     }

@@ -125,4 +125,12 @@ class ConverterTest {
         )
         assertEquals(listOf("→", "←"), source.segmentCandidates("やじるし", 5).takeLast(2))
     }
+
+    @Test
+    fun userWordsEnterLatticeWithPriority() {
+        val c = KanaKanjiConverter(dictionary(), connection(), unknownPosId = 1)
+        assertEquals("橋を渡る", c.convert("はしをわたる", 1).single().text)
+        c.userDictionary = dev.mooma.kanade.core.dict.UserDictionary.parse("わたる 亘る")
+        assertEquals("橋を亘る", c.convert("はしをわたる", 1).single().text)
+    }
 }
