@@ -5,6 +5,7 @@
 #include <whisper.h>
 
 #include <atomic>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -91,6 +92,12 @@ JNIEXPORT jbyteArray JNICALL Java_dev_mooma_kanade_whisper_WhisperNative_transcr
     params.print_special = false;
     params.print_timestamps = false;
     params.suppress_nst = true;
+    // エンコーダは既定で 30 秒の窓を丸ごと計算する。短い音声なら窓を音声の長さまで縮めると何倍も速い
+    // （1 秒 = 50 フレーム。少し余裕を足す）。環境変数 KANADE_FULL_CTX があれば縮めない（比べるため）
+    if (!std::getenv("KANADE_FULL_CTX")) {
+        int frames = static_cast<int>(samples.size() / 320) + 64;
+        if (frames < 1500) params.audio_ctx = frames;
+    }
     params.initial_prompt = initial.empty() ? nullptr : initial.c_str();
     params.abort_callback = [](void *data) { return static_cast<Whisper *>(data)->abort.load(); };
     params.abort_callback_user_data = w;
