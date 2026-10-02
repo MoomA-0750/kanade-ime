@@ -287,6 +287,7 @@ fun evaluateZenz(outDir: File, tsv: File, model: File, lib: File, topK: Int) {
         val pass = IntArray(3)
         val times = List(2) { ArrayList<Double>() }
         val changed = ArrayList<String>()
+        val remaining = ArrayList<String>()
         for (c in cases) {
             val dict = converter.convert(c.input, 100).map { it.text }
             var t = System.nanoTime()
@@ -298,6 +299,12 @@ fun evaluateZenz(outDir: File, tsv: File, model: File, lib: File, topK: Int) {
             val p = listOf(c.passes(dict), c.passes(ranked), c.passes(withGen))
             p.forEachIndexed { i, b -> if (b) pass[i]++ }
             if (p[0] != p[2]) changed += "${if (p[2]) "改善" else "悪化"}\t${c.input}\t${c.command} ${c.rank} ${c.value}\t辞書 ${dict.firstOrNull()}\tzenz ${withGen.firstOrNull()}"
+            if (!p[1]) {
+                // 並べ替えでも外れた文: 正解が辞書の候補の何位にいるか（いなければ、並べ替えでは届かない）
+                val answers = c.value.split('|')
+                val rankInDict = dict.indexOfFirst { it in answers }
+                remaining += "残り\t${c.input}\t${c.value}\tzenz ${ranked.firstOrNull()}\t正解は辞書の${if (rankInDict < 0) "候補にない" else "${rankInDict + 1}位"}"
+            }
         }
         fun pct(n: Int) = "$n（${"%.1f".format(100.0 * n / cases.size)}%）"
         fun med(l: ArrayList<Double>) = l.sorted().let { "中央値 ${"%.1f".format(it[it.size / 2])}ms、95% ${"%.1f".format(it[it.size * 95 / 100])}ms" }
@@ -307,6 +314,8 @@ fun evaluateZenz(outDir: File, tsv: File, model: File, lib: File, topK: Int) {
         println("並べ替え＋生成    ${pct(pass[2])}  ${med(times[1])}")
         println("辞書だけとの違い（並べ替え＋生成）: 改善 ${changed.count { it.startsWith("改善") }}、悪化 ${changed.count { it.startsWith("悪化") }}")
         changed.take(30).forEach { println("  $it") }
+        println("並べ替えでも外れた文: ${remaining.size}")
+        remaining.forEach { println("  $it") }
     }
 }
 

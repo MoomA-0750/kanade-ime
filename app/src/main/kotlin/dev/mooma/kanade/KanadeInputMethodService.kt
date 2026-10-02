@@ -128,6 +128,8 @@ class KanadeInputMethodService : InputMethodService() {
         }
         engine.resetDirectTyped()
         syncLearning()
+        // 設定画面で zenz の大きさを替えていたら読み直す
+        if (settings.zenzSmall != ConversionResources.loadedSmall) zenzThread.execute { zenz = ConversionResources.zenz(this) }
         previewInBar = attribute?.packageName in settings.previewInBarPackages
         // アプリごとの挙動（カーソルが出ないなど）を調べるため、入力欄の情報を記録する
         log(
