@@ -165,6 +165,12 @@ class InputEngine(
     /** Esc・Backspace で変換をやめたあとや F6〜F10 のあとは、次に打つまでかなのまま出す */
     private var showReading = false
 
+    /**
+     * F6〜F10 の元（最初に押したときのかなと、打った文字）。続けて押したときも、変換した結果ではなくここから作り直す
+     * （半角カナや英字にしたあとでも、ひらがな・カタカナ・英字に行き来できるように）。入力を変えたら捨てる
+     */
+    private var widthBase: Pair<String, String>? = null
+
     val isComposing: Boolean get() = units.isNotEmpty() || romaji.pending.isNotEmpty()
     val isConverting: Boolean get() = segs.isNotEmpty()
 
@@ -247,6 +253,7 @@ class InputEngine(
     fun reset() {
         units.clear()
         caret = 0
+        widthBase = null
         romaji.clear()
         conversions = emptyList()
         pinned = emptyList()
@@ -280,15 +287,21 @@ class InputEngine(
         when (input) {
             is KeyInput.Text -> {
                 showReading = false
+                widthBase = null
                 typeChar(input.char)
                 if (!caretInside) expandSnippet()?.let { return EngineResult(it, consumed = true) }
             }
             KeyInput.Backspace -> {
                 showReading = false
+                widthBase = null
                 deleteLast()
             }
-            KeyInput.DeleteForward -> deleteForward()
+            KeyInput.DeleteForward -> {
+                widthBase = null
+                deleteForward()
+            }
             KeyInput.Left, KeyInput.Right, KeyInput.Home, KeyInput.End -> {
+                widthBase = null
                 moveCaret(input)
                 showReading = false
             }
@@ -581,8 +594,9 @@ class InputEngine(
 
     private fun convertWidth(target: WidthTarget) {
         flushPending()
-        val kana = reading
-        val raw = units.joinToString("") { it.raw }
+        val base = widthBase ?: (reading to units.joinToString("") { it.raw })
+        widthBase = base
+        val (kana, raw) = base
         val text = when (target) {
             WidthTarget.HIRAGANA -> CharWidth.toHiragana(kana)
             WidthTarget.KATAKANA -> CharWidth.toKatakana(kana)
