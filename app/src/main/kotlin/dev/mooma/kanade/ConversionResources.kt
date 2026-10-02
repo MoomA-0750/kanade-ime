@@ -6,6 +6,7 @@ import dev.mooma.kanade.core.convert.DictionaryCandidateSource
 import dev.mooma.kanade.core.convert.KanaKanjiConverter
 import dev.mooma.kanade.core.convert.Segmenter
 import dev.mooma.kanade.core.dict.PosTable
+import dev.mooma.kanade.core.dict.SymbolTable
 import dev.mooma.kanade.core.dict.ConnectionMatrix
 import dev.mooma.kanade.core.dict.SystemDictionary
 import dev.mooma.kanade.zenz.ZenzModel
@@ -30,8 +31,11 @@ object ConversionResources {
     }
 
     /** 入力エンジンに渡す候補の出どころ（辞書とラティス、文節分け） */
-    fun candidateSource(context: Context): CandidateSource =
-        DictionaryCandidateSource(converter(context), Segmenter(PosTable.read(mapAsset(context.applicationContext, "pos.kpos"))))
+    fun candidateSource(context: Context): CandidateSource {
+        val app = context.applicationContext
+        val symbols = SymbolTable.parse(app.assets.open("symbol.ksym").bufferedReader().readText())
+        return DictionaryCandidateSource(converter(app), Segmenter(PosTable.read(mapAsset(app, "pos.kpos"))), symbols)
+    }
 
     /** zenz を読む。重いので UI スレッドから呼ばないこと。失敗したら null（辞書だけで変換する） */
     @Synchronized

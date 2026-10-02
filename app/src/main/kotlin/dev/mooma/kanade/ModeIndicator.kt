@@ -12,22 +12,22 @@ import android.view.WindowManager
 import android.widget.TextView
 
 /**
- * 日本語オン/オフを切り替えたとき、「あ」「A」を画面の中央下に少しだけ出す（重ねる窓の権限があるとき）。
- * カーソルの近くは文字に重なるので避け、目に入りやすい中央下に置く。
+ * 日本語オン/オフを切り替えたとき、「あ」「A」をカーソルの近く（候補の窓と同じ位置）に少しだけ出す
+ * （重ねる窓の権限があるとき）。カーソルの位置が分からなければ画面の中央下。
  */
-class ModeIndicator(private val context: Context) {
+class ModeIndicator(private val context: Context, private val anchor: CursorAnchor) {
     private val wm = context.getSystemService(WindowManager::class.java)
     private val handler = Handler(Looper.getMainLooper())
     private val density = context.resources.displayMetrics.density
     private val view = TextView(context).apply {
         setTextColor(Color.WHITE)
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, 28f)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
         gravity = Gravity.CENTER
-        val size = (64 * density).toInt()
+        val size = (44 * density).toInt()
         minWidth = size
         minHeight = size
         background = GradientDrawable().apply {
-            cornerRadius = 16 * density
+            cornerRadius = 10 * density
             setColor(Color.argb(0xCC, 0x20, 0x20, 0x24))
         }
     }
@@ -39,8 +39,7 @@ class ModeIndicator(private val context: Context) {
         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
         PixelFormat.TRANSLUCENT,
     ).apply {
-        gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-        y = (120 * density).toInt()
+        gravity = Gravity.TOP or Gravity.START
         title = "Kanade mode"
     }
     private val hide = Runnable {
@@ -52,10 +51,16 @@ class ModeIndicator(private val context: Context) {
 
     fun show(japanese: Boolean) {
         view.text = if (japanese) "あ" else "A"
+        view.measure(0, 0)
+        val (x, y) = anchor.place(context, wm, view.measuredWidth, view.measuredHeight, anchor.rect())
+        params.x = x
+        params.y = y
         handler.removeCallbacks(hide)
         if (!added) {
             wm.addView(view, params)
             added = true
+        } else {
+            wm.updateViewLayout(view, params)
         }
         handler.postDelayed(hide, SHOW_MS)
     }

@@ -104,4 +104,13 @@ class SegmentTest {
         assertTrue(e.isConverting)
         assertEquals("橋を渡る", e.composingText)
     }
+
+    @Test
+    fun tappingCandidateSelectsLikeDigit() {
+        val e = converting()
+        e.handle(KeyInput.SelectCandidate(2))
+        assertEquals("端を渡る", e.composingText)
+        e.handle(KeyInput.SelectCandidate(1))
+        assertEquals("端を亘る", e.composingText)
+    }
 }

@@ -80,12 +80,17 @@ class KanadeInputMethodService : InputMethodService() {
 
     override fun onEvaluateFullscreenMode(): Boolean = false
 
-    override fun onCreateCandidatesView(): View = CandidateBar(this).also { bar = it }
+    override fun onCreateCandidatesView(): View = CandidateBar(this, ::onCandidateTapped).also { bar = it }
+
+    /** 候補の窓で候補を指で選んだ */
+    private fun onCandidateTapped(index: Int) {
+        handle(KeyInput.SelectCandidate(index))
+    }
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
         // カーソルの位置を受け取り、重ねる帯をその近くに置く（対応しないアプリもある）
-        overlay?.clearAnchor()
+        anchor.clear()
         currentInputConnection?.requestCursorUpdates(
             InputConnection.CURSOR_UPDATE_IMMEDIATE or InputConnection.CURSOR_UPDATE_MONITOR,
         )
@@ -100,12 +105,11 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     override fun onUpdateCursorAnchorInfo(cursorAnchorInfo: CursorAnchorInfo?) {
-        lastAnchor = cursorAnchorInfo
-        overlay?.updateAnchor(cursorAnchorInfo)
+        anchor.update(cursorAnchorInfo)
     }
 
-    /** 重ねる帯を作る前に届いたカーソルの位置 */
-    private var lastAnchor: CursorAnchorInfo? = null
+    /** カーソルの位置（重ねる窓を置く場所） */
+    private val anchor = CursorAnchor()
 
     override fun onFinishInput() {
         engine.reset()
@@ -236,16 +240,13 @@ class KanadeInputMethodService : InputMethodService() {
 
     private fun showModeIndicator(japanese: Boolean) {
         if (!OverlayBar.permitted(this)) return
-        val m = modeIndicator ?: ModeIndicator(window?.window?.context ?: this).also { modeIndicator = it }
+        val m = modeIndicator ?: ModeIndicator(window?.window?.context ?: this, anchor).also { modeIndicator = it }
         runCatching { m.show(japanese) }.onFailure { log("mode indicator failed: $it") }
     }
 
     private fun showBar(anchorOffset: Int = 0, update: (CandidateBar) -> Unit) {
         if (OverlayBar.permitted(this)) {
-            val o = overlay ?: OverlayBar(window?.window?.context ?: this).also {
-                it.updateAnchor(lastAnchor)
-                overlay = it
-            }
+            val o = overlay ?: OverlayBar(window?.window?.context ?: this, anchor, ::onCandidateTapped).also { overlay = it }
             runCatching { o.show(anchorOffset, update) }.onFailure { log("overlay failed: $it") }
             return
         }

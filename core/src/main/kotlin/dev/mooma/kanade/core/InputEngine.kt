@@ -19,6 +19,8 @@ sealed interface KeyInput {
     /** Shift+左右。文節の区切りを縮める・伸ばす（入力中なら変換を始めてから） */
     data object ShiftLeft : KeyInput
     data object ShiftRight : KeyInput
+    /** 候補の帯で指で選んだ（変換中）。数字キーと同じ動き */
+    data class SelectCandidate(val index: Int) : KeyInput
     data class SetJapanese(val on: Boolean) : KeyInput
     data object ToggleJapanese : KeyInput
     data class ConvertWidth(val target: WidthTarget) : KeyInput
@@ -229,6 +231,7 @@ class InputEngine(
                 return EngineResult(commands + conversionView(), consumed = true)
             }
             is KeyInput.ConvertWidth -> convertWidth(input.target)
+            is KeyInput.SelectCandidate -> return EngineResult(emptyList(), consumed = true)
             // 入力中の左右（未確定文字列の中でのカーソル移動）はまだ持たないので、確定してアプリへ渡す
             KeyInput.Left, KeyInput.Right, KeyInput.Other -> return EngineResult(commitAll(), consumed = false)
             is KeyInput.SetJapanese, KeyInput.ToggleJapanese -> error("handled above")
@@ -245,18 +248,26 @@ class InputEngine(
     private fun handleConverting(input: KeyInput): EngineResult {
         val commands = mutableListOf<ImeCommand>()
         val seg = segs[focus]
+        /** 候補を選んで次の文節へ進む（文節が1つなら確定）。数字キーと指で選んだとき */
+        fun choose(index: Int): EngineResult? {
+            seg.selected = index
+            if (segs.size == 1) return EngineResult(commitAll(), consumed = true)
+            if (focus < segs.lastIndex) {
+                focus++
+                commands += requestSegmentRerank()
+            }
+            return null
+        }
         when (input) {
+            is KeyInput.SelectCandidate -> {
+                if (input.index in seg.candidates.indices) choose(input.index)?.let { return it }
+            }
             is KeyInput.Text -> {
                 // 1〜9 は、いま見えている頁（9件ずつ）の中の番号
                 val digit = input.char - '1'
                 val index = seg.selected / PAGE * PAGE + digit
                 if (digit in 0 until PAGE && index < seg.candidates.size) {
-                    seg.selected = index
-                    if (segs.size == 1) return EngineResult(commitAll(), consumed = true)
-                    if (focus < segs.lastIndex) {
-                        focus++
-                        commands += requestSegmentRerank()
-                    }
+                    choose(index)?.let { return it }
                 } else {
                     // 変換中に文字を打ったら、いまの変換を確定して次の入力を始める
                     commands += commitAll()

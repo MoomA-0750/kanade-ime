@@ -1,14 +1,11 @@
 package dev.mooma.kanade
 
 import android.content.Context
-import android.graphics.Matrix
 import android.graphics.PixelFormat
-import android.graphics.RectF
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
-import android.view.inputmethod.CursorAnchorInfo
 
 /**
  * 候補の帯を、IME の窓ではなく「他のアプリの上に重ねる」窓に出す。
@@ -17,25 +14,23 @@ import android.view.inputmethod.CursorAnchorInfo
  *
  * [context] は IME の窓の Context（DeX では IME がいる画面に出すため）。
  */
-class OverlayBar(private val context: Context) {
+class OverlayBar(private val context: Context, private val anchor: CursorAnchor, onSelect: (Int) -> Unit) {
     private val wm = context.getSystemService(WindowManager::class.java)
-    private val bar = CandidateBar(context)
+    private val bar = CandidateBar(context, onSelect)
     private var added = false
     private val params = WindowManager.LayoutParams(
         WindowManager.LayoutParams.WRAP_CONTENT,
         WindowManager.LayoutParams.WRAP_CONTENT,
         WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+        // フォーカスは取らず（入力先のアプリのまま）、窓の中の指の操作だけ受ける。外の操作は後ろのアプリへ
         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
         PixelFormat.TRANSLUCENT,
     ).apply {
         gravity = Gravity.TOP or Gravity.START
         title = "Kanade candidates"
     }
-
-    /** アプリから届いた最後のカーソル情報。分からなければ null で、画面下の中央に出す */
-    private var info: CursorAnchorInfo? = null
 
     val isShowing: Boolean get() = added
 
@@ -44,9 +39,12 @@ class OverlayBar(private val context: Context) {
         update(bar)
         bar.measure(
             View.MeasureSpec.makeMeasureSpec(maxWidth(), View.MeasureSpec.AT_MOST),
-            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+            View.MeasureSpec.makeMeasureSpec(wm.currentWindowMetrics.bounds.height(), View.MeasureSpec.AT_MOST),
         )
-        place(bar.measuredWidth, bar.measuredHeight, anchorRect(anchorOffset))
+        params.width = bar.measuredWidth
+        val (x, y) = anchor.place(context, wm, bar.measuredWidth, bar.measuredHeight, anchor.rect(anchorOffset))
+        params.x = x
+        params.y = y
         if (!added) {
             wm.addView(bar, params)
             added = true
@@ -62,41 +60,9 @@ class OverlayBar(private val context: Context) {
         }
     }
 
-    fun updateAnchor(info: CursorAnchorInfo?) {
-        this.info = info
-    }
-
-    fun clearAnchor() {
-        info = null
-    }
-
-    /** 未確定文字列の [offset] 文字目の枠（画面の座標）。なければ挿入位置 */
-    private fun anchorRect(offset: Int): RectF? {
-        val i = info ?: return null
-        val local = i.composingTextStart.takeIf { it >= 0 }?.let { i.getCharacterBounds(it + offset) ?: i.getCharacterBounds(it) }
-            ?: i.insertionMarkerHorizontal.takeIf { !it.isNaN() }?.let {
-                RectF(it, i.insertionMarkerTop, it, i.insertionMarkerBottom)
-            }
-        return local?.let { RectF(it).also { r -> Matrix(i.matrix).mapRect(r) } }
-    }
-
-    private fun place(w: Int, h: Int, a: RectF?) {
-        val screen = wm.currentWindowMetrics.bounds
-        val gap = (4 * context.resources.displayMetrics.density).toInt()
-        if (a != null) {
-            params.x = a.left.toInt().coerceIn(0, maxOf(0, screen.width() - w))
-            // 行の下に出し、はみ出すなら行の上に出す
-            val below = a.bottom.toInt() + gap
-            params.y = if (below + h <= screen.height()) below else maxOf(0, a.top.toInt() - h - gap)
-        } else {
-            params.x = maxOf(0, (screen.width() - w) / 2)
-            params.y = screen.height() - h - (48 * context.resources.displayMetrics.density).toInt()
-        }
-    }
-
     private fun maxWidth(): Int {
         val screen = wm.currentWindowMetrics.bounds
-        return minOf(screen.width(), (720 * context.resources.displayMetrics.density).toInt())
+        return minOf(screen.width(), (480 * context.resources.displayMetrics.density).toInt())
     }
 
     companion object {

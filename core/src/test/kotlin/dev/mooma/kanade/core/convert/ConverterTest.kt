@@ -107,4 +107,22 @@ class ConverterTest {
         }
         assertNull(Reranker(cancelled).rerank("", "はし", listOf("橋")))
     }
+
+    @Test
+    fun symbolsAreAppendedToSegmentCandidates() {
+        val symbols = dev.mooma.kanade.core.dict.SymbolTable.fromMozc(
+            listOf("POS\tCHAR\tReading", "記号\t→\tやじるし みぎや ->", "記号\t←\tやじるし ひだりや <-"),
+            listOf("# comment", "1F600\t😀\tえがお かお"),
+        )
+        assertEquals(listOf("→", "←"), symbols.lookup("やじるし"))
+        assertEquals(emptyList(), symbols.lookup("->"))
+        assertEquals(listOf("😀"), symbols.lookup("えがお"))
+        assertEquals(symbols.lookup("やじるし"), dev.mooma.kanade.core.dict.SymbolTable.parse(symbols.write()).lookup("やじるし"))
+        val source = DictionaryCandidateSource(
+            KanaKanjiConverter(dictionary(), connection(), unknownPosId = 1),
+            Segmenter(dev.mooma.kanade.core.dict.PosTable(ByteArray(3))),
+            symbols,
+        )
+        assertEquals(listOf("→", "←"), source.segmentCandidates("やじるし", 5).takeLast(2))
+    }
 }

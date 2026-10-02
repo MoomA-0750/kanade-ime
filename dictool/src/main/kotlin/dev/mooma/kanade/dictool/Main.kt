@@ -6,6 +6,7 @@ import dev.mooma.kanade.zenz.ZenzModel
 import dev.mooma.kanade.core.dict.ConnectionMatrix
 import dev.mooma.kanade.core.dict.DictionaryBuilder
 import dev.mooma.kanade.core.dict.PosTable
+import dev.mooma.kanade.core.dict.SymbolTable
 import dev.mooma.kanade.core.convert.Segmenter
 import dev.mooma.kanade.core.dict.SystemDictionary
 import java.io.File
@@ -16,8 +17,11 @@ import kotlin.system.exitProcess
 
 /** Mozc OSS 辞書の取得元。版を固定する（上げるときはここを変え、評価をやり直す） */
 const val MOZC_COMMIT = "a069a88d4cb5c011de0f9aebb6c149a1c808d904"
-/** 辞書の生成物の版（pos.kpos を足したので 2） */
-const val BUILD_REVISION = 2
+/** 辞書の生成物の版（2: pos.kpos、3: symbol.ksym） */
+const val BUILD_REVISION = 3
+
+/** 辞書以外に取る Mozc のデータ（記号・絵文字）。src/data からのパス */
+val MOZC_EXTRA_FILES = listOf("symbol/symbol.tsv", "emoji/emoji_data.tsv")
 
 /** zenz のモデル。リビジョンとハッシュを固定する */
 const val ZENZ_URL = "https://huggingface.co/Miwa-Keita/zenz-v3.2-xsmall-gguf/resolve/4f5423f0fad41a73b1242eb96fe5c12ae4fdca83/ggml-model-Q5_K_M.gguf"
@@ -66,6 +70,15 @@ fun fetch(cacheDir: File) {
         URI(url).toURL().openStream().use { input -> tmp.outputStream().use { input.copyTo(it) } }
         tmp.renameTo(f)
     }
+    for (path in MOZC_EXTRA_FILES) {
+        val f = File(dir, path.substringAfter('/'))
+        if (f.exists() && f.length() > 0) continue
+        val url = "https://raw.githubusercontent.com/google/mozc/$MOZC_COMMIT/src/data/$path"
+        println("取得: $url")
+        val tmp = File(dir, "${f.name}.part")
+        URI(url).toURL().openStream().use { input -> tmp.outputStream().use { input.copyTo(it) } }
+        tmp.renameTo(f)
+    }
     println(dir.path)
 }
 
@@ -105,7 +118,7 @@ fun assets(cacheDir: File, outDir: File) {
     if (!File(built, "mozc-dictionary-license.txt").exists()) build(mozcDir, built)
     val model = fetchModel(cacheDir)
     outDir.mkdirs()
-    for (name in listOf("system.kdic", "connection.kcon", "pos.kpos", "mozc-dictionary-license.txt")) {
+    for (name in listOf("system.kdic", "connection.kcon", "pos.kpos", "symbol.ksym", "mozc-dictionary-license.txt")) {
         File(built, name).copyTo(File(outDir, name), overwrite = true)
     }
     model.copyTo(File(outDir, "zenz.gguf"), overwrite = true)
@@ -121,6 +134,8 @@ fun build(mozcDir: File, outDir: File) {
         File(outDir, "connection.kcon").outputStream().use { ConnectionMatrix.writeFromMozc(lines, it) }
     }
     // 辞書の出典とライセンス（IPAdic・ICOT の表示義務）をアプリに同梱する
+    val symbols = SymbolTable.fromMozc(File(mozcDir, "symbol.tsv").readLines(), File(mozcDir, "emoji_data.tsv").readLines())
+    File(outDir, "symbol.ksym").writeText(symbols.write())
     File(outDir, "pos.kpos").outputStream().use { PosTable.fromMozcIdDef(File(mozcDir, "id.def").readLines()).write(it) }
     File(mozcDir, "README.txt").copyTo(File(outDir, "mozc-dictionary-license.txt"), overwrite = true)
     println("語数 ${words.size}、${File(outDir, "system.kdic").length() / 1024 / 1024}MB")
