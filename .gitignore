@@ -1,0 +1,12 @@
+.gradle/
+build/
+local.properties
+*.iml
+.idea/
+.cxx/
+# モデルは大きいのでリポジトリに入れない（取得手順は docs/ に書く）
+models/
+*.gguf
+*.bin
+*.onnx
+.trash/
