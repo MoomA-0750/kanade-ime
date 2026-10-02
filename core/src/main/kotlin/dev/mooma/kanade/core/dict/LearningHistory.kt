@@ -33,9 +33,12 @@ class LearningHistory(private val maxEntries: Int = 5000) {
         for ((r, s) in map) append(r).append('\t').append(s.replace("\n", "\\n")).append('\n')
     }
 
-    /** 学習した語を、ラティスに入れるためユーザー辞書の形にする */
+    /**
+     * 学習した語を、ラティスに入れるためユーザー辞書の形にする。1文字の読み（「は→葉」など）は入れない
+     * （助詞などの位置を食いやすいため。文節の候補の先頭には出る）
+     */
     @Synchronized
-    fun asDictionary(): UserDictionary = UserDictionary(map.entries.map { it.key to it.value })
+    fun asDictionary(): UserDictionary = UserDictionary(map.entries.filter { it.key.length >= 2 }.map { it.key to it.value })
 
     companion object {
         fun parse(text: String, maxEntries: Int = 5000): LearningHistory = LearningHistory(maxEntries).also { h ->

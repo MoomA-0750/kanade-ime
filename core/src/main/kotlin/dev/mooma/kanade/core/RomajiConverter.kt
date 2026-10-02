@@ -30,6 +30,8 @@ class RomajiConverter {
             out += when {
                 head == 'n' && next != null -> KanaUnit("ん", "n")
                 next != null && head == next && head.isDoublableConsonant() -> KanaUnit("っ", head.toString())
+                // 「matcha」のように t の次が ch なら「っ」（Google 日本語入力・MS-IME と同じ）
+                head == 't' && next == 'c' -> KanaUnit("っ", "t")
                 else -> KanaUnit(head.toString(), head.toString())
             }
             pending = pending.substring(1)

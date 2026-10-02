@@ -162,8 +162,11 @@ class InputEngine(
 
     /** 変換中の文節。空なら変換中ではない */
     private class Seg(val reading: String, var candidates: List<String>, val pinned: List<String> = emptyList()) {
-        /** 最初に出した候補（これと違うものを選んで確定したら学習する） */
-        val initial: String = candidates.firstOrNull().orEmpty()
+        /**
+         * 利用者が候補を動かしたか（Space・矢印・数字・指）。動かして1位以外を選んで確定したときだけ学習する
+         * （zenz の並べ替えで1位が替わっただけのものを学習すると、並べ替えの結果が固まっていくため）
+         */
+        var userChosen = false
         var selected = 0
         var reranked = false
         val surface: String get() = candidates[selected]
@@ -251,6 +254,8 @@ class InputEngine(
         }
         if (isConverting) return emptyList()
         candidates = (pinned + ranked).distinct()
+        // カーソルが未確定文字列の途中にあるあいだは、かなで出しているので見た目は変わらない
+        if (caretInside) return emptyList()
         return listOf(ImeCommand.SetComposing(composingText))
     }
 
@@ -264,7 +269,7 @@ class InputEngine(
         val wasConverting = isConverting
         if (wasConverting) {
             val source = candidateSource
-            for (seg in segs) if (seg.surface != seg.initial) source?.learn(seg.reading, seg.surface)
+            for (seg in segs) if (seg.userChosen && seg.selected != 0) source?.learn(seg.reading, seg.surface)
         }
         reset()
         leftContext = (leftContext + text).takeLast(MAX_CONTEXT)
@@ -351,7 +356,8 @@ class InputEngine(
             commands += ImeCommand.SetComposing("")
             return EngineResult(commands, consumed = true)
         }
-        if (!showReading && !caretInside) commands += refreshCandidates()
+        // ライブ変換を切っているときは、打つたびに候補を作らない（Space を押したときに作る）
+        if (!showReading && !caretInside && settings.liveConversion) commands += refreshCandidates()
         commands += ImeCommand.SetComposing(composingText, cursor = composingCursor)
         return EngineResult(commands, consumed = true)
     }
@@ -373,7 +379,7 @@ class InputEngine(
         if (units.all { it.text.length <= 1 }) return
         val before = units.take(caret).sumOf { it.text.length }
         val split = units.flatMap { u ->
-            if (u.text.length <= 1) listOf(u) else u.text.map { KanaUnit(it.toString(), RomajiTable.reverse[it.toString()] ?: it.toString()) }
+            if (u.text.length <= 1) listOf(u) else u.text.map { KanaUnit(it.toString(), rawOf(it.toString())) }
         }
         units.clear()
         units += split
@@ -385,7 +391,7 @@ class InputEngine(
         val u = units[caret]
         if (u.text.length > 1) {
             val rest = u.text.drop(1)
-            units[caret] = KanaUnit(rest, rest.map { RomajiTable.reverse[it.toString()] ?: it.toString() }.joinToString(""))
+            units[caret] = KanaUnit(rest, rawOf(rest))
         } else {
             units.removeAt(caret)
         }
@@ -397,6 +403,7 @@ class InputEngine(
         /** 候補を選んで次の文節へ進む（文節が1つなら確定）。数字キーと指で選んだとき */
         fun choose(index: Int): EngineResult? {
             seg.selected = index
+            seg.userChosen = true
             if (segs.size == 1) return EngineResult(commitAll(), consumed = true)
             if (focus < segs.lastIndex) {
                 focus++
@@ -414,6 +421,9 @@ class InputEngine(
                 val index = seg.selected / PAGE * PAGE + digit
                 if (digit in 0 until PAGE && index < seg.candidates.size) {
                     choose(index)?.let { return it }
+                } else if (digit in 0 until PAGE) {
+                    // 候補のない番号は無視する（確定して数字を入れない）
+                    return EngineResult(emptyList(), consumed = true)
                 } else {
                     // 変換中に文字を打ったら、いまの変換を確定して次の入力を始める
                     commands += commitAll()
@@ -424,8 +434,14 @@ class InputEngine(
                     return EngineResult(commands, consumed = true)
                 }
             }
-            KeyInput.Space, KeyInput.Down -> seg.selected = (seg.selected + 1).mod(seg.candidates.size)
-            KeyInput.ShiftSpace, KeyInput.Up -> seg.selected = (seg.selected - 1).mod(seg.candidates.size)
+            KeyInput.Space, KeyInput.Down -> {
+                seg.selected = (seg.selected + 1).mod(seg.candidates.size)
+                seg.userChosen = true
+            }
+            KeyInput.ShiftSpace, KeyInput.Up -> {
+                seg.selected = (seg.selected - 1).mod(seg.candidates.size)
+                seg.userChosen = true
+            }
             KeyInput.Left, KeyInput.Right -> {
                 val next = (focus + if (input == KeyInput.Left) -1 else 1).coerceIn(0, segs.lastIndex)
                 if (next != focus) {
@@ -610,7 +626,7 @@ class InputEngine(
         if (last.text.length > 1) {
             // 「きゃ」の「ゃ」だけ消したときなど。残りの綴りは逆引きで作り直す
             val rest = last.text.dropLast(1)
-            insertUnits(listOf(KanaUnit(rest, rest.map { RomajiTable.reverse[it.toString()] ?: it.toString() }.joinToString(""))))
+            insertUnits(listOf(KanaUnit(rest, rawOf(rest))))
         }
     }
 
@@ -638,6 +654,22 @@ class InputEngine(
         units += KanaUnit(text, raw)
         caret = units.size
         showReading = true
+    }
+
+    /**
+     * 単位を分けたり一部を消したりしたときに、綴り（F9・F10 の元）を作り直す。
+     * 全角英数は半角に、カタカナはひらがなに戻してからローマ字を引く（F7・F9 のあとでも F10 で英字に戻るように）
+     */
+    private fun rawOf(text: String): String = buildString {
+        for (c in text) {
+            val half = CharWidth.toHalfWidthAscii(c.toString())
+            if (half.length == 1 && half[0] in '!'..'~') {
+                append(half)
+                continue
+            }
+            val hira = CharWidth.toHiragana(c.toString())
+            append(RomajiTable.reverse[hira] ?: c.toString())
+        }
     }
 
     private fun pass() = EngineResult(emptyList(), consumed = false)
