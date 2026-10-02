@@ -13,15 +13,15 @@ import java.io.Closeable
 class ZenzModel private constructor(private var handle: Long) : LanguageModel, Closeable {
     private val lock = Any()
 
-    override fun score(leftContext: String, reading: String, candidates: List<String>): FloatArray? = synchronized(lock) {
+    override fun score(leftContext: String, reading: String, candidates: List<String>, rightContext: String): FloatArray? = synchronized(lock) {
         if (handle == 0L) return null
-        val prompt = prompt(leftContext, reading).encodeToByteArray()
+        val prompt = prompt(leftContext, reading, rightContext).encodeToByteArray()
         return ZenzNative.score(handle, prompt, candidates.map { normalize(it).encodeToByteArray() }.toTypedArray())
     }
 
-    override fun generate(leftContext: String, reading: String): String? = synchronized(lock) {
+    override fun generate(leftContext: String, reading: String, rightContext: String): String? = synchronized(lock) {
         if (handle == 0L) return null
-        val prompt = prompt(leftContext, reading).encodeToByteArray()
+        val prompt = prompt(leftContext, reading, rightContext).encodeToByteArray()
         // 出力はおおむね読みより短い。ずれても打ち切れるよう読みの長さ＋余裕を上限にする
         val bytes = ZenzNative.greedy(handle, prompt, reading.length + 8) ?: return null
         return bytes.decodeToString().takeIf { it.isNotEmpty() && '�' !in it }
@@ -45,9 +45,11 @@ class ZenzModel private constructor(private var handle: Long) : LanguageModel, C
             return if (h == 0L) null else ZenzModel(h)
         }
 
-        fun prompt(leftContext: String, reading: String): String {
+        /** 右の文脈（カーソルの後ろの文）は v3.2 から。左の文脈のあとに置く（azooKey の ZenzPromptBuilder と同じ並び） */
+        fun prompt(leftContext: String, reading: String, rightContext: String = ""): String {
             val left = normalize(leftContext).takeLast(MAX_LEFT_CONTEXT)
-            val context = if (left.isEmpty()) "" else "$left"
+            val right = normalize(rightContext).take(MAX_LEFT_CONTEXT)
+            val context = (if (left.isEmpty()) "" else "$left") + (if (right.isEmpty()) "" else "$right")
             return context + "" + CharWidth.toKatakana(normalize(reading)) + ""
         }
 

@@ -353,11 +353,14 @@ fun evaluateContext(outDir: File, tsv: File, model: File, lib: File) {
         var dictHit = 0
         var noCtx = 0
         var withCtx = 0
-        for ((context, reading, answer) in cases) {
+        for (f in cases) {
+            val (context, reading, answer) = f
+            // 4列目があれば右の文脈（カーソルの後ろの文）。比べるのは「文脈なし」と「左右の文脈あり」
+            val right = f.getOrElse(3) { "" }
             val answers = answer.split('|')
             val dict = converter.convert(reading, 100).map { it.text }
             val a = reranker.rerank("", reading, dict)!!.candidates.firstOrNull()
-            val b = reranker.rerank(context, reading, dict)!!.candidates.firstOrNull()
+            val b = reranker.rerank(context, reading, dict, rightContext = right)!!.candidates.firstOrNull()
             if (dict.firstOrNull() in answers) dictHit++
             if (a in answers) noCtx++
             if (b in answers) withCtx++
@@ -367,7 +370,7 @@ fun evaluateContext(outDir: File, tsv: File, model: File, lib: File) {
                 b in answers -> "正"
                 else -> "誤"
             }
-            println("$mark\t$context｜$reading\t文脈なし $a\t文脈あり $b")
+            println("$mark\t$context｜$reading｜$right\t文脈なし $a\t文脈あり $b")
         }
         println("件数 ${cases.size}: 辞書だけ $dictHit、zenz 文脈なし $noCtx、zenz 文脈あり $withCtx")
     }

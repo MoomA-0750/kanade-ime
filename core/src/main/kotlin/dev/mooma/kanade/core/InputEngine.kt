@@ -71,7 +71,14 @@ sealed interface ImeCommand {
      * 言語モデルでの並べ替えを頼む。IME は裏で計算し、終わったら [InputEngine.onReranked] に [id] とともに返す。
      * 新しい要求が出たら古いものは捨ててよい（止めてよい）
      */
-    data class RequestRerank(val id: Long, val leftContext: String, val reading: String, val candidates: List<String>) : ImeCommand
+    data class RequestRerank(
+        val id: Long,
+        val leftContext: String,
+        val reading: String,
+        val candidates: List<String>,
+        /** カーソルの後ろの文（文の途中で打っているとき） */
+        val rightContext: String = "",
+    ) : ImeCommand
 }
 
 /** [consumed] が false なら、キーを IME で止めずにアプリへ渡す */
@@ -125,6 +132,9 @@ class InputEngine(
 
     /** 未確定の直前にある確定済みの文（言語モデルの文脈）。IME が入力の始まりに入れ、確定のたびにこちらでも足す */
     var leftContext: String = ""
+
+    /** 未確定の直後にある文（文の途中で打っているとき）。IME が入力の始まりに入れる */
+    var rightContext: String = ""
 
     /** スニペット（打った文字の末尾がキーになった瞬間に置き換える） */
     var snippets: Snippets = Snippets.EMPTY
@@ -510,7 +520,7 @@ class InputEngine(
         requestId++
         segRerank = SegRerank(requestId, focus, prefix, suffix)
         val sentences = seg.candidates.take(settings.candidateCount).map { prefix + it + suffix }
-        return listOf(ImeCommand.RequestRerank(requestId, leftContext, reading, sentences))
+        return listOf(ImeCommand.RequestRerank(requestId, leftContext, reading, sentences, rightContext))
     }
 
     private fun stopConverting(commands: MutableList<ImeCommand>) {
@@ -534,7 +544,7 @@ class InputEngine(
         candidates = (pinned + fromDictionary).distinct()
         requestId++
         if (fromDictionary.size < 2) return emptyList()
-        return listOf(ImeCommand.RequestRerank(requestId, leftContext, r, fromDictionary))
+        return listOf(ImeCommand.RequestRerank(requestId, leftContext, r, fromDictionary, rightContext))
     }
 
     /**

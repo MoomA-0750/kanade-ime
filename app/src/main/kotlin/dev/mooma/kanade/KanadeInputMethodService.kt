@@ -227,6 +227,7 @@ class KanadeInputMethodService : InputMethodService() {
         if (input is KeyInput.Text && engine.japanese && !engine.isComposing && !previewInBar) {
             // 入力の始まりに、カーソルの前の文を言語モデルの文脈として取る
             engine.leftContext = currentInputConnection?.getTextBeforeCursor(InputEngine.MAX_CONTEXT, 0)?.toString().orEmpty()
+            engine.rightContext = currentInputConnection?.getTextAfterCursor(InputEngine.MAX_CONTEXT, 0)?.toString().orEmpty()
         }
         val result = engine.handle(input)
         apply(result.commands)
@@ -292,7 +293,7 @@ class KanadeInputMethodService : InputMethodService() {
             if (request.id != latestRerank) return@execute
             val model = zenz ?: return@execute
             val ranked = runCatching {
-                Reranker(model).rerank(request.leftContext, request.reading, request.candidates)
+                Reranker(model).rerank(request.leftContext, request.reading, request.candidates, rightContext = request.rightContext)
             }.getOrNull() ?: return@execute
             main.post { apply(engine.onReranked(request.id, ranked.candidates)) }
         }

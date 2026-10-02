@@ -78,10 +78,10 @@ class ConverterTest {
     }
 
     private class FakeModel(private val preferred: String) : LanguageModel {
-        override fun score(leftContext: String, reading: String, candidates: List<String>) =
+        override fun score(leftContext: String, reading: String, candidates: List<String>, rightContext: String) =
             FloatArray(candidates.size) { if (candidates[it] == preferred) -1f else -20f }
 
-        override fun generate(leftContext: String, reading: String) = preferred
+        override fun generate(leftContext: String, reading: String, rightContext: String) = preferred
         override fun cancel() {}
     }
 
@@ -102,8 +102,8 @@ class ConverterTest {
     @Test
     fun rerankerReturnsNullWhenCancelled() {
         val cancelled = object : LanguageModel {
-            override fun score(leftContext: String, reading: String, candidates: List<String>): FloatArray? = null
-            override fun generate(leftContext: String, reading: String): String? = null
+            override fun score(leftContext: String, reading: String, candidates: List<String>, rightContext: String): FloatArray? = null
+            override fun generate(leftContext: String, reading: String, rightContext: String): String? = null
             override fun cancel() {}
         }
         assertNull(Reranker(cancelled).rerank("", "はし", listOf("橋")))
