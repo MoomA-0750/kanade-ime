@@ -34,18 +34,19 @@ class OverlayBar(private val context: Context) {
         title = "Kanade candidates"
     }
 
-    /** カーソル（未確定文字列の先頭）の画面上の位置。分からなければ null で、画面下の中央に出す */
-    private var anchor: RectF? = null
+    /** アプリから届いた最後のカーソル情報。分からなければ null で、画面下の中央に出す */
+    private var info: CursorAnchorInfo? = null
 
     val isShowing: Boolean get() = added
 
-    fun show(update: (CandidateBar) -> Unit) {
+    /** [anchorOffset] は、帯を合わせる文字が未確定文字列の何文字目か（変換中は選んでいる文節の先頭） */
+    fun show(anchorOffset: Int = 0, update: (CandidateBar) -> Unit) {
         update(bar)
         bar.measure(
             View.MeasureSpec.makeMeasureSpec(maxWidth(), View.MeasureSpec.AT_MOST),
             View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
         )
-        place(bar.measuredWidth, bar.measuredHeight)
+        place(bar.measuredWidth, bar.measuredHeight, anchorRect(anchorOffset))
         if (!added) {
             wm.addView(bar, params)
             added = true
@@ -61,26 +62,26 @@ class OverlayBar(private val context: Context) {
         }
     }
 
-    /** アプリから届いたカーソルの位置。未確定文字列の先頭の文字の枠があればそれ、なければ挿入位置を使う */
     fun updateAnchor(info: CursorAnchorInfo?) {
-        if (info == null) {
-            anchor = null
-            return
-        }
-        val local = info.composingTextStart.takeIf { it >= 0 }?.let { info.getCharacterBounds(it) }
-            ?: info.insertionMarkerHorizontal.takeIf { !it.isNaN() }?.let {
-                RectF(it, info.insertionMarkerTop, it, info.insertionMarkerBottom)
-            }
-        anchor = local?.let { RectF(it).also { r -> Matrix(info.matrix).mapRect(r) } }
+        this.info = info
     }
 
     fun clearAnchor() {
-        anchor = null
+        info = null
     }
 
-    private fun place(w: Int, h: Int) {
+    /** 未確定文字列の [offset] 文字目の枠（画面の座標）。なければ挿入位置 */
+    private fun anchorRect(offset: Int): RectF? {
+        val i = info ?: return null
+        val local = i.composingTextStart.takeIf { it >= 0 }?.let { i.getCharacterBounds(it + offset) ?: i.getCharacterBounds(it) }
+            ?: i.insertionMarkerHorizontal.takeIf { !it.isNaN() }?.let {
+                RectF(it, i.insertionMarkerTop, it, i.insertionMarkerBottom)
+            }
+        return local?.let { RectF(it).also { r -> Matrix(i.matrix).mapRect(r) } }
+    }
+
+    private fun place(w: Int, h: Int, a: RectF?) {
         val screen = wm.currentWindowMetrics.bounds
-        val a = anchor
         val gap = (4 * context.resources.displayMetrics.density).toInt()
         if (a != null) {
             params.x = a.left.toInt().coerceIn(0, maxOf(0, screen.width() - w))

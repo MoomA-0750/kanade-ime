@@ -8,7 +8,11 @@ import android.view.View
 import android.view.inputmethod.CursorAnchorInfo
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
-import dev.mooma.kanade.core.CandidateSource
+import android.graphics.Color
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.BackgroundColorSpan
+import android.text.style.UnderlineSpan
 import dev.mooma.kanade.core.ImeCommand
 import dev.mooma.kanade.core.InputEngine
 import dev.mooma.kanade.core.KeyInput
@@ -43,6 +47,9 @@ class KanadeInputMethodService : InputMethodService() {
     /** 重ねる窓の帯（権限があればこちらを使う） */
     private var overlay: OverlayBar? = null
 
+    /** 日本語オン/オフの「あ」「A」（重ねる窓） */
+    private var modeIndicator: ModeIndicator? = null
+
     /** 未確定文字列をアプリに出さず、帯に出すアプリを使っている */
     private var previewInBar = false
 
@@ -50,8 +57,7 @@ class KanadeInputMethodService : InputMethodService() {
         super.onCreate()
         settings = KanadeSettings(this)
         keyLog = KeyLog(this)
-        val converter = ConversionResources.converter(this)
-        engine.candidateSource = CandidateSource { reading, n -> converter.convert(reading, n).map { it.text } }
+        engine.candidateSource = ConversionResources.candidateSource(this)
         zenzThread.execute { zenz = ConversionResources.zenz(this) }
         // 前回のモードを引き継ぐ
         if (settings.lastJapanese) engine.handle(KeyInput.SetJapanese(true))
@@ -59,6 +65,7 @@ class KanadeInputMethodService : InputMethodService() {
 
     override fun onDestroy() {
         overlay?.hide()
+        modeIndicator?.dismiss()
         zenzThread.shutdownNow()
         super.onDestroy()
     }
@@ -93,7 +100,8 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     override fun onUpdateCursorAnchorInfo(cursorAnchorInfo: CursorAnchorInfo?) {
-        overlay?.updateAnchor(cursorAnchorInfo) ?: run { lastAnchor = cursorAnchorInfo }
+        lastAnchor = cursorAnchorInfo
+        overlay?.updateAnchor(cursorAnchorInfo)
     }
 
     /** 重ねる帯を作る前に届いたカーソルの位置 */
@@ -171,7 +179,7 @@ class KanadeInputMethodService : InputMethodService() {
                         ic?.setComposingText("", 1)
                         ic?.finishComposingText()
                     } else {
-                        ic?.setComposingText(command.text, 1)
+                        ic?.setComposingText(styled(command), 1)
                     }
                 is ImeCommand.Commit -> {
                     ic?.commitText(command.text, 1)
@@ -180,8 +188,9 @@ class KanadeInputMethodService : InputMethodService() {
                 is ImeCommand.ModeChanged -> {
                     settings.lastJapanese = command.japanese
                     updateStatusIcon()
+                    showModeIndicator(command.japanese)
                 }
-                is ImeCommand.ShowCandidates -> showBar {
+                is ImeCommand.ShowCandidates -> showBar(command.anchorOffset) {
                     it.showCandidates(command.candidates, command.selected, if (previewInBar) engine.composingText else null)
                 }
                 ImeCommand.HideCandidates -> if (previewInBar && engine.isComposing) {
@@ -209,13 +218,35 @@ class KanadeInputMethodService : InputMethodService() {
         }
     }
 
-    private fun showBar(update: (CandidateBar) -> Unit) {
+    /** 変換中は文節ごとに下線を引き、選んでいる文節に色を付ける */
+    private fun styled(command: ImeCommand.SetComposing): CharSequence {
+        if (command.segmentLengths.isEmpty()) return command.text
+        val text = SpannableString(command.text)
+        var start = 0
+        for ((i, len) in command.segmentLengths.withIndex()) {
+            val end = (start + len).coerceAtMost(text.length)
+            text.setSpan(UnderlineSpan(), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE or Spanned.SPAN_COMPOSING)
+            if (i == command.focused) {
+                text.setSpan(BackgroundColorSpan(FOCUS_COLOR), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE or Spanned.SPAN_COMPOSING)
+            }
+            start = end
+        }
+        return text
+    }
+
+    private fun showModeIndicator(japanese: Boolean) {
+        if (!OverlayBar.permitted(this)) return
+        val m = modeIndicator ?: ModeIndicator(window?.window?.context ?: this).also { modeIndicator = it }
+        runCatching { m.show(japanese) }.onFailure { log("mode indicator failed: $it") }
+    }
+
+    private fun showBar(anchorOffset: Int = 0, update: (CandidateBar) -> Unit) {
         if (OverlayBar.permitted(this)) {
             val o = overlay ?: OverlayBar(window?.window?.context ?: this).also {
                 it.updateAnchor(lastAnchor)
                 overlay = it
             }
-            runCatching { o.show(update) }.onFailure { log("overlay failed: $it") }
+            runCatching { o.show(anchorOffset, update) }.onFailure { log("overlay failed: $it") }
             return
         }
         if (!barShown) {
@@ -246,6 +277,11 @@ class KanadeInputMethodService : InputMethodService() {
 
     private fun log(event: KeyEvent, note: String) {
         if (settings.keyLogEnabled) keyLog.record(event, note)
+    }
+
+    private companion object {
+        /** 変換中に選んでいる文節の背景（薄い青。明るい画面でも暗い画面でも字が読める程度に） */
+        val FOCUS_COLOR = Color.argb(0x60, 0x40, 0x80, 0xE0)
     }
 
     private fun log(note: String) {

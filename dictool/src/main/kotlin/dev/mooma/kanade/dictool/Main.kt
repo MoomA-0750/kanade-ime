@@ -5,6 +5,8 @@ import dev.mooma.kanade.core.convert.Reranker
 import dev.mooma.kanade.zenz.ZenzModel
 import dev.mooma.kanade.core.dict.ConnectionMatrix
 import dev.mooma.kanade.core.dict.DictionaryBuilder
+import dev.mooma.kanade.core.dict.PosTable
+import dev.mooma.kanade.core.convert.Segmenter
 import dev.mooma.kanade.core.dict.SystemDictionary
 import java.io.File
 import java.net.URI
@@ -14,6 +16,9 @@ import kotlin.system.exitProcess
 
 /** Mozc OSS 辞書の取得元。版を固定する（上げるときはここを変え、評価をやり直す） */
 const val MOZC_COMMIT = "a069a88d4cb5c011de0f9aebb6c149a1c808d904"
+/** 辞書の生成物の版（pos.kpos を足したので 2） */
+const val BUILD_REVISION = 2
+
 /** zenz のモデル。リビジョンとハッシュを固定する */
 const val ZENZ_URL = "https://huggingface.co/Miwa-Keita/zenz-v3.2-xsmall-gguf/resolve/4f5423f0fad41a73b1242eb96fe5c12ae4fdca83/ggml-model-Q5_K_M.gguf"
 const val ZENZ_FILE = "zenz-v3.2-xsmall-Q5_K_M.gguf"
@@ -94,12 +99,13 @@ fun sha256(f: File): String {
 fun assets(cacheDir: File, outDir: File) {
     fetch(cacheDir)
     val mozcDir = File(cacheDir, "mozc-$MOZC_COMMIT")
-    val built = File(cacheDir, "built-$MOZC_COMMIT-v${SystemDictionary.VERSION}")
+    // 生成物の中身を変えたら BUILD_REVISION を上げる（古い生成物を使わないように）
+    val built = File(cacheDir, "built-$MOZC_COMMIT-v${SystemDictionary.VERSION}-r$BUILD_REVISION")
     // ライセンス文は build の最後に書くので、これがあれば変換は済んでいる
     if (!File(built, "mozc-dictionary-license.txt").exists()) build(mozcDir, built)
     val model = fetchModel(cacheDir)
     outDir.mkdirs()
-    for (name in listOf("system.kdic", "connection.kcon", "mozc-dictionary-license.txt")) {
+    for (name in listOf("system.kdic", "connection.kcon", "pos.kpos", "mozc-dictionary-license.txt")) {
         File(built, name).copyTo(File(outDir, name), overwrite = true)
     }
     model.copyTo(File(outDir, "zenz.gguf"), overwrite = true)
@@ -115,6 +121,7 @@ fun build(mozcDir: File, outDir: File) {
         File(outDir, "connection.kcon").outputStream().use { ConnectionMatrix.writeFromMozc(lines, it) }
     }
     // 辞書の出典とライセンス（IPAdic・ICOT の表示義務）をアプリに同梱する
+    File(outDir, "pos.kpos").outputStream().use { PosTable.fromMozcIdDef(File(mozcDir, "id.def").readLines()).write(it) }
     File(mozcDir, "README.txt").copyTo(File(outDir, "mozc-dictionary-license.txt"), overwrite = true)
     println("語数 ${words.size}、${File(outDir, "system.kdic").length() / 1024 / 1024}MB")
 }
@@ -171,7 +178,11 @@ fun convert(outDir: File, inputs: List<String>) {
         val result = converter.convert(input, 10)
         val ms = (System.nanoTime() - t) / 1e6
         println("$input (${"%.1f".format(ms)}ms)")
-        for (c in result) println("  ${c.cost}\t${c.text}\t${c.words.joinToString("|") { it.surface }}")
+        val segmenter = File(outDir, "pos.kpos").takeIf { it.exists() }?.let { Segmenter(PosTable.read(java.nio.ByteBuffer.wrap(it.readBytes()))) }
+        for (c in result) {
+            val segs = segmenter?.segments(c.words)?.joinToString(" / ") { it.surface } ?: ""
+            println("  ${c.cost}\t${c.text}\t${c.words.joinToString("|") { it.surface }}\t文節: $segs")
+        }
     }
 }
 

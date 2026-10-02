@@ -1,7 +1,11 @@
 package dev.mooma.kanade
 
 import android.content.Context
+import dev.mooma.kanade.core.CandidateSource
+import dev.mooma.kanade.core.convert.DictionaryCandidateSource
 import dev.mooma.kanade.core.convert.KanaKanjiConverter
+import dev.mooma.kanade.core.convert.Segmenter
+import dev.mooma.kanade.core.dict.PosTable
 import dev.mooma.kanade.core.dict.ConnectionMatrix
 import dev.mooma.kanade.core.dict.SystemDictionary
 import dev.mooma.kanade.zenz.ZenzModel
@@ -24,6 +28,10 @@ object ConversionResources {
         KanaKanjiConverter(SystemDictionary(mapAsset(app, "system.kdic")), ConnectionMatrix(mapAsset(app, "connection.kcon")))
             .also { converter = it }
     }
+
+    /** 入力エンジンに渡す候補の出どころ（辞書とラティス、文節分け） */
+    fun candidateSource(context: Context): CandidateSource =
+        DictionaryCandidateSource(converter(context), Segmenter(PosTable.read(mapAsset(context.applicationContext, "pos.kpos"))))
 
     /** zenz を読む。重いので UI スレッドから呼ばないこと。失敗したら null（辞書だけで変換する） */
     @Synchronized

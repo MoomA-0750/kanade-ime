@@ -14,10 +14,16 @@ class LiveConversionTest {
         "か" to listOf("課", "蚊"),
     )
 
-    private fun engine(live: Boolean = true) = InputEngine(
-        EngineSettings(liveConversion = live),
-        CandidateSource { r, _ -> table[r] ?: listOf(r) },
-    ).apply { handle(KeyInput.SetJapanese(true)) }
+    /** 文全体は1文節として返す偽の辞書 */
+    private val source = object : CandidateSource {
+        override fun convert(reading: String, n: Int) =
+            (table[reading] ?: listOf(reading)).map { Conversion(listOf(Segment(reading, it))) }
+
+        override fun segmentCandidates(reading: String, n: Int) = table[reading] ?: listOf(reading)
+    }
+
+    private fun engine(live: Boolean = true) = InputEngine(EngineSettings(liveConversion = live), source)
+        .apply { handle(KeyInput.SetJapanese(true)) }
 
     private fun InputEngine.type(s: String) = s.map { handle(KeyInput.Text(it)) }
 

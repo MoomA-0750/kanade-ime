@@ -59,7 +59,7 @@ android {
 
     androidResources {
         // 圧縮せずに入れ、辞書は APK から直接 mmap する
-        noCompress += listOf("kdic", "kcon", "gguf")
+        noCompress += listOf("kdic", "kcon", "kpos", "gguf")
     }
 
     buildTypes {

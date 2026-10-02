@@ -13,10 +13,16 @@ sealed interface KeyInput {
     /** 上下の矢印。変換中は候補の選択を動かす */
     data object Up : KeyInput
     data object Down : KeyInput
+    /** 左右の矢印。変換中は文節を移る */
+    data object Left : KeyInput
+    data object Right : KeyInput
+    /** Shift+左右。文節の区切りを縮める・伸ばす（入力中なら変換を始めてから） */
+    data object ShiftLeft : KeyInput
+    data object ShiftRight : KeyInput
     data class SetJapanese(val on: Boolean) : KeyInput
     data object ToggleJapanese : KeyInput
     data class ConvertWidth(val target: WidthTarget) : KeyInput
-    /** 上記以外（左右の矢印、Ctrl 併用など）。未確定があれば確定してからアプリへ渡す */
+    /** 上記以外（Ctrl 併用など）。未確定があれば確定してからアプリへ渡す */
     data object Other : KeyInput
 }
 
@@ -25,12 +31,15 @@ enum class WidthTarget { HIRAGANA, KATAKANA, HALF_KATAKANA, FULL_ALNUM, HALF_ALN
 
 /** IME がアプリへ行う操作 */
 sealed interface ImeCommand {
-    /** 未確定文字列を置き換える（空文字なら未確定を消す） */
-    data class SetComposing(val text: String) : ImeCommand
+    /**
+     * 未確定文字列を置き換える（空文字なら未確定を消す）。
+     * 変換中は [segmentLengths] に文節ごとの長さ、[focused] に選んでいる文節が入る（見た目の下線用）
+     */
+    data class SetComposing(val text: String, val segmentLengths: List<Int> = emptyList(), val focused: Int = -1) : ImeCommand
     data class Commit(val text: String) : ImeCommand
     data class ModeChanged(val japanese: Boolean) : ImeCommand
-    /** 候補の一覧を出す（変換中）。[selected] は選択中の位置 */
-    data class ShowCandidates(val candidates: List<String>, val selected: Int) : ImeCommand
+    /** 候補の一覧を出す（変換中）。[selected] は選択中の位置、[anchorOffset] は選んでいる文節が未確定文字列の何文字目からか */
+    data class ShowCandidates(val candidates: List<String>, val selected: Int, val anchorOffset: Int = 0) : ImeCommand
     data object HideCandidates : ImeCommand
     /**
      * 言語モデルでの並べ替えを頼む。IME は裏で計算し、終わったら [InputEngine.onReranked] に [id] とともに返す。
@@ -51,13 +60,25 @@ data class EngineSettings(
     val candidateCount: Int = 10,
 )
 
+/** 文節（読みと、いま選んでいる表記） */
+data class Segment(val reading: String, val surface: String)
+
+/** 文全体の変換結果。文節に分けてある */
+data class Conversion(val segments: List<Segment>) {
+    val text: String get() = segments.joinToString("") { it.surface }
+}
+
 /** かな漢字変換の候補を出すもの（辞書とラティス）。速いので入力のたびに同期で呼ぶ */
-fun interface CandidateSource {
-    fun candidates(reading: String, n: Int): List<String>
+interface CandidateSource {
+    /** 文全体の変換の N-best（よい順） */
+    fun convert(reading: String, n: Int): List<Conversion>
+
+    /** [reading] を1文節としたときの候補（よい順。ひらがな・カタカナも含める） */
+    fun segmentCandidates(reading: String, n: Int): List<String>
 }
 
 /**
- * 入力エンジン。ローマ字→かな、未確定文字列、ライブ変換と変換中の候補選択を持つ。
+ * 入力エンジン。ローマ字→かな、未確定文字列、ライブ変換、文節に分けた変換と候補選択を持つ。
  * Android には依存せず、言語モデルの並べ替えは [ImeCommand.RequestRerank] で外に頼み、結果を [onReranked] で受ける。
  */
 class InputEngine(
@@ -73,20 +94,32 @@ class InputEngine(
     private val romaji = RomajiConverter()
     private val units = mutableListOf<KanaUnit>()
 
-    /** 候補（[candidatesFor] の読みに対するもの）。並べ替えが届いたら差し替わる */
+    /** ライブ変換の候補（文全体。[candidatesFor] の読みに対するもの）。並べ替えが届いたら差し替わる */
+    private var conversions: List<Conversion> = emptyList()
     private var candidates: List<String> = emptyList()
     private var candidatesFor: String? = null
     private var requestId = 0L
 
-    /** Space を押して候補を選んでいる最中 */
-    private var converting = false
-    private var selected = 0
+    /** 変換中の文節。空なら変換中ではない */
+    private class Seg(val reading: String, var candidates: List<String>) {
+        var selected = 0
+        var reranked = false
+        val surface: String get() = candidates[selected]
+    }
+
+    private val segs = mutableListOf<Seg>()
+    private var focus = 0
+
+    /** 文節の候補の並べ替えの依頼（文全体として採点し、前後を外して戻す） */
+    private class SegRerank(val id: Long, val index: Int, val prefix: String, val suffix: String)
+
+    private var segRerank: SegRerank? = null
 
     /** Esc・Backspace で変換をやめたあとや F6〜F10 のあとは、次に打つまでかなのまま出す */
     private var showReading = false
 
     val isComposing: Boolean get() = units.isNotEmpty() || romaji.pending.isNotEmpty()
-    val isConverting: Boolean get() = converting
+    val isConverting: Boolean get() = segs.isNotEmpty()
 
     /** 確定済みのかな（読み）。綴りの途中は含まない */
     private val reading: String get() = units.joinToString("") { it.text }
@@ -94,7 +127,7 @@ class InputEngine(
     /** 未確定文字列として出すもの */
     val composingText: String
         get() {
-            if (converting) return candidates.getOrElse(selected) { reading }
+            if (isConverting) return segs.joinToString("") { it.surface }
             if (showReading || !settings.liveConversion) return reading + romaji.pending
             return (bestFor(reading) ?: reading) + romaji.pending
         }
@@ -108,12 +141,22 @@ class InputEngine(
     /** 並べ替えの結果。古い要求の結果なら何もしない */
     fun onReranked(id: Long, ranked: List<String>): List<ImeCommand> {
         if (id != requestId || ranked.isEmpty()) return emptyList()
-        val current = candidates.getOrNull(selected)
+        val sr = segRerank
+        if (isConverting && sr != null && sr.id == id) {
+            val seg = segs.getOrNull(sr.index) ?: return emptyList()
+            val mapped = ranked.filter { it.startsWith(sr.prefix) && it.endsWith(sr.suffix) && it.length > sr.prefix.length + sr.suffix.length }
+                .map { it.substring(sr.prefix.length, it.length - sr.suffix.length) }
+            if (mapped.isEmpty()) return emptyList()
+            val current = seg.surface
+            val moved = seg.selected != 0
+            seg.candidates = (mapped + seg.candidates).distinct()
+            seg.selected = if (moved) seg.candidates.indexOf(current).coerceAtLeast(0) else 0
+            seg.reranked = true
+            return conversionView()
+        }
+        if (isConverting) return emptyList()
         candidates = ranked
-        if (!converting) return listOf(ImeCommand.SetComposing(composingText))
-        // 変換中に候補を選び直していたら、その候補を選んだままにする
-        selected = if (selected == 0) 0 else ranked.indexOf(current).coerceAtLeast(0)
-        return listOf(ImeCommand.SetComposing(composingText), ImeCommand.ShowCandidates(candidates, selected))
+        return listOf(ImeCommand.SetComposing(composingText))
     }
 
     /** アプリ側の事情（入力欄の切り替えなど）や Enter で、いま出しているものを確定させる */
@@ -121,9 +164,9 @@ class InputEngine(
         if (!isComposing) return emptyList()
         flushPending()
         // 末尾の「n」が「ん」になるなどで読みが変わったら、辞書の1位を取り直す（並べ替えの依頼は捨てる）
-        if (!converting && !showReading && settings.liveConversion) refreshCandidates()
+        if (!isConverting && !showReading && settings.liveConversion) refreshCandidates()
         val text = composingText
-        val wasConverting = converting
+        val wasConverting = isConverting
         reset()
         leftContext = (leftContext + text).takeLast(MAX_CONTEXT)
         return listOfNotNull(ImeCommand.Commit(text), ImeCommand.HideCandidates.takeIf { wasConverting })
@@ -133,10 +176,12 @@ class InputEngine(
     fun reset() {
         units.clear()
         romaji.clear()
+        conversions = emptyList()
         candidates = emptyList()
         candidatesFor = null
-        converting = false
-        selected = 0
+        segs.clear()
+        focus = 0
+        segRerank = null
         showReading = false
         requestId++
     }
@@ -156,76 +201,165 @@ class InputEngine(
             // 未確定がないときは、文字以外はアプリの通常動作に任せる
             if (input !is KeyInput.Text) return pass()
         }
+        if (isConverting) return handleConverting(input)
+
         val commands = mutableListOf<ImeCommand>()
         when (input) {
             is KeyInput.Text -> {
-                if (converting) {
-                    // 1〜9 は、いま見えている頁（9件ずつ）の中の番号
-                    val digit = input.char - '1'
-                    val index = selected / PAGE * PAGE + digit
-                    if (digit in 0 until PAGE && index < candidates.size) {
-                        selected = index
-                        return EngineResult(commitAll(), consumed = true)
-                    }
-                    // 変換中に文字を打ったら、選んでいる候補を確定して次の入力を始める
-                    commands += commitAll()
-                }
                 showReading = false
                 typeChar(input.char)
             }
             KeyInput.Backspace -> {
-                if (converting) stopConverting(commands) else {
-                    showReading = false
-                    deleteLast()
-                }
+                showReading = false
+                deleteLast()
             }
             KeyInput.Enter -> return EngineResult(commitAll(), consumed = true)
             KeyInput.Escape -> {
-                if (converting) {
-                    stopConverting(commands)
-                } else {
-                    reset()
-                    return EngineResult(listOf(ImeCommand.SetComposing("")), consumed = true)
-                }
+                reset()
+                return EngineResult(listOf(ImeCommand.SetComposing("")), consumed = true)
             }
-            KeyInput.Space, KeyInput.Down -> moveSelection(+1, commands)
-            KeyInput.ShiftSpace, KeyInput.Up -> moveSelection(-1, commands)
-            is KeyInput.ConvertWidth -> {
-                if (converting) stopConverting(commands)
-                convertWidth(input.target)
+            KeyInput.Space, KeyInput.Down, KeyInput.ShiftSpace, KeyInput.Up -> {
+                commands += startConversion()
+                if (input == KeyInput.ShiftSpace || input == KeyInput.Up) segs.firstOrNull()?.let { it.selected = it.candidates.lastIndex }
+                return EngineResult(commands + conversionView(), consumed = true)
             }
-            KeyInput.Other -> return EngineResult(commitAll(), consumed = false)
+            KeyInput.ShiftLeft, KeyInput.ShiftRight -> {
+                commands += startConversion()
+                if (isConverting) commands += resize(if (input == KeyInput.ShiftLeft) -1 else +1)
+                return EngineResult(commands + conversionView(), consumed = true)
+            }
+            is KeyInput.ConvertWidth -> convertWidth(input.target)
+            // 入力中の左右（未確定文字列の中でのカーソル移動）はまだ持たないので、確定してアプリへ渡す
+            KeyInput.Left, KeyInput.Right, KeyInput.Other -> return EngineResult(commitAll(), consumed = false)
             is KeyInput.SetJapanese, KeyInput.ToggleJapanese -> error("handled above")
         }
         if (!isComposing) {
             commands += ImeCommand.SetComposing("")
             return EngineResult(commands, consumed = true)
         }
-        if (!converting && !showReading) commands += refreshCandidates()
+        if (!showReading) commands += refreshCandidates()
         commands += ImeCommand.SetComposing(composingText)
         return EngineResult(commands, consumed = true)
     }
 
-    /** 変換を始める、または候補を進める・戻す */
-    private fun moveSelection(delta: Int, commands: MutableList<ImeCommand>) {
-        if (!converting) {
-            flushPending()
-            commands += refreshCandidates()
-            if (candidates.isEmpty()) return
-            converting = true
-            showReading = false
-            // 1回目の Space は、ライブ変換で見えている1位をそのまま候補の一覧にする
-            selected = if (delta > 0) 0 else candidates.lastIndex
-        } else {
-            selected = (selected + delta).mod(candidates.size)
+    private fun handleConverting(input: KeyInput): EngineResult {
+        val commands = mutableListOf<ImeCommand>()
+        val seg = segs[focus]
+        when (input) {
+            is KeyInput.Text -> {
+                // 1〜9 は、いま見えている頁（9件ずつ）の中の番号
+                val digit = input.char - '1'
+                val index = seg.selected / PAGE * PAGE + digit
+                if (digit in 0 until PAGE && index < seg.candidates.size) {
+                    seg.selected = index
+                    if (segs.size == 1) return EngineResult(commitAll(), consumed = true)
+                    if (focus < segs.lastIndex) {
+                        focus++
+                        commands += requestSegmentRerank()
+                    }
+                } else {
+                    // 変換中に文字を打ったら、いまの変換を確定して次の入力を始める
+                    commands += commitAll()
+                    typeChar(input.char)
+                    commands += refreshCandidates()
+                    commands += ImeCommand.SetComposing(composingText)
+                    return EngineResult(commands, consumed = true)
+                }
+            }
+            KeyInput.Space, KeyInput.Down -> seg.selected = (seg.selected + 1).mod(seg.candidates.size)
+            KeyInput.ShiftSpace, KeyInput.Up -> seg.selected = (seg.selected - 1).mod(seg.candidates.size)
+            KeyInput.Left, KeyInput.Right -> {
+                val next = (focus + if (input == KeyInput.Left) -1 else 1).coerceIn(0, segs.lastIndex)
+                if (next != focus) {
+                    focus = next
+                    commands += requestSegmentRerank()
+                }
+            }
+            KeyInput.ShiftLeft -> commands += resize(-1)
+            KeyInput.ShiftRight -> commands += resize(+1)
+            KeyInput.Enter -> return EngineResult(commitAll(), consumed = true)
+            KeyInput.Escape, KeyInput.Backspace -> {
+                stopConverting(commands)
+                commands += ImeCommand.SetComposing(composingText)
+                return EngineResult(commands, consumed = true)
+            }
+            is KeyInput.ConvertWidth -> {
+                stopConverting(commands)
+                convertWidth(input.target)
+                commands += ImeCommand.SetComposing(composingText)
+                return EngineResult(commands, consumed = true)
+            }
+            KeyInput.Other -> return EngineResult(commitAll(), consumed = false)
+            is KeyInput.SetJapanese, KeyInput.ToggleJapanese -> error("handled above")
         }
-        commands += ImeCommand.ShowCandidates(candidates, selected)
+        return EngineResult(commands + conversionView(), consumed = true)
+    }
+
+    /** 変換中の未確定文字列と候補の帯 */
+    private fun conversionView(): List<ImeCommand> {
+        if (!isConverting) return emptyList()
+        val seg = segs[focus]
+        return listOf(
+            ImeCommand.SetComposing(composingText, segs.map { it.surface.length }, focus),
+            ImeCommand.ShowCandidates(seg.candidates, seg.selected, segs.take(focus).sumOf { it.surface.length }),
+        )
+    }
+
+    /** 変換を始める。ライブ変換の1位（並べ替え済みならその結果）の文節分けをそのまま使う */
+    private fun startConversion(): List<ImeCommand> {
+        flushPending()
+        val commands = refreshCandidates().toMutableList()
+        val source = candidateSource ?: return commands
+        val top = candidates.firstOrNull() ?: return commands
+        val conv = conversions.firstOrNull { it.text == top } ?: Conversion(listOf(Segment(reading, top)))
+        segs.clear()
+        for (s in conv.segments) segs += newSeg(s.reading, s.surface, source)
+        focus = 0
+        showReading = false
+        commands += requestSegmentRerank()
+        return commands
+    }
+
+    /** 選んでいる文節を縮める・伸ばす。後ろの文節は引き直す */
+    private fun resize(delta: Int): List<ImeCommand> {
+        val source = candidateSource ?: return emptyList()
+        val all = reading
+        val start = segs.take(focus).sumOf { it.reading.length }
+        val oldLen = segs[focus].reading.length
+        val newLen = (oldLen + delta).coerceIn(1, all.length - start)
+        if (newLen == oldLen) return emptyList()
+        val head = all.substring(start, start + newLen)
+        val rest = all.substring(start + newLen)
+        while (segs.size > focus) segs.removeAt(segs.lastIndex)
+        segs += Seg(head, source.segmentCandidates(head, settings.candidateCount).ifEmpty { listOf(head) })
+        if (rest.isNotEmpty()) {
+            val conv = source.convert(rest, 1).firstOrNull() ?: Conversion(listOf(Segment(rest, rest)))
+            for (s in conv.segments) segs += newSeg(s.reading, s.surface, source)
+        }
+        return requestSegmentRerank()
+    }
+
+    private fun newSeg(reading: String, surface: String, source: CandidateSource): Seg =
+        Seg(reading, (listOf(surface) + source.segmentCandidates(reading, settings.candidateCount)).distinct())
+
+    /** 選んでいる文節の候補を、前後の文節を付けた文として言語モデルに並べ替えてもらう */
+    private fun requestSegmentRerank(): List<ImeCommand> {
+        val seg = segs[focus]
+        if (seg.reranked || seg.candidates.size < 2) return emptyList()
+        val prefix = segs.take(focus).joinToString("") { it.surface }
+        val suffix = segs.drop(focus + 1).joinToString("") { it.surface }
+        requestId++
+        segRerank = SegRerank(requestId, focus, prefix, suffix)
+        val sentences = seg.candidates.take(settings.candidateCount).map { prefix + it + suffix }
+        return listOf(ImeCommand.RequestRerank(requestId, leftContext, reading, sentences))
     }
 
     private fun stopConverting(commands: MutableList<ImeCommand>) {
-        converting = false
-        selected = 0
+        segs.clear()
+        focus = 0
+        segRerank = null
         showReading = true
+        requestId++
         commands += ImeCommand.HideCandidates
     }
 
@@ -235,7 +369,8 @@ class InputEngine(
         val r = reading
         if (r == candidatesFor) return emptyList()
         candidatesFor = r
-        candidates = if (r.isEmpty()) emptyList() else source.candidates(r, settings.candidateCount).ifEmpty { listOf(r) }
+        conversions = if (r.isEmpty()) emptyList() else source.convert(r, settings.candidateCount)
+        candidates = conversions.map { it.text }.ifEmpty { if (r.isEmpty()) emptyList() else listOf(r) }
         requestId++
         if (candidates.size < 2) return emptyList()
         return listOf(ImeCommand.RequestRerank(requestId, leftContext, r, candidates))
