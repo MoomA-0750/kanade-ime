@@ -45,7 +45,7 @@ fun main(args: Array<String>) {
         "convert" -> convert(File(args[1]), args.drop(2))
         "zenz" -> zenzTry(File(args[1]), File(args[2]), File(args[3]), args.drop(4))
         "whisper" -> whisperTry(File(args[1]), File(args[2]), args.drop(3).map(::File))
-        "eval-zenz" -> evaluateZenz(File(args[1]), File(args[2]), File(args[3]), File(args[4]), args.getOrNull(5)?.toInt() ?: 10)
+        "eval-zenz" -> evaluateZenz(File(args[1]), File(args[2]), File(args[3]), File(args[4]), args.getOrNull(5)?.toInt() ?: 10, args.getOrNull(6)?.toFloat() ?: 1.0f)
         else -> {
             System.err.println(
                 """
@@ -279,11 +279,11 @@ fun zenzTry(outDir: File, model: File, lib: File, inputs: List<String>) {
 }
 
 /** 辞書だけ・zenz で並べ替え・並べ替え＋生成 の合格数と時間を比べる */
-fun evaluateZenz(outDir: File, tsv: File, model: File, lib: File, topK: Int) {
+fun evaluateZenz(outDir: File, tsv: File, model: File, lib: File, topK: Int, beta: Float = 1.0f) {
     val converter = loadConverter(outDir)
     val cases = loadCases(tsv)
     openZenz(model, lib).use { zenz ->
-        val reranker = Reranker(zenz, topK = topK)
+        val reranker = Reranker(zenz, topK = topK, beta = beta)
         val pass = IntArray(3)
         val times = List(2) { ArrayList<Double>() }
         val changed = ArrayList<String>()
@@ -308,7 +308,7 @@ fun evaluateZenz(outDir: File, tsv: File, model: File, lib: File, topK: Int) {
         }
         fun pct(n: Int) = "$n（${"%.1f".format(100.0 * n / cases.size)}%）"
         fun med(l: ArrayList<Double>) = l.sorted().let { "中央値 ${"%.1f".format(it[it.size / 2])}ms、95% ${"%.1f".format(it[it.size * 95 / 100])}ms" }
-        println("件数 ${cases.size}、topK $topK、モデル ${model.name}")
+        println("件数 ${cases.size}、topK $topK、β $beta、モデル ${model.name}")
         println("辞書だけ          ${pct(pass[0])}")
         println("zenz で並べ替え   ${pct(pass[1])}  ${med(times[0])}")
         println("並べ替え＋生成    ${pct(pass[2])}  ${med(times[1])}")

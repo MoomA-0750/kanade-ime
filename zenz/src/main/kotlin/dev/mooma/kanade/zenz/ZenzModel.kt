@@ -7,18 +7,20 @@ import java.io.Closeable
 /**
  * zenz v3 系（v3.2 なら右文脈にも対応するが、まだ使わない）。プロンプトは
  * `<左文脈> <読み（カタカナ）> <出力></s>`（azooKey の ZenzPromptBuilder と同じ）。
- * 1本のスレッドから呼ぶこと。[cancel] だけは別スレッドから呼べる。
+ * llama.cpp の文脈は1つなので、[score]・[generate]・[close] は錠で順番にする（IME の裏のスレッドと設定画面の計測が
+ * 同じモデルを同時に使って落ちたことがある）。[cancel] だけは錠を取らずに呼べる。
  */
 class ZenzModel private constructor(private var handle: Long) : LanguageModel, Closeable {
+    private val lock = Any()
 
-    override fun score(leftContext: String, reading: String, candidates: List<String>): FloatArray? {
-        check(handle != 0L)
+    override fun score(leftContext: String, reading: String, candidates: List<String>): FloatArray? = synchronized(lock) {
+        if (handle == 0L) return null
         val prompt = prompt(leftContext, reading).encodeToByteArray()
         return ZenzNative.score(handle, prompt, candidates.map { normalize(it).encodeToByteArray() }.toTypedArray())
     }
 
-    override fun generate(leftContext: String, reading: String): String? {
-        check(handle != 0L)
+    override fun generate(leftContext: String, reading: String): String? = synchronized(lock) {
+        if (handle == 0L) return null
         val prompt = prompt(leftContext, reading).encodeToByteArray()
         // 出力はおおむね読みより短い。ずれても打ち切れるよう読みの長さ＋余裕を上限にする
         val bytes = ZenzNative.greedy(handle, prompt, reading.length + 8) ?: return null
@@ -29,7 +31,7 @@ class ZenzModel private constructor(private var handle: Long) : LanguageModel, C
         if (handle != 0L) ZenzNative.cancel(handle)
     }
 
-    override fun close() {
+    override fun close() = synchronized(lock) {
         if (handle != 0L) ZenzNative.free(handle)
         handle = 0L
     }

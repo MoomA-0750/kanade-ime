@@ -11,13 +11,14 @@ internal object WhisperNative {
 }
 
 /**
- * 音声認識（whisper.cpp）。1本のスレッドから呼ぶこと。[cancel] だけは別スレッドから呼べる。
+ * 音声認識（whisper.cpp）。[transcribe]・[close] は錠で順番にする。[cancel] だけは錠を取らずに呼べる。
  */
 class WhisperModel private constructor(private var handle: Long) : Closeable {
+    private val lock = Any()
 
     /** 16kHz・モノラル・-1〜1 の音声を文字にする。ほぼ無音・中断・失敗・幻聴（よく出る決まり文句）は null */
-    fun transcribe(pcm: FloatArray, language: String = "ja", prompt: String = DEFAULT_PROMPT): String? {
-        check(handle != 0L)
+    fun transcribe(pcm: FloatArray, language: String = "ja", prompt: String = DEFAULT_PROMPT): String? = synchronized(lock) {
+        if (handle == 0L) return null
         if (isSilent(pcm)) return null
         val bytes = WhisperNative.transcribe(handle, pcm, language.encodeToByteArray(), prompt.encodeToByteArray()) ?: return null
         val text = bytes.decodeToString().trim()
@@ -28,7 +29,7 @@ class WhisperModel private constructor(private var handle: Long) : Closeable {
         if (handle != 0L) WhisperNative.cancel(handle)
     }
 
-    override fun close() {
+    override fun close() = synchronized(lock) {
         if (handle != 0L) WhisperNative.free(handle)
         handle = 0L
     }
