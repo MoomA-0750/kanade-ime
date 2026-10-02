@@ -26,11 +26,14 @@ object ConversionBench {
         appendLine("zenz 並べ替え 10件（${ms(t)}）: ${ranked?.take(5)?.joinToString(" / ")}")
     }
 
-    /** 同梱の評価セット（eval/daily.tsv）で、1位の正解率と1回あたりの時間を測る */
+    /** 同梱の評価セット（eval/daily.tsv・daily2.tsv）で、1位の正解率と1回あたりの時間を測る */
     fun runEval(context: Context, progress: (String) -> Unit): String {
-        val cases = context.assets.open("eval-daily.tsv").bufferedReader().readLines()
-            .filter { it.isNotBlank() && !it.startsWith("#") }
-            .map { it.split('\t').let { f -> f[0] to f[1].split('|') } }
+        // 同梱の評価セット2つ（日常文 102 件、同音異義語など 100 件）
+        val cases = listOf("eval-daily.tsv", "eval-daily2.tsv").flatMap { name ->
+            context.assets.open(name).bufferedReader().readLines()
+                .filter { it.isNotBlank() && !it.startsWith("#") }
+                .map { it.split('\t').let { f -> f[0] to f[1].split('|') } }
+        }
         val converter = ConversionResources.converter(context)
         val zenz = ConversionResources.zenz(context) ?: return "zenz を読み込めなかった"
         val reranker = Reranker(zenz)
