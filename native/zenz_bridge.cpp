@@ -87,7 +87,11 @@ int decode(Zenz &z, const std::vector<llama_token> &tokens, int logits_from) {
         z.batch.seq_id[k][0] = 0;
         z.batch.logits[k] = i >= logits_from;
     }
-    if (z.abort) return -1;
+    if (z.abort) {
+        // KV はもう消したので、覚えている列も捨てる（次の呼び出しで、消した分を使い回そうとしないため）
+        reset_cache(z);
+        return -1;
+    }
     int rc = llama_decode(z.ctx, z.batch);
     if (rc != 0) {
         if (rc != 2) LOGE("llama_decode failed: %d", rc);

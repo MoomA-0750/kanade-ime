@@ -31,7 +31,11 @@ class DictionaryCandidateSource(
     /** 学習が変わった（保存したほうがよい） */
     @Volatile var learningChanged = false
 
+    /** 学習しないよう求める入力欄（パスワード欄・シークレットモードなど）にいるあいだ true */
+    @Volatile var learningPaused = false
+
     override fun learn(reading: String, surface: String) {
+        if (learningPaused) return
         val h = learning ?: return
         if (h.learn(reading, surface)) {
             converter.learnedDictionary = h.asDictionary()

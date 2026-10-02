@@ -62,6 +62,15 @@ class KanadeInputMethodService : InputMethodService() {
     /** 日本語オン/オフの「あ」「A」（重ねる窓） */
     private var modeIndicator: ModeIndicator? = null
 
+    /** パスワード欄など。キーに一切手を出さず（記録もせず）アプリへ渡す */
+    private var secureField = false
+
+    /** 入力欄が替わるたびに進める番号。裏で動いていた音声認識の結果を、別の入力欄に入れないため */
+    private var inputGeneration = 0L
+
+    /** 最後に確定した時刻。自分の確定に対する遅れた選択範囲の通知で、次の入力を捨てないため */
+    private var lastCommitAt = 0L
+
     /** アプリから最後に知らされた未確定文字列の先頭の位置（カーソルを未確定文字列の途中に置くのに使う） */
     private var composingStart = -1
 
@@ -131,6 +140,11 @@ class KanadeInputMethodService : InputMethodService() {
         // 設定画面で zenz の大きさを替えていたら読み直す
         if (settings.zenzSmall != ConversionResources.loadedSmall) zenzThread.execute { zenz = ConversionResources.zenz(this) }
         previewInBar = attribute?.packageName in settings.previewInBarPackages
+        inputGeneration++
+        secureField = isSecure(attribute)
+        // 学習しないよう求める入力欄（シークレットモードなど）では学習を止める
+        candidateSource?.learningPaused = secureField ||
+            ((attribute?.imeOptions ?: 0) and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0
         // アプリごとの挙動（カーソルが出ないなど）を調べるため、入力欄の情報を記録する
         log(
             "start-input pkg=${attribute?.packageName} restarting=$restarting type=0x${Integer.toHexString(attribute?.inputType ?: 0)} " +
@@ -157,6 +171,7 @@ class KanadeInputMethodService : InputMethodService() {
 
     override fun onFinishInput() {
         log("finish-input")
+        inputGeneration++
         saveLearning()
         if (VoiceInput.isRecording) {
             VoiceInput.cancel()
@@ -178,13 +193,16 @@ class KanadeInputMethodService : InputMethodService() {
         // （帯に出しているときはアプリに未確定文字列がないので、この判定はしない）
         composingStart = candidatesStart
         log("selection old=$oldSelStart,$oldSelEnd new=$newSelStart,$newSelEnd composing=$candidatesStart,$candidatesEnd")
-        if (!previewInBar && engine.isComposing && candidatesStart == -1 && candidatesEnd == -1) {
+        // 自分が確定した直後の通知は、確定より前の状態を報告していることがあるので見ない（遅れて届くと次の入力を捨ててしまう）
+        val justCommitted = android.os.SystemClock.uptimeMillis() - lastCommitAt < STALE_SELECTION_MS
+        if (!previewInBar && !justCommitted && engine.isComposing && candidatesStart == -1 && candidatesEnd == -1) {
             engine.reset()
             hideBar()
         }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (secureField) return super.onKeyDown(keyCode, event)
         if (keyCode == settings.voiceKey) {
             // 押している間だけ録音する（押しっぱなしの繰り返しは無視）
             if (event.repeatCount == 0) startVoice()
@@ -211,6 +229,7 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (secureField) return super.onKeyUp(keyCode, event)
         if (keyCode == settings.voiceKey) {
             stopVoice()
             log(event, "voice")
@@ -224,10 +243,10 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     private fun handle(input: KeyInput): Boolean {
-        if (input is KeyInput.Text && engine.japanese && !engine.isComposing && !previewInBar) {
-            // 入力の始まりに、カーソルの前の文を言語モデルの文脈として取る
-            engine.leftContext = currentInputConnection?.getTextBeforeCursor(InputEngine.MAX_CONTEXT, 0)?.toString().orEmpty()
-            engine.rightContext = currentInputConnection?.getTextAfterCursor(InputEngine.MAX_CONTEXT, 0)?.toString().orEmpty()
+        if (input is KeyInput.Text && engine.japanese && !engine.isComposing) {
+            // 入力の始まりに、カーソルの前後の文を言語モデルの文脈として取る（端末アプリなど帯に出すアプリでは取らない）
+            engine.leftContext = if (previewInBar) "" else currentInputConnection?.getTextBeforeCursor(InputEngine.MAX_CONTEXT, 0)?.toString().orEmpty()
+            engine.rightContext = if (previewInBar) "" else currentInputConnection?.getTextAfterCursor(InputEngine.MAX_CONTEXT, 0)?.toString().orEmpty()
         }
         val result = engine.handle(input)
         apply(result.commands)
@@ -254,6 +273,7 @@ class KanadeInputMethodService : InputMethodService() {
                     }
                 is ImeCommand.Commit -> {
                     ic?.commitText(command.text, 1)
+                    lastCommitAt = android.os.SystemClock.uptimeMillis()
                     if (previewInBar) hideBar()
                 }
                 is ImeCommand.ModeChanged -> {
@@ -352,13 +372,14 @@ class KanadeInputMethodService : InputMethodService() {
         if (!source.learningChanged) return
         source.learningChanged = false
         val text = h.write()
-        Thread {
+        // 1本のスレッドで順に書く（続けて保存したとき、同じ一時ファイルに同時に書かないように）
+        saveThread.execute {
             val tmp = java.io.File(learningFile.path + ".tmp")
             runCatching {
                 tmp.writeText(text)
                 tmp.renameTo(learningFile)
             }
-        }.start()
+        }
     }
 
     /** 話しながら途中の文字を出しているか（ReazonSpeech が使えるとき） */
@@ -406,6 +427,7 @@ class KanadeInputMethodService : InputMethodService() {
 
     /** 話している途中の文字を未確定文字列（または Termux などでは帯）に出す */
     private fun showPartial(text: String) {
+        if (engine.isComposing) return
         partialText = text
         if (previewInBar) {
             showBar { it.showPreview("🎤 $text") }
@@ -419,18 +441,30 @@ class KanadeInputMethodService : InputMethodService() {
         main.removeCallbacks(partialTick)
         showIndicatorText("…", 0)
         val started = System.nanoTime()
+        val generation = inputGeneration
         val finish = { text: String?, engineName: String ->
             main.post {
                 modeIndicator?.dismiss()
+                if (generation != inputGeneration) {
+                    // 認識しているあいだに入力欄が替わった。別の入力欄には入れない
+                    log("voice: 入力欄が替わったので捨てた")
+                    partialText = null
+                    voiceStreaming = false
+                    return@post
+                }
                 val ms = (System.nanoTime() - started) / 1_000_000
                 // 確定の文が作れなければ、話している途中に出していた文を使う
                 val final = text ?: partialText
                 log("voice: $engineName ${ms}ms ${final ?: "（認識できなかった）"}")
                 val ic = currentInputConnection
+                // 認識しているあいだに打ち始めていたら、その文字を先に確定する（未確定を上書きしないため）
+                val typing = engine.isComposing
+                if (typing && final != null) apply(engine.commitAll())
                 if (final != null) {
                     ic?.commitText(final, 1)
+                    lastCommitAt = android.os.SystemClock.uptimeMillis()
                     engine.leftContext = (engine.leftContext + final).takeLast(InputEngine.MAX_CONTEXT)
-                } else if (partialText != null || !previewInBar) {
+                } else if (!typing && (partialText != null || !previewInBar)) {
                     ic?.setComposingText("", 1)
                     ic?.finishComposingText()
                 }
@@ -491,11 +525,30 @@ class KanadeInputMethodService : InputMethodService() {
         if (engine.japanese) showStatusIcon(R.drawable.ic_mode_ja) else hideStatusIcon()
     }
 
+    private val saveThread = Executors.newSingleThreadExecutor { Thread(it, "kanade-save") }
+
+    /** パスワードの入力欄か */
+    private fun isSecure(info: EditorInfo?): Boolean {
+        val type = info?.inputType ?: return false
+        val cls = type and android.text.InputType.TYPE_MASK_CLASS
+        val variation = type and android.text.InputType.TYPE_MASK_VARIATION
+        return when (cls) {
+            android.text.InputType.TYPE_CLASS_TEXT -> variation == android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD ||
+                variation == android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
+                variation == android.text.InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD
+            android.text.InputType.TYPE_CLASS_NUMBER -> variation == android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
+            else -> false
+        }
+    }
+
     private fun log(event: KeyEvent, note: String) {
         if (settings.keyLogEnabled) keyLog.record(event, note)
     }
 
     private companion object {
+        /** 自分が確定してから、選択範囲の通知を古いものとして扱う時間 */
+        const val STALE_SELECTION_MS = 300L
+
         /** 話しながら途中の文字を出し直す間隔 */
         const val PARTIAL_INTERVAL_MS = 600L
 
