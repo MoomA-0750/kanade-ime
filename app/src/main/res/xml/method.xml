@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="dev.mooma.kanade.SettingsActivity"
+    android:supportsSwitchingToNextInputMethod="true">
+    <subtype
+        android:label="@string/subtype_ja"
+        android:imeSubtypeLocale="ja_JP"
+        android:languageTag="ja-JP"
+        android:imeSubtypeMode="keyboard"
+        android:isAsciiCapable="true" />
+</input-method>

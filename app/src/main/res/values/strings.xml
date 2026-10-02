@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Kanade</string>
+    <string name="settings_title">Kanade の設定</string>
+    <string name="subtype_ja">日本語（物理キーボード）</string>
+</resources>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 日本語入力中を示すステータスアイコン（角丸の四角に横線2本） -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M6,3h12a3,3 0 0 1 3,3v12a3,3 0 0 1 -3,3h-12a3,3 0 0 1 -3,-3v-12a3,3 0 0 1 3,-3zM7,8v2h10v-2zM7,14v2h10v-2z" />
+</vector>
