@@ -40,6 +40,11 @@ class KeyLog(context: Context) {
         }
     }
 
+    /** キー以外の出来事（帯が出たかなど、端末ごとの挙動を調べるため） */
+    fun note(text: String) = synchronized(this) {
+        file.appendText("${time.format(Date())} note $text\n")
+    }
+
     fun read(): String = synchronized(this) { if (file.exists()) file.readText() else "" }
 
     fun clear() = synchronized(this) { file.delete() }

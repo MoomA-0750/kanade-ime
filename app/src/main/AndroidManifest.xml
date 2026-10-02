@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- 候補の帯を IME の窓ではなく重ねる窓に出すため（Galaxy では物理キーボード使用中に IME の窓が出ないことがある） -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <application
         android:label="@string/app_name"
         android:icon="@drawable/ic_mode_ja"

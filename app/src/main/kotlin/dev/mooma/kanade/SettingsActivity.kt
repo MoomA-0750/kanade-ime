@@ -20,6 +20,7 @@ class SettingsActivity : Activity() {
     private lateinit var settings: KanadeSettings
     private lateinit var keyLog: KeyLog
     private lateinit var logView: TextView
+    private lateinit var overlayStatus: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,6 +41,17 @@ class SettingsActivity : Activity() {
         root.addView(Button(this).apply {
             text = "入力方法を選ぶ"
             setOnClickListener { getSystemService(InputMethodManager::class.java).showInputMethodPicker() }
+        })
+
+        root.addView(heading("候補の帯"))
+        root.addView(note("変換候補と、Termux などで入力中の文字を出す帯は「他のアプリの上に重ねて表示」で出す（カーソルの近くに出る）。許可しないと IME の窓に出すが、Galaxy で物理キーボードを使っていると出ないことがある"))
+        overlayStatus = TextView(this)
+        root.addView(overlayStatus)
+        root.addView(Button(this).apply {
+            text = "重ねて表示を許可する"
+            setOnClickListener {
+                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:$packageName")))
+            }
         })
 
         root.addView(heading("日本語オン/オフのキー（US 配列用）"))
@@ -144,6 +156,7 @@ class SettingsActivity : Activity() {
     override fun onResume() {
         super.onResume()
         refreshLog()
+        overlayStatus.text = if (OverlayBar.permitted(this)) "許可済み（重ねる窓に出す）" else "未許可（IME の窓に出す）"
     }
 
     /** 重い処理を別スレッドで動かし、結果を UI スレッドで受け取る */

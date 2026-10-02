@@ -5,7 +5,9 @@ import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
+import android.view.inputmethod.CursorAnchorInfo
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
 import dev.mooma.kanade.core.CandidateSource
 import dev.mooma.kanade.core.ImeCommand
 import dev.mooma.kanade.core.InputEngine
@@ -34,8 +36,12 @@ class KanadeInputMethodService : InputMethodService() {
     @Volatile private var latestRerank = 0L
     private val main = Handler(Looper.getMainLooper())
 
+    /** IME の窓の中の帯（重ねる権限がないとき用） */
     private var bar: CandidateBar? = null
     private var barShown = false
+
+    /** 重ねる窓の帯（権限があればこちらを使う） */
+    private var overlay: OverlayBar? = null
 
     /** 未確定文字列をアプリに出さず、帯に出すアプリを使っている */
     private var previewInBar = false
@@ -52,6 +58,7 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     override fun onDestroy() {
+        overlay?.hide()
         zenzThread.shutdownNow()
         super.onDestroy()
     }
@@ -70,6 +77,11 @@ class KanadeInputMethodService : InputMethodService() {
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
+        // カーソルの位置を受け取り、重ねる帯をその近くに置く（対応しないアプリもある）
+        overlay?.clearAnchor()
+        currentInputConnection?.requestCursorUpdates(
+            InputConnection.CURSOR_UPDATE_IMMEDIATE or InputConnection.CURSOR_UPDATE_MONITOR,
+        )
         engine.settings = settings.engineSettings()
         mapper.triggers = settings.toggleTriggers
         previewInBar = attribute?.packageName in settings.previewInBarPackages
@@ -79,6 +91,13 @@ class KanadeInputMethodService : InputMethodService() {
         }
         updateStatusIcon()
     }
+
+    override fun onUpdateCursorAnchorInfo(cursorAnchorInfo: CursorAnchorInfo?) {
+        overlay?.updateAnchor(cursorAnchorInfo) ?: run { lastAnchor = cursorAnchorInfo }
+    }
+
+    /** 重ねる帯を作る前に届いたカーソルの位置 */
+    private var lastAnchor: CursorAnchorInfo? = null
 
     override fun onFinishInput() {
         engine.reset()
@@ -191,15 +210,29 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     private fun showBar(update: (CandidateBar) -> Unit) {
+        if (OverlayBar.permitted(this)) {
+            val o = overlay ?: OverlayBar(window?.window?.context ?: this).also {
+                it.updateAnchor(lastAnchor)
+                overlay = it
+            }
+            runCatching { o.show(update) }.onFailure { log("overlay failed: $it") }
+            return
+        }
         if (!barShown) {
             barShown = true
             setCandidatesViewShown(true)
             requestShowSelf(0)
+            // 端末によっては IME の窓が出ない。出たかを記録し、設定画面のキー記録で確かめられるようにする
+            main.postDelayed({
+                val b = bar
+                log("ime-window bar: created=${b != null} shown=${b?.isShown} height=${b?.height} window=${window?.window?.decorView?.isShown}")
+            }, 500)
         }
         bar?.let(update)
     }
 
     private fun hideBar() {
+        overlay?.hide()
         if (barShown) {
             barShown = false
             setCandidatesViewShown(false)
@@ -213,5 +246,9 @@ class KanadeInputMethodService : InputMethodService() {
 
     private fun log(event: KeyEvent, note: String) {
         if (settings.keyLogEnabled) keyLog.record(event, note)
+    }
+
+    private fun log(note: String) {
+        if (settings.keyLogEnabled) keyLog.note(note)
     }
 }
