@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "kanade-ime"
-include(":core", ":app")
+include(":core", ":zenz", ":dictool", ":app")

@@ -65,6 +65,38 @@ class SettingsActivity : Activity() {
         root.addView(heading("試し打ち"))
         root.addView(EditText(this).apply { hint = "ここで入力を試す" })
 
+        root.addView(heading("変換の試験（段階2）"))
+        root.addView(note("ひらがなの読みを入れて変換する。まだ入力中の変換には使っていない"))
+        val readingInput = EditText(this).apply { hint = "例: きょうはいいてんきですね" }
+        root.addView(readingInput)
+        val convertResult = TextView(this).apply {
+            textSize = 13f
+            setTextIsSelectable(true)
+        }
+        val convertButtons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        convertButtons.addView(Button(this).apply {
+            text = "変換"
+            setOnClickListener {
+                val reading = readingInput.text.toString().trim()
+                if (reading.isEmpty()) return@setOnClickListener
+                convertResult.text = "変換中…"
+                background { ConversionBench.tryConvert(this@SettingsActivity, reading) }.let { task ->
+                    task { convertResult.text = it }
+                }
+            }
+        })
+        convertButtons.addView(Button(this).apply {
+            text = "評価セットで測る"
+            setOnClickListener {
+                convertResult.text = "準備中…"
+                background {
+                    ConversionBench.runEval(this@SettingsActivity) { msg -> runOnUiThread { convertResult.text = msg } }
+                }.let { task -> task { convertResult.text = it } }
+            }
+        })
+        root.addView(convertButtons)
+        root.addView(convertResult)
+
         root.addView(heading("キー記録"))
         root.addView(note("IME に届いたキーを記録する。DeX が先に取るキーはここに出ない"))
         root.addView(CheckBox(this).apply {
@@ -98,6 +130,14 @@ class SettingsActivity : Activity() {
     override fun onResume() {
         super.onResume()
         refreshLog()
+    }
+
+    /** 重い処理を別スレッドで動かし、結果を UI スレッドで受け取る */
+    private fun background(work: () -> String): ((String) -> Unit) -> Unit = { onDone ->
+        Thread {
+            val result = runCatching(work).getOrElse { "失敗: $it" }
+            runOnUiThread { onDone(result) }
+        }.start()
     }
 
     private fun refreshLog() {

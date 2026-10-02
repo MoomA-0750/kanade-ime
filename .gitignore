@@ -10,3 +10,5 @@ models/
 *.bin
 *.onnx
 .trash/
+# 取得した辞書・モデルのキャッシュ（scripts と dictool が置く）
+.cache/

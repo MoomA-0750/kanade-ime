@@ -2,20 +2,22 @@
 
 ## 現在（2026-10-02）
 
-- 段階0（方式決定）を終え、段階1（最小の IME）の実装をエミュレータで確かめたところ
-- 段階1で残っているのは、Fold 7 実機の DeX で届くキーの表（[docs/DEX-KEYS.md](docs/DEX-KEYS.md)）だけ。本人に debug APK を入れてもらう必要がある
-- 次の一手: 段階2（Mozc 辞書の LOUDS 変換とビタビを `core` に、zenz の JNI を別モジュールに）
+- 段階2（変換エンジン）を実装し、エミュレータで動作を確かめた。辞書（Mozc）＋ラティス＋zenz の並べ替えで、日常文の評価セットの1位正解が 76.5%→95.1%
+- **Fold 7 での実速度がまだ**。設定画面の「変換の試験」→「評価セットで測る」の結果をもらう
+- 次の一手: 段階3（ライブ変換）。Fold 7 の速度を見て、打鍵ごとに zenz を回すか、辞書の結果を先に出して止まったときだけ並べ替えるかを決める
 
 ## 完了
 
-- 段階0: 既存の Android 向け zenz 実装（Sumire・Keynako）、azooKey の Swift 移植、Mozc の Android ビルドと辞書を調べ、方式B（Kotlin の辞書・ラティス＋zenz を JNI）に仮決定（`docs/PLAN.md`「段階0の決定」、`docs/RESEARCH-stage0.md`）
-- 段階1（実機確認を除く）: `core`（ローマ字→かな・未確定・F6〜F10、単体テスト12件）と `app`（UI なしの IME、JIS/US の切り替えキー、設定とキー記録の画面）。to-fu のエミュレータで動作確認（`docs/BUILD.md`）
+- 段階0: 方式B（Kotlin の辞書・ラティス＋zenz を JNI）に仮決定（`docs/PLAN.md`「段階0の決定」、`docs/RESEARCH-stage0.md`）
+- 段階1: UI なしの IME、JIS/US の切り替えキー、F6〜F10 と Ctrl+U/I/O/P/T、キー記録。Fold 7 の DeX で本人が試して不具合なし
+- 段階2: `core/dict`・`core/convert`（辞書・ラティス・N-best・並べ替え）、`zenz`・`native/`（llama.cpp の JNI）、`dictool`（辞書の取得・変換・評価）、設定画面の変換の試験。単体テスト 19 件
 
 ## 未完了・次の手順
 
-- 段階1: Fold 7 の DeX でキー表を取る（本人に `app-debug.apk` の導入を依頼）
-- 段階2:
-  - Mozc の `dictionary_oss` を取得し、ビルド時に LOUDS 形式へ変換するツール（JVM）を作る。辞書はリポジトリに入れない
-  - `core` にラティスとビタビ（N-best）。Sumire の `converter/` と `path_algorithm/` を参考にする
-  - zenz: azooKey フォークの llama.cpp を submodule にして NDK でビルド（arm64-v8a と、エミュレータ用の x86_64）。作業機に NDK・CMake がまだない
-  - Fold 7 で推論時間を測る
+- Fold 7 で「評価セットで測る」を実行してもらい、結果を `docs/PLAN.md` の段階2に書く
+- DeX のキー表（`docs/DEX-KEYS.md`）は未記入。設定画面の「キー記録」の中身をもらえれば埋める
+- 段階3: ライブ変換
+  - 未確定文字列を打鍵ごとに辞書の1位で置き換え、止まったら（または Space で）zenz の並べ替え結果に差し替える。要求に番号を振り、古い推論は `cancel` で止める
+  - 左文脈は `getTextBeforeCursor(40)`
+  - 文節の区切りと伸縮（Shift+矢印）、候補の表示（まず画面下の帯）
+- 後回し: APK を縮める、Zenzai の制約付き再探索の移植、ユーザー辞書・学習
