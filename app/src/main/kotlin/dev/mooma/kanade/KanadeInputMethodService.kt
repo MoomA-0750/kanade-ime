@@ -158,7 +158,9 @@ class KanadeInputMethodService : InputMethodService() {
         saveLearning()
         if (VoiceInput.isRecording) {
             VoiceInput.cancel()
+            main.removeCallbacks(partialTick)
             modeIndicator?.dismiss()
+            partialText = null
         }
         engine.reset()
         hideBar()
@@ -356,12 +358,33 @@ class KanadeInputMethodService : InputMethodService() {
         }.start()
     }
 
+    /** 話しながら途中の文字を出しているか（ReazonSpeech が使えるとき） */
+    private var voiceStreaming = false
+    private var partialBusy = false
+    private var partialText: String? = null
+    private val partialTick = object : Runnable {
+        override fun run() {
+            if (!VoiceInput.isRecording || !voiceStreaming) return
+            if (!partialBusy) {
+                partialBusy = true
+                StreamingRecognizer.recognize(this@KanadeInputMethodService, VoiceInput.snapshot(), settings.voiceThreads) { text ->
+                    main.post {
+                        partialBusy = false
+                        if (VoiceInput.isRecording && text != null) showPartial(text)
+                    }
+                }
+            }
+            main.postDelayed(this, PARTIAL_INTERVAL_MS)
+        }
+    }
+
     private fun startVoice() {
         if (VoiceInput.isRecording) return
-        val model = settings.voiceModel
+        val whisperReady = settings.voiceModel.isReady(this)
+        val streamingReady = settings.voiceStreaming && StreamingRecognizer.isReady(this)
         val message = when {
             !VoiceInput.hasPermission(this) -> "マイクの権限がない（設定画面で許可）"
-            !model.isReady(this) -> "音声認識のモデルがない（設定画面で取得）"
+            !whisperReady && !streamingReady -> "音声認識のモデルがない（設定画面で取り込む）"
             !VoiceInput.start(this) -> "録音を始められない"
             else -> null
         }
@@ -372,21 +395,52 @@ class KanadeInputMethodService : InputMethodService() {
         }
         // 入力中の文字があれば先に確定し、認識した文はその後ろに入れる
         apply(engine.commitAll())
+        voiceStreaming = streamingReady
+        partialText = null
         showIndicatorText("🎤", 0)
+        if (voiceStreaming) main.postDelayed(partialTick, PARTIAL_INTERVAL_MS)
+    }
+
+    /** 話している途中の文字を未確定文字列（または Termux などでは帯）に出す */
+    private fun showPartial(text: String) {
+        partialText = text
+        if (previewInBar) {
+            showBar { it.showPreview("🎤 $text") }
+        } else {
+            currentInputConnection?.setComposingText(text, 1)
+        }
     }
 
     private fun stopVoice() {
-        if (!VoiceInput.isRecording) return
+        val pcm = VoiceInput.stopRecording() ?: return
+        main.removeCallbacks(partialTick)
         showIndicatorText("…", 0)
-        VoiceInput.stop(this, settings.voiceModel, settings.voiceThreads) { text, ms ->
+        val started = System.nanoTime()
+        val finish = { text: String?, engineName: String ->
             main.post {
                 modeIndicator?.dismiss()
-                log("voice: ${ms}ms ${text ?: "（認識できなかった）"}")
-                if (text != null) {
-                    currentInputConnection?.commitText(text, 1)
-                    engine.leftContext = (engine.leftContext + text).takeLast(InputEngine.MAX_CONTEXT)
+                val ms = (System.nanoTime() - started) / 1_000_000
+                // 確定の文が作れなければ、話している途中に出していた文を使う
+                val final = text ?: partialText
+                log("voice: $engineName ${ms}ms ${final ?: "（認識できなかった）"}")
+                val ic = currentInputConnection
+                if (final != null) {
+                    ic?.commitText(final, 1)
+                    engine.leftContext = (engine.leftContext + final).takeLast(InputEngine.MAX_CONTEXT)
+                } else if (partialText != null || !previewInBar) {
+                    ic?.setComposingText("", 1)
+                    ic?.finishComposingText()
                 }
+                if (previewInBar) hideBar()
+                partialText = null
+                voiceStreaming = false
             }
+        }
+        if (settings.voiceModel.isReady(this)) {
+            // 句読点の付いた確定の文は whisper で作る
+            VoiceInput.transcribe(this, pcm, settings.voiceModel, settings.voiceThreads) { text, _ -> finish(text, "whisper") }
+        } else {
+            StreamingRecognizer.recognize(this, pcm, settings.voiceThreads) { text -> finish(text, "reazon") }
         }
     }
 
@@ -439,6 +493,9 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     private companion object {
+        /** 話しながら途中の文字を出し直す間隔 */
+        const val PARTIAL_INTERVAL_MS = 600L
+
         /** 変換中に選んでいる文節の背景（薄い青。明るい画面でも暗い画面でも字が読める程度に） */
         val FOCUS_COLOR = Color.argb(0x60, 0x40, 0x80, 0xE0)
     }

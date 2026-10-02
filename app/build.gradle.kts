@@ -76,6 +76,11 @@ android {
         getByName("main").assets.srcDir(kanadeAssetsDir)
     }
 
+    packaging {
+        // ネイティブ（特に sherpa-onnx の 24MB）を APK の中で圧縮する。入れるときに展開されるので、APK の受け渡しが軽くなる
+        jniLibs.useLegacyPackaging = true
+    }
+
     androidResources {
         // 圧縮せずに入れ、辞書は APK から直接 mmap する
         noCompress += listOf("kpos", "gguf", "kgz")
@@ -108,4 +113,6 @@ dependencies {
     implementation(project(":zenz"))
     implementation(project(":whisper"))
     implementation(project(":native-whisper"))
+    // 話しながら文字が出る音声認識（ReazonSpeech）に使う sherpa-onnx。prepareKanadeAssets が .cache/ へ取得する
+    implementation(files(rootProject.file(".cache/sherpa-aar/sherpa-onnx-static-link-onnxruntime-1.13.8.aar")))
 }

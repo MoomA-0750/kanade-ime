@@ -49,6 +49,11 @@ class KanadeSettings(context: Context) {
         get() = prefs.getInt(KEY_VOICE_KEY, android.view.KeyEvent.KEYCODE_F12)
         set(value) = prefs.edit().putInt(KEY_VOICE_KEY, value).apply()
 
+    /** 話しながら文字を出す（ReazonSpeech）。切ると、離してから whisper で文字にするだけ */
+    var voiceStreaming: Boolean
+        get() = prefs.getBoolean(KEY_VOICE_STREAMING, true)
+        set(value) = prefs.edit().putBoolean(KEY_VOICE_STREAMING, value).apply()
+
     var voiceThreads: Int
         get() = prefs.getInt(KEY_VOICE_THREADS, 4)
         set(value) = prefs.edit().putInt(KEY_VOICE_THREADS, value).apply()
@@ -80,6 +85,7 @@ class KanadeSettings(context: Context) {
         const val KEY_LEARNING_RESET = "learning_reset_at"
         const val KEY_VOICE_KEY = "voice_key"
         const val KEY_VOICE_THREADS = "voice_threads"
+        const val KEY_VOICE_STREAMING = "voice_streaming"
         const val KEY_PREVIEW_PACKAGES = "preview_in_bar_packages"
         val DEFAULT_PREVIEW_PACKAGES = setOf("com.termux")
     }

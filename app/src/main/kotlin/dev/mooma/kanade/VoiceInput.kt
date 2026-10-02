@@ -108,16 +108,18 @@ object VoiceInput {
         return true
     }
 
-    /** 録音をやめて文字にする。[onResult] には文字（失敗・空なら null）と、認識にかかった ms を渡す */
-    fun stop(context: Context, voiceModel: VoiceModel, threads: Int, onResult: (String?, Long) -> Unit) {
-        val r = recorder ?: return
+    /** 録音中の、ここまでの音声（話しながら途中の文字を出すため） */
+    fun snapshot(): FloatArray = synchronized(samples) { WhisperModel.pcm16ToFloat(samples.array, samples.size) }
+
+    /** 録音をやめて、録った音声を返す（録音していなければ null） */
+    fun stopRecording(): FloatArray? {
+        val r = recorder ?: return null
         recorder = null
         recordThread?.join(500)
         recordThread = null
         runCatching { r.stop() }
         r.release()
-        val pcm = synchronized(samples) { WhisperModel.pcm16ToFloat(samples.array, samples.size) }
-        transcribe(context, pcm, voiceModel, threads, onResult)
+        return snapshot()
     }
 
     /** 録音をやめて捨てる */
@@ -131,7 +133,7 @@ object VoiceInput {
         model?.cancel()
     }
 
-    /** 音声を文字にする（設定画面の試験からも使う） */
+    /** whisper で音声を文字にする（設定画面の試験からも使う）。[onResult] には文字（失敗・空なら null）と、認識にかかった ms を渡す */
     fun transcribe(context: Context, pcm: FloatArray, voiceModel: VoiceModel, threads: Int, onResult: (String?, Long) -> Unit) {
         val app = context.applicationContext
         worker.execute {

@@ -11,4 +11,6 @@
 | whisper.cpp（v1.9.4） | submodule、静的リンク | MIT | |
 | whisper のモデル（OpenAI Whisper small・large-v3-turbo の ggml 版） | 本人がブラウザで取得して取り込む（APK に入れない） | MIT | |
 | kotoba-whisper v2.0（kotoba-tech） | 同上 | Apache-2.0 | |
+| sherpa-onnx（v1.13.8、onnxruntime を静的に含む AAR） | ビルド時に取得して依存に | Apache-2.0（onnxruntime は MIT） | |
+| ReazonSpeech の k2 モデル（`csukuangfj/reazonspeech-k2-v2-ja-en`） | 本人がブラウザで取得して取り込む | Apache-2.0（ReazonSpeech の表記。公開前に確かめる） | |
 | 見本の音声 `eval/voice-sample-ja.wav` | リポジトリ・APK | Windows の音声合成（Microsoft Haruka）で作成 | 公開前に扱いを確かめる |

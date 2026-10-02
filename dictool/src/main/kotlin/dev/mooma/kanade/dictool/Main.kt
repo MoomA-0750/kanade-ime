@@ -20,6 +20,11 @@ const val MOZC_COMMIT = "a069a88d4cb5c011de0f9aebb6c149a1c808d904"
 /** 辞書の生成物の版（2: pos.kpos、3: symbol.ksym、4: 記号と絵文字を分けた emoji.ksym） */
 const val BUILD_REVISION = 4
 
+/** 逐次の音声認識に使う sherpa-onnx の Android 用ライブラリ（onnxruntime を静的に含む AAR）。版とハッシュを固定する */
+const val SHERPA_AAR_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-static-link-onnxruntime-1.13.8.aar"
+const val SHERPA_AAR_FILE = "sherpa-onnx-static-link-onnxruntime-1.13.8.aar"
+const val SHERPA_AAR_SHA256 = "b22c3fc1b6a45666d28892bb2f7694beeb77a8362d7ebd77c1a5431ec9435471"
+
 /** 辞書以外に取る Mozc のデータ（記号・絵文字）。src/data からのパス */
 val MOZC_EXTRA_FILES = listOf("symbol/symbol.tsv", "emoji/emoji_data.tsv")
 
@@ -33,6 +38,7 @@ fun main(args: Array<String>) {
     when (args.firstOrNull()) {
         "fetch" -> fetch(File(args[1]))
         "fetch-model" -> fetchModel(File(args[1]))
+        "fetch-sherpa" -> fetchSherpa(File(args[1]))
         "assets" -> assets(File(args[1]), File(args[2]))
         "build" -> build(File(args[1]), File(args[2]))
         "eval" -> evaluate(File(args[1]), File(args[2]))
@@ -97,6 +103,20 @@ fun fetchModel(cacheDir: File): File {
     return f
 }
 
+/** sherpa-onnx の AAR を取得する（無いときだけ）。app の依存として .cache から読む */
+fun fetchSherpa(cacheDir: File): File {
+    val dir = File(cacheDir, "sherpa-aar").apply { mkdirs() }
+    val f = File(dir, SHERPA_AAR_FILE)
+    if (!f.exists() || sha256(f) != SHERPA_AAR_SHA256) {
+        println("取得: $SHERPA_AAR_URL")
+        val tmp = File(dir, "$SHERPA_AAR_FILE.part")
+        URI(SHERPA_AAR_URL).toURL().openStream().use { input -> tmp.outputStream().use { input.copyTo(it) } }
+        check(sha256(tmp) == SHERPA_AAR_SHA256) { "sherpa-onnx の AAR のハッシュが合わない" }
+        tmp.renameTo(f)
+    }
+    return f
+}
+
 fun sha256(f: File): String {
     val md = java.security.MessageDigest.getInstance("SHA-256")
     f.inputStream().use { input ->
@@ -124,6 +144,7 @@ fun assets(cacheDir: File, outDir: File) {
         File(built, name).copyTo(File(outDir, name), overwrite = true)
     }
     model.copyTo(File(outDir, "zenz.gguf"), overwrite = true)
+    fetchSherpa(cacheDir)
 }
 
 fun build(mozcDir: File, outDir: File) {

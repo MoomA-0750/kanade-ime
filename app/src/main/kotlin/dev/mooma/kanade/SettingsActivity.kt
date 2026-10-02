@@ -278,6 +278,38 @@ class SettingsActivity : Activity() {
                 }
             })
         })
+        root.addView(note(
+            "話しながら文字を出すには ReazonSpeech（約 73MB、4 つのファイル）を取り込む。話している途中は ReazonSpeech の結果を出し、" +
+                "離したら whisper（取り込んであれば）で句読点の付いた文にして確定する。whisper がなければ ReazonSpeech の結果で確定する"
+        ))
+        root.addView(CheckBox(this).apply {
+            text = "話しながら文字を出す（ReazonSpeech）"
+            isChecked = settings.voiceStreaming
+            setOnCheckedChangeListener { _, checked -> settings.voiceStreaming = checked }
+        })
+        root.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(Button(this@SettingsActivity).apply {
+                text = "ReazonSpeech をブラウザで取得"
+                setOnClickListener {
+                    startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(StreamingRecognizer.PAGE_URL)))
+                    android.app.AlertDialog.Builder(this@SettingsActivity)
+                        .setMessage("開いたページから次の 4 つを落とす:\n" + StreamingRecognizer.FILES.keys.joinToString("\n"))
+                        .setPositiveButton("閉じる", null).show()
+                }
+            })
+            addView(Button(this@SettingsActivity).apply {
+                text = "取得した4つを選ぶ"
+                setOnClickListener {
+                    @Suppress("DEPRECATION")
+                    startActivityForResult(
+                        Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
+                            .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true),
+                        REQUEST_REAZON,
+                    )
+                }
+            })
+        })
         val result = TextView(this).apply {
             textSize = 13f
             setTextIsSelectable(true)
@@ -285,18 +317,41 @@ class SettingsActivity : Activity() {
         root.addView(Button(this).apply {
             text = "見本の音声で測る（8.8秒の日本語）"
             setOnClickListener {
-                if (!settings.voiceModel.isReady(this@SettingsActivity)) {
+                val whisperReady = settings.voiceModel.isReady(this@SettingsActivity)
+                val reazonReady = StreamingRecognizer.isReady(this@SettingsActivity)
+                if (!whisperReady && !reazonReady) {
                     result.text = "モデルがまだない"
                     return@setOnClickListener
                 }
                 result.text = "認識中…（初回はモデルの読み込みも含む）"
                 val pcm = readSampleWav()
-                val started = System.nanoTime()
-                VoiceInput.transcribe(this@SettingsActivity, pcm, settings.voiceModel, settings.voiceThreads) { text, ms ->
-                    val total = (System.nanoTime() - started) / 1_000_000
-                    runOnUiThread {
-                        result.text = "${settings.voiceModel.name}・${settings.voiceThreads}スレッド: 認識 ${ms}ms（読み込み込みで ${total}ms）\n${text ?: "（認識できなかった）"}"
+                // ReazonSpeech（あれば）→ whisper（あれば）の順に測る。2回目は読み込み済みの速さ
+                fun runWhisper() {
+                    if (!whisperReady) return
+                    val started = System.nanoTime()
+                    VoiceInput.transcribe(this@SettingsActivity, pcm, settings.voiceModel, settings.voiceThreads) { text, ms ->
+                        val total = (System.nanoTime() - started) / 1_000_000
+                        runOnUiThread {
+                            result.append("whisper ${settings.voiceModel.name}・${settings.voiceThreads}スレッド: 認識 ${ms}ms（読み込み込みで ${total}ms）\n${text ?: "（認識できなかった）"}\n")
+                        }
                     }
+                }
+                result.text = ""
+                if (reazonReady) {
+                    val started = System.nanoTime()
+                    StreamingRecognizer.recognize(this@SettingsActivity, pcm, settings.voiceThreads) { first ->
+                        val firstMs = (System.nanoTime() - started) / 1_000_000
+                        val again = System.nanoTime()
+                        StreamingRecognizer.recognize(this@SettingsActivity, pcm, settings.voiceThreads) { _ ->
+                            val ms = (System.nanoTime() - again) / 1_000_000
+                            runOnUiThread {
+                                result.append("ReazonSpeech: 認識 ${ms}ms（初回は読み込み込みで ${firstMs}ms）\n${first ?: "（認識できなかった）"}\n")
+                                runWhisper()
+                            }
+                        }
+                    }
+                } else {
+                    runWhisper()
                 }
             }
         })
@@ -309,6 +364,18 @@ class SettingsActivity : Activity() {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
         val uri = data?.data
+        if (requestCode == REQUEST_REAZON && resultCode == RESULT_OK && data != null) {
+            val uris = data.clipData?.let { c -> (0 until c.itemCount).map { c.getItemAt(it).uri } } ?: listOfNotNull(data.data)
+            voiceStatus.text = "写している…"
+            Thread {
+                val n = runCatching { StreamingRecognizer.importFrom(this, uris) }.getOrDefault(0)
+                runOnUiThread {
+                    refreshVoice()
+                    voiceStatus.append("\nReazonSpeech: ${n} 個を取り込んだ（名前と大きさが合うものだけ）")
+                }
+            }.start()
+            return
+        }
         if (requestCode != REQUEST_MODEL || resultCode != RESULT_OK || uri == null) return
         val model = settings.voiceModel
         voiceStatus.text = "写している…"
@@ -340,7 +407,7 @@ class SettingsActivity : Activity() {
         }
         voiceStatus.text = "マイク: ${if (VoiceInput.hasPermission(this)) "許可済み" else "未許可"}　" +
             "モデル: ${m.name}（$state）　録音キー: ${KeyEvent.keyCodeToString(settings.voiceKey).removePrefix("KEYCODE_")}　" +
-            "スレッド: ${settings.voiceThreads}"
+            "スレッド: ${settings.voiceThreads}　ReazonSpeech: ${StreamingRecognizer.readyCount(this)}/${StreamingRecognizer.FILES.size}"
     }
 
     /** 次に押したキーを録音キーにする */
@@ -417,5 +484,6 @@ class SettingsActivity : Activity() {
 
     private companion object {
         const val REQUEST_MODEL = 10
+        const val REQUEST_REAZON = 11
     }
 }
