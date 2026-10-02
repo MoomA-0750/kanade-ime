@@ -29,16 +29,29 @@ class KanadeSettings(context: Context) {
         get() = prefs.getBoolean(KEY_KEYLOG, true)
         set(value) = prefs.edit().putBoolean(KEY_KEYLOG, value).apply()
 
+    var liveConversion: Boolean
+        get() = prefs.getBoolean(KEY_LIVE, true)
+        set(value) = prefs.edit().putBoolean(KEY_LIVE, value).apply()
+
+    /** 未確定文字列をうまく出せないアプリ（端末など）。ここに入れたアプリでは、入力中の文字を候補欄に出す */
+    var previewInBarPackages: Set<String>
+        get() = prefs.getString(KEY_PREVIEW_PACKAGES, null)?.split(',', ' ', '\n')?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet()
+            ?: DEFAULT_PREVIEW_PACKAGES
+        set(value) = prefs.edit().putString(KEY_PREVIEW_PACKAGES, value.joinToString(",")).apply()
+
     var lastJapanese: Boolean
         get() = prefs.getBoolean(KEY_LAST_MODE, false)
         set(value) = prefs.edit().putBoolean(KEY_LAST_MODE, value).apply()
 
-    fun engineSettings() = EngineSettings(fullWidthSymbols = fullWidthSymbols)
+    fun engineSettings() = EngineSettings(fullWidthSymbols = fullWidthSymbols, liveConversion = liveConversion)
 
     private companion object {
         const val KEY_TRIGGERS = "toggle_triggers"
         const val KEY_FULL_WIDTH = "full_width_symbols"
         const val KEY_KEYLOG = "key_log"
         const val KEY_LAST_MODE = "last_japanese"
+        const val KEY_LIVE = "live_conversion"
+        const val KEY_PREVIEW_PACKAGES = "preview_in_bar_packages"
+        val DEFAULT_PREVIEW_PACKAGES = setOf("com.termux")
     }
 }

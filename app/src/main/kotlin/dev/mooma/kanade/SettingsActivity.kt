@@ -62,11 +62,25 @@ class SettingsActivity : Activity() {
             setOnCheckedChangeListener { _, checked -> settings.fullWidthSymbols = checked }
         })
 
+        root.addView(CheckBox(this).apply {
+            text = "ライブ変換（打つたびに変換結果を出す）"
+            isChecked = settings.liveConversion
+            setOnCheckedChangeListener { _, checked -> settings.liveConversion = checked }
+        })
+        root.addView(note("入力中の文字を帯に出すアプリ（未確定文字列をうまく出せない端末アプリなど）。パッケージ名をカンマ区切りで"))
+        root.addView(EditText(this).apply {
+            setText(settings.previewInBarPackages.sorted().joinToString(", "))
+            isSingleLine = true
+            setOnFocusChangeListener { _, focused ->
+                if (!focused) settings.previewInBarPackages = text.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+            }
+        })
+
         root.addView(heading("試し打ち"))
         root.addView(EditText(this).apply { hint = "ここで入力を試す" })
 
-        root.addView(heading("変換の試験（段階2）"))
-        root.addView(note("ひらがなの読みを入れて変換する。まだ入力中の変換には使っていない"))
+        root.addView(heading("変換の試験"))
+        root.addView(note("ひらがなの読みを入れて、辞書と zenz の結果と時間を見る"))
         val readingInput = EditText(this).apply { hint = "例: きょうはいいてんきですね" }
         root.addView(readingInput)
         val convertResult = TextView(this).apply {

@@ -1,15 +1,23 @@
 package dev.mooma.kanade
 
 import android.inputmethodservice.InputMethodService
+import android.os.Handler
+import android.os.Looper
 import android.view.KeyEvent
+import android.view.View
 import android.view.inputmethod.EditorInfo
+import dev.mooma.kanade.core.CandidateSource
 import dev.mooma.kanade.core.ImeCommand
 import dev.mooma.kanade.core.InputEngine
 import dev.mooma.kanade.core.KeyInput
+import dev.mooma.kanade.core.convert.Reranker
+import dev.mooma.kanade.zenz.ZenzModel
+import java.util.concurrent.Executors
 
 /**
- * 物理キーボード専用の IME。画面キーボードも候補欄も出さず、キーをすべて onKeyDown/onKeyUp で受ける。
- * 入力の判断は [InputEngine]（core）に任せ、ここは Android との受け渡しだけをする。
+ * 物理キーボード専用の IME。画面キーボードは出さず、キーをすべて onKeyDown/onKeyUp で受ける。
+ * 入力の判断は [InputEngine]（core）に任せ、ここは Android との受け渡しと、zenz を裏で回すことだけをする。
+ * 候補は変換中だけ画面下の帯（[CandidateBar]）に出す。
  */
 class KanadeInputMethodService : InputMethodService() {
     private lateinit var settings: KanadeSettings
@@ -20,28 +28,61 @@ class KanadeInputMethodService : InputMethodService() {
     /** onKeyDown で止めたキーは、対応する onKeyUp も止める */
     private val consumedDown = HashSet<Int>()
 
+    /** zenz は1本のスレッドで動かす（読み込みも並べ替えも） */
+    private val zenzThread = Executors.newSingleThreadExecutor { Thread(it, "kanade-zenz") }
+    @Volatile private var zenz: ZenzModel? = null
+    @Volatile private var latestRerank = 0L
+    private val main = Handler(Looper.getMainLooper())
+
+    private var bar: CandidateBar? = null
+    private var barShown = false
+
+    /** 未確定文字列をアプリに出さず、帯に出すアプリを使っている */
+    private var previewInBar = false
+
     override fun onCreate() {
         super.onCreate()
         settings = KanadeSettings(this)
         keyLog = KeyLog(this)
-        // 前回のモードを引き継ぐ。ModeChanged を出させるため、反対の状態から切り替える
+        val converter = ConversionResources.converter(this)
+        engine.candidateSource = CandidateSource { reading, n -> converter.convert(reading, n).map { it.text } }
+        zenzThread.execute { zenz = ConversionResources.zenz(this) }
+        // 前回のモードを引き継ぐ
         if (settings.lastJapanese) engine.handle(KeyInput.SetJapanese(true))
+    }
+
+    override fun onDestroy() {
+        zenzThread.shutdownNow()
+        super.onDestroy()
     }
 
     override fun onEvaluateInputViewShown(): Boolean = false
 
+    /**
+     * Android 11 以降、IME の窓を見せるかはシステムが決め、IME が自分で showWindow しても出ない。
+     * 帯を出したいときだけ requestShowSelf し、その要求をここで通す（画面キーボードは出さないので、帯だけが出る）
+     */
+    override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean = barShown
+
     override fun onEvaluateFullscreenMode(): Boolean = false
+
+    override fun onCreateCandidatesView(): View = CandidateBar(this).also { bar = it }
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
         engine.settings = settings.engineSettings()
         mapper.triggers = settings.toggleTriggers
-        if (!restarting) engine.reset()
+        previewInBar = attribute?.packageName in settings.previewInBarPackages
+        if (!restarting) {
+            engine.reset()
+            hideBar()
+        }
         updateStatusIcon()
     }
 
     override fun onFinishInput() {
         engine.reset()
+        hideBar()
         super.onFinishInput()
     }
 
@@ -51,7 +92,11 @@ class KanadeInputMethodService : InputMethodService() {
     ) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         // クリックなどで未確定文字列が外から確定・消去されたら、こちらの状態も捨てる
-        if (engine.isComposing && candidatesStart == -1 && candidatesEnd == -1) engine.reset()
+        // （帯に出しているときはアプリに未確定文字列がないので、この判定はしない）
+        if (!previewInBar && engine.isComposing && candidatesStart == -1 && candidatesEnd == -1) {
+            engine.reset()
+            hideBar()
+        }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
@@ -65,7 +110,7 @@ class KanadeInputMethodService : InputMethodService() {
             }
             return super.onKeyDown(keyCode, event)
         }
-        val consumed = apply(input)
+        val consumed = handle(input)
         log(event, "$input consumed=$consumed")
         if (consumed) {
             consumedDown += keyCode
@@ -76,34 +121,90 @@ class KanadeInputMethodService : InputMethodService() {
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
         val input = mapper.onKeyUp(event)
-        if (input != null) apply(input)
+        if (input != null) handle(input)
         val consumed = consumedDown.remove(keyCode)
         log(event, if (input != null) "$input" else if (consumed) "consumed" else "pass")
         return consumed || super.onKeyUp(keyCode, event)
     }
 
-    private fun apply(input: KeyInput): Boolean {
+    private fun handle(input: KeyInput): Boolean {
+        if (input is KeyInput.Text && engine.japanese && !engine.isComposing && !previewInBar) {
+            // 入力の始まりに、カーソルの前の文を言語モデルの文脈として取る
+            engine.leftContext = currentInputConnection?.getTextBeforeCursor(InputEngine.MAX_CONTEXT, 0)?.toString().orEmpty()
+        }
         val result = engine.handle(input)
+        apply(result.commands)
+        return result.consumed
+    }
+
+    private fun apply(commands: List<ImeCommand>) {
+        if (commands.isEmpty()) return
         val ic = currentInputConnection
         ic?.beginBatchEdit()
-        for (command in result.commands) {
+        for (command in commands) {
             when (command) {
                 is ImeCommand.SetComposing ->
-                    if (command.text.isEmpty()) {
+                    if (previewInBar) {
+                        if (!engine.isConverting) {
+                            if (command.text.isEmpty()) hideBar() else showBar { it.showPreview(command.text) }
+                        }
+                    } else if (command.text.isEmpty()) {
                         ic?.setComposingText("", 1)
                         ic?.finishComposingText()
                     } else {
                         ic?.setComposingText(command.text, 1)
                     }
-                is ImeCommand.Commit -> ic?.commitText(command.text, 1)
+                is ImeCommand.Commit -> {
+                    ic?.commitText(command.text, 1)
+                    if (previewInBar) hideBar()
+                }
                 is ImeCommand.ModeChanged -> {
                     settings.lastJapanese = command.japanese
                     updateStatusIcon()
                 }
+                is ImeCommand.ShowCandidates -> showBar {
+                    it.showCandidates(command.candidates, command.selected, if (previewInBar) engine.composingText else null)
+                }
+                ImeCommand.HideCandidates -> if (previewInBar && engine.isComposing) {
+                    showBar { it.showPreview(engine.composingText) }
+                } else {
+                    hideBar()
+                }
+                is ImeCommand.RequestRerank -> requestRerank(command)
             }
         }
         ic?.endBatchEdit()
-        return result.consumed
+    }
+
+    /** 並べ替えを裏で回す。新しい要求が来たら、走っている古い推論は止める */
+    private fun requestRerank(request: ImeCommand.RequestRerank) {
+        latestRerank = request.id
+        zenz?.cancel()
+        zenzThread.execute {
+            if (request.id != latestRerank) return@execute
+            val model = zenz ?: return@execute
+            val ranked = runCatching {
+                Reranker(model).rerank(request.leftContext, request.reading, request.candidates)
+            }.getOrNull() ?: return@execute
+            main.post { apply(engine.onReranked(request.id, ranked.candidates)) }
+        }
+    }
+
+    private fun showBar(update: (CandidateBar) -> Unit) {
+        if (!barShown) {
+            barShown = true
+            setCandidatesViewShown(true)
+            requestShowSelf(0)
+        }
+        bar?.let(update)
+    }
+
+    private fun hideBar() {
+        if (barShown) {
+            barShown = false
+            setCandidatesViewShown(false)
+            requestHideSelf(0)
+        }
     }
 
     private fun updateStatusIcon() {

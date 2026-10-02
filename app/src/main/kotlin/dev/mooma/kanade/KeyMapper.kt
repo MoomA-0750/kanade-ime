@@ -44,7 +44,9 @@ class KeyMapper(var triggers: Set<ToggleTrigger>) {
         return when (code) {
             KeyEvent.KEYCODE_DEL -> KeyInput.Backspace
             KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> KeyInput.Enter
-            KeyEvent.KEYCODE_SPACE -> KeyInput.Space
+            KeyEvent.KEYCODE_SPACE -> if (event.isShiftPressed) KeyInput.ShiftSpace else KeyInput.Space
+            KeyEvent.KEYCODE_DPAD_UP -> if (event.isShiftPressed) KeyInput.Other else KeyInput.Up
+            KeyEvent.KEYCODE_DPAD_DOWN -> if (event.isShiftPressed) KeyInput.Other else KeyInput.Down
             KeyEvent.KEYCODE_ESCAPE -> KeyInput.Escape
             KeyEvent.KEYCODE_F6 -> KeyInput.ConvertWidth(WidthTarget.HIRAGANA)
             KeyEvent.KEYCODE_F7 -> KeyInput.ConvertWidth(WidthTarget.KATAKANA)
