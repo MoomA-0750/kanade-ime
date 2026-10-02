@@ -10,7 +10,6 @@ import android.media.MediaRecorder
 import android.net.Uri
 import dev.mooma.kanade.whisper.WhisperModel
 import java.io.File
-import java.util.concurrent.Executors
 
 /**
  * 音声認識のモデル。APK には入れない。ブラウザで取得したファイルを設定画面で選んでアプリ内へ写す
@@ -69,7 +68,8 @@ enum class VoiceModel(val label: String, val file: String, val url: String, val 
  * 録音・認識は専用のスレッドで行い、結果は [onResult] でメインスレッド以外から返す（呼ぶ側で UI スレッドへ）。
  */
 object VoiceInput {
-    private val worker = Executors.newSingleThreadExecutor { Thread(it, "kanade-whisper") }
+    private val worker = java.util.concurrent.Executors.newSingleThreadScheduledExecutor { Thread(it, "kanade-whisper") }
+    private var unloadTask: java.util.concurrent.ScheduledFuture<*>? = null
     @Volatile private var model: WhisperModel? = null
     @Volatile private var loadedModel: VoiceModel? = null
     @Volatile private var recorder: AudioRecord? = null
@@ -145,7 +145,21 @@ object VoiceInput {
             val t = System.nanoTime()
             val text = runCatching { m.transcribe(pcm) }.getOrNull()?.takeIf { it.isNotBlank() }
             onResult(text, (System.nanoTime() - t) / 1_000_000)
+            scheduleUnload()
         }
+    }
+
+    /**
+     * しばらく使わなければモデルを放す（数百 MB あり、IME のプロセスが裏で落とされやすくなるため）。
+     * 次に使うときに読み直す（small で 0.2 秒ほど）
+     */
+    private fun scheduleUnload() {
+        unloadTask?.cancel(false)
+        unloadTask = worker.schedule({
+            model?.close()
+            model = null
+            loadedModel = null
+        }, IDLE_UNLOAD_MINUTES, java.util.concurrent.TimeUnit.MINUTES)
     }
 
     /** 選んだモデルを読む（別のモデルに変わっていたら読み直す）。worker のスレッドから呼ぶ */
@@ -163,6 +177,9 @@ object VoiceInput {
             loadedModel = voiceModel
         }
     }
+
+    /** これだけ使わなければモデルを放す */
+    const val IDLE_UNLOAD_MINUTES = 5L
 
     /** 60 秒で録音を打ち切る */
     private const val MAX_SAMPLES = WhisperModel.SAMPLE_RATE * 60

@@ -27,7 +27,8 @@ object StreamingRecognizer {
         "tokens.txt" to 26_631L,
     )
 
-    private val worker = Executors.newSingleThreadExecutor { Thread(it, "kanade-reazon") }
+    private val worker = Executors.newSingleThreadScheduledExecutor { Thread(it, "kanade-reazon") }
+    private var unloadTask: java.util.concurrent.ScheduledFuture<*>? = null
     @Volatile private var recognizer: OfflineRecognizer? = null
 
     fun dir(context: Context) = File(context.getExternalFilesDir("models"), "reazonspeech")
@@ -86,6 +87,12 @@ object StreamingRecognizer {
                 t
             }.getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
             onResult(text)
+            // しばらく使わなければ放す（VoiceInput と同じ）
+            unloadTask?.cancel(false)
+            unloadTask = worker.schedule({
+                recognizer?.release()
+                recognizer = null
+            }, VoiceInput.IDLE_UNLOAD_MINUTES, java.util.concurrent.TimeUnit.MINUTES)
         }
     }
 
