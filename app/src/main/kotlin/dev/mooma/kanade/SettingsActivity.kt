@@ -87,6 +87,24 @@ class SettingsActivity : Activity() {
             isChecked = settings.liveConversion
             setOnCheckedChangeListener { _, checked -> settings.liveConversion = checked }
         })
+        root.addView(CheckBox(this).apply {
+            text = "学習する（前に選んだ候補を次から上に出す）"
+            isChecked = settings.learningEnabled
+            setOnCheckedChangeListener { _, checked -> settings.learningEnabled = checked }
+        })
+        root.addView(Button(this).apply {
+            text = "学習を消す"
+            setOnClickListener {
+                android.app.AlertDialog.Builder(this@SettingsActivity)
+                    .setMessage("覚えた候補をすべて消す（ユーザー辞書は消えない）")
+                    .setPositiveButton("消す") { _, _ ->
+                        java.io.File(filesDir, "learning.tsv").delete()
+                        settings.learningResetAt = System.currentTimeMillis()
+                    }
+                    .setNegativeButton("キャンセル", null)
+                    .show()
+            }
+        })
         root.addView(note("入力中の文字を帯に出すアプリ（未確定文字列をうまく出せない端末アプリなど）。パッケージ名をカンマ区切りで"))
         root.addView(EditText(this).apply {
             setText(settings.previewInBarPackages.sorted().joinToString(", "))

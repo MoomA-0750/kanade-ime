@@ -53,6 +53,16 @@ class KanadeSettings(context: Context) {
         get() = prefs.getInt(KEY_VOICE_THREADS, 4)
         set(value) = prefs.edit().putInt(KEY_VOICE_THREADS, value).apply()
 
+    /** よく選ぶ候補を上げる（前に選んだ候補を覚える） */
+    var learningEnabled: Boolean
+        get() = prefs.getBoolean(KEY_LEARNING, true)
+        set(value) = prefs.edit().putBoolean(KEY_LEARNING, value).apply()
+
+    /** 設定画面で学習を消した時刻。IME はこれが変わったら覚えたものを捨てる */
+    var learningResetAt: Long
+        get() = prefs.getLong(KEY_LEARNING_RESET, 0L)
+        set(value) = prefs.edit().putLong(KEY_LEARNING_RESET, value).apply()
+
     var lastJapanese: Boolean
         get() = prefs.getBoolean(KEY_LAST_MODE, false)
         set(value) = prefs.edit().putBoolean(KEY_LAST_MODE, value).apply()
@@ -66,6 +76,8 @@ class KanadeSettings(context: Context) {
         const val KEY_LAST_MODE = "last_japanese"
         const val KEY_LIVE = "live_conversion"
         const val KEY_VOICE_MODEL = "voice_model"
+        const val KEY_LEARNING = "learning"
+        const val KEY_LEARNING_RESET = "learning_reset_at"
         const val KEY_VOICE_KEY = "voice_key"
         const val KEY_VOICE_THREADS = "voice_threads"
         const val KEY_PREVIEW_PACKAGES = "preview_in_bar_packages"

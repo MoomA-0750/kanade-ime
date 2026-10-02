@@ -26,6 +26,9 @@ class KanaKanjiConverter(
 ) {
     /** ユーザー辞書。名詞,一般として、システム辞書の語より強く優先するコストで入れる */
     @Volatile var userDictionary: UserDictionary = UserDictionary.EMPTY
+
+    /** 学習した語（前に選んだ候補）。ユーザー辞書と辞書の間のコストで入れる */
+    @Volatile var learnedDictionary: UserDictionary = UserDictionary.EMPTY
     private class Node(
         val begin: Int,
         val end: Int,
@@ -58,14 +61,15 @@ class KanaKanjiConverter(
                 }
                 if (l == 1) hasSingle = true
             }
-            val user = userDictionary
-            for (l in 1..minOf(user.maxReadingLength, len - pos)) {
-                val reading = input.substring(pos, pos + l)
-                for (surface in user.lookup(reading)) {
-                    val node = Node(pos, pos + l, Word(reading, surface, unknownPosId, unknownPosId, USER_WORD_COST))
-                    beginAt[pos] += node
-                    endAt[pos + l] += node
-                    if (l == 1) hasSingle = true
+            for ((extra, cost) in listOf(userDictionary to USER_WORD_COST, learnedDictionary to LEARNED_WORD_COST)) {
+                for (l in 1..minOf(extra.maxReadingLength, len - pos)) {
+                    val reading = input.substring(pos, pos + l)
+                    for (surface in extra.lookup(reading)) {
+                        val node = Node(pos, pos + l, Word(reading, surface, unknownPosId, unknownPosId, cost))
+                        beginAt[pos] += node
+                        endAt[pos + l] += node
+                        if (l == 1) hasSingle = true
+                    }
                 }
             }
             if (!hasSingle) {
@@ -132,5 +136,8 @@ class KanaKanjiConverter(
     companion object {
         /** ユーザー辞書の語のコスト。Mozc の一般名詞（多くは 3000〜8000）より十分小さくする */
         const val USER_WORD_COST = 1000
+
+        /** 学習した語のコスト。ユーザー辞書よりは弱く、たいていの辞書の語よりは強い */
+        const val LEARNED_WORD_COST = 2500
     }
 }

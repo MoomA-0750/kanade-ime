@@ -3,6 +3,7 @@ package dev.mooma.kanade.core.convert
 import dev.mooma.kanade.core.CandidateSource
 import dev.mooma.kanade.core.CharWidth
 import dev.mooma.kanade.core.Conversion
+import dev.mooma.kanade.core.dict.LearningHistory
 import dev.mooma.kanade.core.dict.SymbolTable
 import dev.mooma.kanade.core.dict.UserDictionary
 
@@ -19,6 +20,24 @@ class DictionaryCandidateSource(
         set(value) {
             converter.userDictionary = value
         }
+
+    /** 学習（前に選んだ候補）。null なら学習しない */
+    @Volatile var learning: LearningHistory? = null
+        set(value) {
+            field = value
+            converter.learnedDictionary = value?.asDictionary() ?: UserDictionary.EMPTY
+        }
+
+    /** 学習が変わった（保存したほうがよい） */
+    @Volatile var learningChanged = false
+
+    override fun learn(reading: String, surface: String) {
+        val h = learning ?: return
+        if (h.learn(reading, surface)) {
+            converter.learnedDictionary = h.asDictionary()
+            learningChanged = true
+        }
+    }
 
     override fun convert(reading: String, n: Int): List<Conversion> =
         converter.convert(reading, n).map { Conversion(segmenter.segments(it.words)) }
@@ -52,7 +71,8 @@ class DictionaryCandidateSource(
         else -> null
     }
 
-    override fun pinned(reading: String): List<String> = userDictionary.lookup(reading)
+    override fun pinned(reading: String): List<String> =
+        (userDictionary.lookup(reading) + listOfNotNull(learning?.lookup(reading))).distinct()
 
     private companion object {
         const val SYMBOL_POSITION = 3

@@ -34,6 +34,10 @@ class KanadeInputMethodService : InputMethodService() {
     private val mapper = KeyMapper(emptySet())
 
     private var candidateSource: dev.mooma.kanade.core.convert.DictionaryCandidateSource? = null
+    /** 学習（前に選んだ候補）の保存先 */
+    private lateinit var learningFile: java.io.File
+    private var learningResetSeen = -1L
+
     private lateinit var userDictionaryStore: TextStore
     private var userDictionaryVersion = -1L
     private lateinit var snippetStore: TextStore
@@ -70,6 +74,7 @@ class KanadeInputMethodService : InputMethodService() {
         keyLog = KeyLog(this)
         candidateSource = ConversionResources.candidateSource(this)
         engine.candidateSource = candidateSource
+        learningFile = java.io.File(filesDir, "learning.tsv")
         userDictionaryStore = TextStore.userDictionary(this)
         snippetStore = TextStore.snippets(this)
         zenzThread.execute { zenz = ConversionResources.zenz(this) }
@@ -122,6 +127,7 @@ class KanadeInputMethodService : InputMethodService() {
             engine.snippets = Snippets.parse(snippetStore.read())
         }
         engine.resetDirectTyped()
+        syncLearning()
         previewInBar = attribute?.packageName in settings.previewInBarPackages
         // アプリごとの挙動（カーソルが出ないなど）を調べるため、入力欄の情報を記録する
         log(
@@ -149,6 +155,7 @@ class KanadeInputMethodService : InputMethodService() {
 
     override fun onFinishInput() {
         log("finish-input")
+        saveLearning()
         if (VoiceInput.isRecording) {
             VoiceInput.cancel()
             modeIndicator?.dismiss()
@@ -314,6 +321,39 @@ class KanadeInputMethodService : InputMethodService() {
             start = end
         }
         return text
+    }
+
+    /** 学習を設定に合わせる: 切られていれば使わず、設定画面で消されていれば捨てる。初めは保存したものを読む */
+    private fun syncLearning() {
+        val source = candidateSource ?: return
+        if (!settings.learningEnabled) {
+            source.learning = null
+            return
+        }
+        val resetAt = settings.learningResetAt
+        if (source.learning == null || resetAt != learningResetSeen) {
+            if (resetAt != learningResetSeen && learningResetSeen != -1L) learningFile.delete()
+            learningResetSeen = resetAt
+            source.learning = dev.mooma.kanade.core.dict.LearningHistory.parse(
+                runCatching { learningFile.readText() }.getOrDefault(""),
+            )
+        }
+    }
+
+    /** 学習が変わっていたら保存する（入力欄を離れたとき） */
+    private fun saveLearning() {
+        val source = candidateSource ?: return
+        val h = source.learning ?: return
+        if (!source.learningChanged) return
+        source.learningChanged = false
+        val text = h.write()
+        Thread {
+            val tmp = java.io.File(learningFile.path + ".tmp")
+            runCatching {
+                tmp.writeText(text)
+                tmp.renameTo(learningFile)
+            }
+        }.start()
     }
 
     private fun startVoice() {

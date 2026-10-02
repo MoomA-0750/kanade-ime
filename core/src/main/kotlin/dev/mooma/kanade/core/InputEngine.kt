@@ -107,6 +107,9 @@ interface CandidateSource {
 
     /** 候補の窓で候補の右に出す説明（「ユーザー辞書」「半角」など）。なければ null */
     fun labelFor(reading: String, candidate: String): String? = null
+
+    /** 文節で、最初に出した候補と違うものを選んで確定した（学習する） */
+    fun learn(reading: String, surface: String) {}
 }
 
 /**
@@ -149,6 +152,8 @@ class InputEngine(
 
     /** 変換中の文節。空なら変換中ではない */
     private class Seg(val reading: String, var candidates: List<String>, val pinned: List<String> = emptyList()) {
+        /** 最初に出した候補（これと違うものを選んで確定したら学習する） */
+        val initial: String = candidates.firstOrNull().orEmpty()
         var selected = 0
         var reranked = false
         val surface: String get() = candidates[selected]
@@ -247,6 +252,10 @@ class InputEngine(
         if (!isConverting && !showReading && settings.liveConversion) refreshCandidates()
         val text = composingText
         val wasConverting = isConverting
+        if (wasConverting) {
+            val source = candidateSource
+            for (seg in segs) if (seg.surface != seg.initial) source?.learn(seg.reading, seg.surface)
+        }
         reset()
         leftContext = (leftContext + text).takeLast(MAX_CONTEXT)
         return listOfNotNull(ImeCommand.Commit(text), ImeCommand.HideCandidates.takeIf { wasConverting })
