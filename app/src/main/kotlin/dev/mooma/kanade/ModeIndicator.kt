@@ -24,6 +24,7 @@ class ModeIndicator(private val context: Context, private val anchor: CursorAnch
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
         gravity = Gravity.CENTER
         val size = (44 * density).toInt()
+        setPadding((10 * density).toInt(), 0, (10 * density).toInt(), 0)
         minWidth = size
         minHeight = size
         background = GradientDrawable().apply {
@@ -49,8 +50,11 @@ class ModeIndicator(private val context: Context, private val anchor: CursorAnch
         }
     }
 
-    fun show(japanese: Boolean) {
-        view.text = if (japanese) "あ" else "A"
+    fun show(japanese: Boolean) = showText(if (japanese) "あ" else "A", SHOW_MS)
+
+    /** 任意の短い文字（🎤 など）を出す。[durationMs] が 0 なら [dismiss] まで出したまま */
+    fun showText(text: String, durationMs: Long) {
+        view.text = text
         view.measure(0, 0)
         val (x, y) = anchor.place(context, wm, view.measuredWidth, view.measuredHeight, anchor.rect())
         params.x = x
@@ -62,7 +66,7 @@ class ModeIndicator(private val context: Context, private val anchor: CursorAnch
         } else {
             wm.updateViewLayout(view, params)
         }
-        handler.postDelayed(hide, SHOW_MS)
+        if (durationMs > 0) handler.postDelayed(hide, durationMs)
     }
 
     fun dismiss() {

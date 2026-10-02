@@ -24,6 +24,8 @@ val prepareKanadeAssets by tasks.registering(JavaExec::class) {
     doLast {
         rootProject.file("eval/daily.tsv").copyTo(File(out, "eval-daily.tsv"), overwrite = true)
         rootProject.file("docs/USAGE.md").copyTo(File(out, "usage.md"), overwrite = true)
+        // 音声認識の速さを端末で測るための見本（to-fu の Windows の音声合成で作った 8.8 秒の日本語）
+        rootProject.file("eval/voice-sample-ja.wav").copyTo(File(out, "voice-sample-ja.wav"), overwrite = true)
     }
 }
 
@@ -90,4 +92,6 @@ tasks.named("preBuild") { dependsOn(prepareKanadeAssets) }
 dependencies {
     implementation(project(":core"))
     implementation(project(":zenz"))
+    implementation(project(":whisper"))
+    implementation(project(":native-whisper"))
 }

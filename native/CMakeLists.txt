@@ -40,3 +40,5 @@ elseif (JNI_FOUND)
     target_include_directories(kanade_zenz PRIVATE ${JNI_INCLUDE_DIRS})
 endif()
 target_compile_options(kanade_zenz PRIVATE -O3)
+# whisper の .so も ggml を持つので、静的に取り込んだ記号は外へ出さない
+target_link_options(kanade_zenz PRIVATE "-Wl,--exclude-libs,ALL")

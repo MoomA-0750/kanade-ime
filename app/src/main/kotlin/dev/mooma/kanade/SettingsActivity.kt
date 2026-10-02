@@ -5,6 +5,8 @@ import android.content.Intent
 import android.graphics.Typeface
 import android.os.Bundle
 import android.provider.Settings
+import android.view.KeyEvent
+import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.CheckBox
@@ -111,6 +113,8 @@ class SettingsActivity : Activity() {
         ))
         root.addView(PairEditor(this, TextStore.snippets(this), "キー（打つ文字）", "出力", prefs, "snippets_text_mode"))
 
+        addVoiceSection(root)
+
         root.addView(heading("試し打ち"))
         root.addView(EditText(this).apply { hint = "ここで入力を試す" })
 
@@ -179,7 +183,175 @@ class SettingsActivity : Activity() {
     override fun onResume() {
         super.onResume()
         refreshLog()
+        refreshVoice()
         overlayStatus.text = if (OverlayBar.permitted(this)) "許可済み（重ねる窓に出す）" else "未許可（IME の窓に出す）"
+    }
+
+    private lateinit var voiceStatus: TextView
+
+    /** 音声入力: マイクの権限、モデルの取得、録音キー、見本の音声での計測 */
+    private fun addVoiceSection(root: LinearLayout) {
+        root.addView(heading("音声入力"))
+        root.addView(note(
+            "録音キーを押している間だけ録音し、離すと端末内の whisper で文字にして入れる（音声は外へ送らない）。" +
+                "モデルは大きいので APK に入れていない。「ブラウザで取得」で落としてから「取得したファイルを選ぶ」で選ぶと、アプリ内へ写す" +
+                "（Kanade 自身はネットにつながない）。速さは「見本の音声で測る」で確かめられる"
+        ))
+        voiceStatus = TextView(this).apply { textSize = 13f }
+        root.addView(voiceStatus)
+        root.addView(Button(this).apply {
+            text = "マイクを許可する"
+            setOnClickListener { requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), 1) }
+        })
+        val group = android.widget.RadioGroup(this)
+        for (m in VoiceModel.entries) {
+            group.addView(android.widget.RadioButton(this).apply {
+                id = View.generateViewId()
+                text = m.label
+                isChecked = settings.voiceModel == m
+                setOnCheckedChangeListener { _, checked ->
+                    if (checked) {
+                        settings.voiceModel = m
+                        refreshVoice()
+                    }
+                }
+            })
+        }
+        root.addView(group)
+        root.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(Button(this@SettingsActivity).apply {
+                text = "ブラウザで取得"
+                setOnClickListener {
+                    startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(settings.voiceModel.url)))
+                }
+            })
+            addView(Button(this@SettingsActivity).apply {
+                text = "取得したファイルを選ぶ"
+                setOnClickListener {
+                    @Suppress("DEPRECATION")
+                    startActivityForResult(
+                        Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*"),
+                        REQUEST_MODEL,
+                    )
+                }
+            })
+            addView(Button(this@SettingsActivity).apply {
+                text = "状態を更新"
+                setOnClickListener { refreshVoice() }
+            })
+        })
+        root.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(Button(this@SettingsActivity).apply {
+                text = "録音キーを変える"
+                setOnClickListener { assignVoiceKey() }
+            })
+            addView(Button(this@SettingsActivity).apply {
+                text = "スレッド数を変える"
+                setOnClickListener {
+                    val options = listOf(2, 4, 6, 8)
+                    android.app.AlertDialog.Builder(this@SettingsActivity)
+                        .setTitle("認識に使うスレッド数")
+                        .setItems(options.map { "$it" }.toTypedArray()) { _, i ->
+                            settings.voiceThreads = options[i]
+                            refreshVoice()
+                        }.show()
+                }
+            })
+        })
+        val result = TextView(this).apply {
+            textSize = 13f
+            setTextIsSelectable(true)
+        }
+        root.addView(Button(this).apply {
+            text = "見本の音声で測る（8.8秒の日本語）"
+            setOnClickListener {
+                if (!settings.voiceModel.isReady(this@SettingsActivity)) {
+                    result.text = "モデルがまだない"
+                    return@setOnClickListener
+                }
+                result.text = "認識中…（初回はモデルの読み込みも含む）"
+                val pcm = readSampleWav()
+                val started = System.nanoTime()
+                VoiceInput.transcribe(this@SettingsActivity, pcm, settings.voiceModel, settings.voiceThreads) { text, ms ->
+                    val total = (System.nanoTime() - started) / 1_000_000
+                    runOnUiThread {
+                        result.text = "${settings.voiceModel.name}・${settings.voiceThreads}スレッド: 認識 ${ms}ms（読み込み込みで ${total}ms）\n${text ?: "（認識できなかった）"}"
+                    }
+                }
+            }
+        })
+        root.addView(result)
+        refreshVoice()
+    }
+
+    @Deprecated("Activity Result API を入れるほどではないので、昔の形で受ける")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        val uri = data?.data
+        if (requestCode != REQUEST_MODEL || resultCode != RESULT_OK || uri == null) return
+        val model = settings.voiceModel
+        voiceStatus.text = "写している…"
+        Thread {
+            var last = 0L
+            val ok = runCatching {
+                model.importFrom(this, uri) { total ->
+                    if (total - last > 20_000_000) {
+                        last = total
+                        runOnUiThread { voiceStatus.text = "写している… ${total / 1_000_000}MB / ${model.bytes / 1_000_000}MB" }
+                    }
+                }
+            }.getOrDefault(false)
+            runOnUiThread {
+                refreshVoice()
+                if (!ok) voiceStatus.append("\n写せなかった（${model.file} の大きさが合わない。選んだモデルと同じファイルか確かめる）")
+            }
+        }.start()
+    }
+
+    private fun refreshVoice() {
+        if (!::voiceStatus.isInitialized) return
+        val m = settings.voiceModel
+        val file = m.path(this)
+        val state = when {
+            m.isReady(this) -> "取得済み"
+            file.exists() -> "大きさが合わない（${file.length() / 1_000_000}MB / ${m.bytes / 1_000_000}MB）"
+            else -> "未取得"
+        }
+        voiceStatus.text = "マイク: ${if (VoiceInput.hasPermission(this)) "許可済み" else "未許可"}　" +
+            "モデル: ${m.name}（$state）　録音キー: ${KeyEvent.keyCodeToString(settings.voiceKey).removePrefix("KEYCODE_")}　" +
+            "スレッド: ${settings.voiceThreads}"
+    }
+
+    /** 次に押したキーを録音キーにする */
+    private fun assignVoiceKey() {
+        val dialog = android.app.AlertDialog.Builder(this)
+            .setTitle("録音キー")
+            .setMessage("録音に使うキーを押す（Esc でやめる）。F12 など、ふだん使わないキーがよい")
+            .create()
+        dialog.setOnKeyListener { d, keyCode, event ->
+            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener true
+            if (keyCode != KeyEvent.KEYCODE_ESCAPE && keyCode != KeyEvent.KEYCODE_BACK) {
+                settings.voiceKey = keyCode
+                refreshVoice()
+            }
+            d.dismiss()
+            true
+        }
+        dialog.show()
+    }
+
+    /** 同梱の見本の音声（16kHz・モノラル・16bit の wav）を -1〜1 の float にする */
+    private fun readSampleWav(): FloatArray {
+        val bytes = assets.open("voice-sample-ja.wav").readBytes()
+        val n = (bytes.size - 44) / 2
+        return FloatArray(n) { i ->
+            val lo = bytes[44 + 2 * i].toInt() and 0xFF
+            val hi = bytes[45 + 2 * i].toInt()
+            ((hi shl 8) or lo).toShort() / 32768f
+        }
     }
 
     /** 使い方（docs/USAGE.md を assets に入れたもの）を出す。表の罫線などの記号は読みやすく省く */
@@ -223,5 +395,9 @@ class SettingsActivity : Activity() {
     private fun note(text: String) = TextView(this).apply {
         this.text = text
         textSize = 13f
+    }
+
+    private companion object {
+        const val REQUEST_MODEL = 10
     }
 }

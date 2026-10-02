@@ -39,6 +39,20 @@ class KanadeSettings(context: Context) {
             ?: DEFAULT_PREVIEW_PACKAGES
         set(value) = prefs.edit().putString(KEY_PREVIEW_PACKAGES, value.joinToString(",")).apply()
 
+    /** 音声入力のモデル */
+    var voiceModel: VoiceModel
+        get() = VoiceModel.entries.find { it.name == prefs.getString(KEY_VOICE_MODEL, null) } ?: VoiceModel.SMALL
+        set(value) = prefs.edit().putString(KEY_VOICE_MODEL, value.name).apply()
+
+    /** 押している間だけ録音するキー（KeyEvent のキーコード）。既定は F12 */
+    var voiceKey: Int
+        get() = prefs.getInt(KEY_VOICE_KEY, android.view.KeyEvent.KEYCODE_F12)
+        set(value) = prefs.edit().putInt(KEY_VOICE_KEY, value).apply()
+
+    var voiceThreads: Int
+        get() = prefs.getInt(KEY_VOICE_THREADS, 4)
+        set(value) = prefs.edit().putInt(KEY_VOICE_THREADS, value).apply()
+
     var lastJapanese: Boolean
         get() = prefs.getBoolean(KEY_LAST_MODE, false)
         set(value) = prefs.edit().putBoolean(KEY_LAST_MODE, value).apply()
@@ -51,6 +65,9 @@ class KanadeSettings(context: Context) {
         const val KEY_KEYLOG = "key_log"
         const val KEY_LAST_MODE = "last_japanese"
         const val KEY_LIVE = "live_conversion"
+        const val KEY_VOICE_MODEL = "voice_model"
+        const val KEY_VOICE_KEY = "voice_key"
+        const val KEY_VOICE_THREADS = "voice_threads"
         const val KEY_PREVIEW_PACKAGES = "preview_in_bar_packages"
         val DEFAULT_PREVIEW_PACKAGES = setOf("com.termux")
     }

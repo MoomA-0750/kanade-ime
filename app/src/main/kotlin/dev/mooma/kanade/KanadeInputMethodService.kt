@@ -149,6 +149,10 @@ class KanadeInputMethodService : InputMethodService() {
 
     override fun onFinishInput() {
         log("finish-input")
+        if (VoiceInput.isRecording) {
+            VoiceInput.cancel()
+            modeIndicator?.dismiss()
+        }
         engine.reset()
         hideBar()
         super.onFinishInput()
@@ -170,6 +174,12 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == settings.voiceKey) {
+            // 押している間だけ録音する（押しっぱなしの繰り返しは無視）
+            if (event.repeatCount == 0) startVoice()
+            log(event, "voice")
+            return true
+        }
         val input = mapper.onKeyDown(event)
         if (input == null) {
             val consume = keyCode == KeyEvent.KEYCODE_ALT_RIGHT && mapper.consumesRightAlt()
@@ -190,6 +200,11 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == settings.voiceKey) {
+            stopVoice()
+            log(event, "voice")
+            return true
+        }
         val input = mapper.onKeyUp(event)
         if (input != null) handle(input)
         val consumed = consumedDown.remove(keyCode)
@@ -299,6 +314,46 @@ class KanadeInputMethodService : InputMethodService() {
             start = end
         }
         return text
+    }
+
+    private fun startVoice() {
+        if (VoiceInput.isRecording) return
+        val model = settings.voiceModel
+        val message = when {
+            !VoiceInput.hasPermission(this) -> "マイクの権限がない（設定画面で許可）"
+            !model.isReady(this) -> "音声認識のモデルがない（設定画面で取得）"
+            !VoiceInput.start(this) -> "録音を始められない"
+            else -> null
+        }
+        if (message != null) {
+            showIndicatorText(message, 2000)
+            log("voice: $message")
+            return
+        }
+        // 入力中の文字があれば先に確定し、認識した文はその後ろに入れる
+        apply(engine.commitAll())
+        showIndicatorText("🎤", 0)
+    }
+
+    private fun stopVoice() {
+        if (!VoiceInput.isRecording) return
+        showIndicatorText("…", 0)
+        VoiceInput.stop(this, settings.voiceModel, settings.voiceThreads) { text, ms ->
+            main.post {
+                modeIndicator?.dismiss()
+                log("voice: ${ms}ms ${text ?: "（認識できなかった）"}")
+                if (text != null) {
+                    currentInputConnection?.commitText(text, 1)
+                    engine.leftContext = (engine.leftContext + text).takeLast(InputEngine.MAX_CONTEXT)
+                }
+            }
+        }
+    }
+
+    private fun showIndicatorText(text: String, durationMs: Long) {
+        if (!OverlayBar.permitted(this)) return
+        val m = modeIndicator ?: ModeIndicator(window?.window?.context ?: this, anchor).also { modeIndicator = it }
+        runCatching { m.showText(text, durationMs) }.onFailure { log("indicator failed: $it") }
     }
 
     private fun showModeIndicator(japanese: Boolean) {

@@ -30,6 +30,16 @@ $D eval-zenz .cache/out eval/daily.tsv .cache/models/zenz-v3.2-xsmall-Q5_K_M.ggu
 
 - 作業機は VM で CPU に AVX2 が見えないので、zenz の時間は参考にならない（正解率は正しい）。速度は Fold 7 で測る
 
+## 音声認識（手元）
+
+```sh
+scripts/build-host-whisper.sh
+$D whisper .cache/models/ggml-small-q5_1.bin .cache/host-whisper/libkanade_whisper.so eval/voice-sample-ja.wav
+```
+
+- エミュレータで試すときは、モデルを to-fu で落として `adb push` で `/sdcard/Android/data/dev.mooma.kanade/files/models/` に置ける。エミュレータは `-no-audio` で起動しているのでマイクは無音
+- 見本の音声は to-fu の Windows の音声合成で作れる（PowerShell の `System.Speech`、`Microsoft Haruka Desktop`、16kHz・モノラル・16bit）
+
 ## エミュレータでの確認（to-fu）
 
 作業機は VM で KVM がないので、to-fu（Windows）の Android Studio のエミュレータ（Pixel_10_Pro_Fold、Android 16、x86_64）を ssh 越しに使う。

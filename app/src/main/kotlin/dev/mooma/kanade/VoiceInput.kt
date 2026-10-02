@@ -1,0 +1,181 @@
+package dev.mooma.kanade
+
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.Context
+import android.content.pm.PackageManager
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
+import android.net.Uri
+import dev.mooma.kanade.whisper.WhisperModel
+import java.io.File
+import java.util.concurrent.Executors
+
+/**
+ * 音声認識のモデル。APK には入れない。ブラウザで取得したファイルを設定画面で選んでアプリ内へ写す
+ * （Kanade にネットの権限を持たせないため。Android のダウンロード機能も、頼むアプリにネットの権限を求める）
+ */
+enum class VoiceModel(val label: String, val file: String, val url: String, val bytes: Long) {
+    SMALL(
+        "whisper small（190MB、速い・精度はほどほど）", "ggml-small-q5_1.bin",
+        "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin", 190_085_487L,
+    ),
+    KOTOBA(
+        "kotoba-whisper v2.0（538MB、日本語向け・高精度・重い）", "ggml-kotoba-whisper-v2.0-q5_0.bin",
+        "https://huggingface.co/kotoba-tech/kotoba-whisper-v2.0-ggml/resolve/main/ggml-kotoba-whisper-v2.0-q5_0.bin", 537_819_875L,
+    ),
+    TURBO(
+        "whisper large-v3-turbo（574MB、多言語・高精度・重い）", "ggml-large-v3-turbo-q5_0.bin",
+        "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin", 574_041_195L,
+    );
+
+    fun path(context: Context): File = File(context.getExternalFilesDir("models"), file)
+
+    /** 取得済み（大きさが合っている） */
+    fun isReady(context: Context): Boolean = path(context).let { it.exists() && it.length() == bytes }
+
+    /**
+     * 選んだファイル（ブラウザで取得したもの）をアプリ内へ写す。大きさが合わなければ写さずに false。
+     * 時間がかかるので UI スレッドから呼ばないこと
+     */
+    fun importFrom(context: Context, uri: Uri, progress: (Long) -> Unit): Boolean {
+        val dest = path(context)
+        dest.parentFile?.mkdirs()
+        val tmp = File(dest.path + ".part")
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            tmp.outputStream().use { out ->
+                val buf = ByteArray(1 shl 20)
+                var total = 0L
+                while (true) {
+                    val n = input.read(buf)
+                    if (n < 0) break
+                    out.write(buf, 0, n)
+                    total += n
+                    progress(total)
+                }
+            }
+        } ?: return false
+        if (tmp.length() != bytes) {
+            tmp.delete()
+            return false
+        }
+        return tmp.renameTo(dest)
+    }
+}
+
+/**
+ * 押している間だけ録音し、離したら whisper で文字にする。モデルは初めて使うときに読み、そのまま持っておく。
+ * 録音・認識は専用のスレッドで行い、結果は [onResult] でメインスレッド以外から返す（呼ぶ側で UI スレッドへ）。
+ */
+object VoiceInput {
+    private val worker = Executors.newSingleThreadExecutor { Thread(it, "kanade-whisper") }
+    @Volatile private var model: WhisperModel? = null
+    @Volatile private var loadedModel: VoiceModel? = null
+    @Volatile private var recorder: AudioRecord? = null
+    private var recordThread: Thread? = null
+    private val samples = ShortArrayBuilder()
+
+    fun hasPermission(context: Context) =
+        context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+
+    val isRecording: Boolean get() = recorder != null
+
+    /** 録音を始める。権限がなければ false */
+    @SuppressLint("MissingPermission")
+    fun start(context: Context): Boolean {
+        if (recorder != null) return true
+        if (!hasPermission(context)) return false
+        val min = AudioRecord.getMinBufferSize(WhisperModel.SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+        val r = AudioRecord(
+            MediaRecorder.AudioSource.VOICE_RECOGNITION, WhisperModel.SAMPLE_RATE,
+            AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(min, WhisperModel.SAMPLE_RATE),
+        )
+        if (r.state != AudioRecord.STATE_INITIALIZED) {
+            r.release()
+            return false
+        }
+        synchronized(samples) { samples.clear() }
+        r.startRecording()
+        recorder = r
+        recordThread = Thread({
+            val buf = ShortArray(1600)
+            while (recorder === r) {
+                val n = r.read(buf, 0, buf.size)
+                if (n > 0) synchronized(samples) { if (samples.size < MAX_SAMPLES) samples.append(buf, n) }
+            }
+        }, "kanade-record").also { it.start() }
+        return true
+    }
+
+    /** 録音をやめて文字にする。[onResult] には文字（失敗・空なら null）と、認識にかかった ms を渡す */
+    fun stop(context: Context, voiceModel: VoiceModel, threads: Int, onResult: (String?, Long) -> Unit) {
+        val r = recorder ?: return
+        recorder = null
+        recordThread?.join(500)
+        recordThread = null
+        runCatching { r.stop() }
+        r.release()
+        val pcm = synchronized(samples) { WhisperModel.pcm16ToFloat(samples.array, samples.size) }
+        transcribe(context, pcm, voiceModel, threads, onResult)
+    }
+
+    /** 録音をやめて捨てる */
+    fun cancel() {
+        val r = recorder ?: return
+        recorder = null
+        recordThread?.join(500)
+        recordThread = null
+        runCatching { r.stop() }
+        r.release()
+        model?.cancel()
+    }
+
+    /** 音声を文字にする（設定画面の試験からも使う） */
+    fun transcribe(context: Context, pcm: FloatArray, voiceModel: VoiceModel, threads: Int, onResult: (String?, Long) -> Unit) {
+        val app = context.applicationContext
+        worker.execute {
+            val m = load(app, voiceModel, threads)
+            if (m == null || pcm.size < WhisperModel.SAMPLE_RATE / 4) {
+                onResult(null, 0)
+                return@execute
+            }
+            val t = System.nanoTime()
+            val text = runCatching { m.transcribe(pcm) }.getOrNull()?.takeIf { it.isNotBlank() }
+            onResult(text, (System.nanoTime() - t) / 1_000_000)
+        }
+    }
+
+    /** 選んだモデルを読む（別のモデルに変わっていたら読み直す）。worker のスレッドから呼ぶ */
+    private fun load(context: Context, voiceModel: VoiceModel, threads: Int): WhisperModel? {
+        if (loadedModel == voiceModel && model != null) return model
+        model?.close()
+        model = null
+        loadedModel = null
+        if (!voiceModel.isReady(context)) return null
+        return runCatching {
+            System.loadLibrary("kanade_whisper")
+            WhisperModel.open(voiceModel.path(context).absolutePath, threads)
+        }.getOrNull()?.also {
+            model = it
+            loadedModel = voiceModel
+        }
+    }
+
+    /** 60 秒で録音を打ち切る */
+    private const val MAX_SAMPLES = WhisperModel.SAMPLE_RATE * 60
+
+    private class ShortArrayBuilder {
+        var array = ShortArray(WhisperModel.SAMPLE_RATE * 5)
+        var size = 0
+        fun clear() {
+            size = 0
+        }
+
+        fun append(buf: ShortArray, n: Int) {
+            if (size + n > array.size) array = array.copyOf(maxOf(array.size * 2, size + n))
+            System.arraycopy(buf, 0, array, size, n)
+            size += n
+        }
+    }
+}

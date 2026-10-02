@@ -18,6 +18,7 @@ kotlin {
 dependencies {
     implementation(project(":core"))
     implementation(project(":zenz"))
+    implementation(project(":whisper"))
 }
 
 application {

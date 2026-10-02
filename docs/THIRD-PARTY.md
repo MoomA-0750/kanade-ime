@@ -8,3 +8,7 @@
 | Mozc の記号・絵文字の表（`src/data/symbol/symbol.tsv`、`src/data/emoji/emoji_data.tsv`、同じコミット） | ビルド時に取得・変換して assets へ（`symbol.ksym`） | BSD-3-Clause（Mozc）。絵文字の読みは Unicode CLDR 由来（Unicode License v3） | |
 | zenz-v3.2-xsmall-gguf（Miwa-Keita、リビジョン 4f5423f） | ビルド時に取得して assets へ | Apache-2.0（HuggingFace の表記。公開前に作者の表明を確かめる） | |
 | llama.cpp（azooKey フォーク、コミット 66afb88） | submodule、静的リンク | MIT | |
+| whisper.cpp（v1.9.4） | submodule、静的リンク | MIT | |
+| whisper のモデル（OpenAI Whisper small・large-v3-turbo の ggml 版） | 本人がブラウザで取得して取り込む（APK に入れない） | MIT | |
+| kotoba-whisper v2.0（kotoba-tech） | 同上 | Apache-2.0 | |
+| 見本の音声 `eval/voice-sample-ja.wav` | リポジトリ・APK | Windows の音声合成（Microsoft Haruka）で作成 | 公開前に扱いを確かめる |

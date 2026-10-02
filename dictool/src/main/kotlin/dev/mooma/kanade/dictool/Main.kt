@@ -38,6 +38,7 @@ fun main(args: Array<String>) {
         "eval" -> evaluate(File(args[1]), File(args[2]))
         "convert" -> convert(File(args[1]), args.drop(2))
         "zenz" -> zenzTry(File(args[1]), File(args[2]), File(args[3]), args.drop(4))
+        "whisper" -> whisperTry(File(args[1]), File(args[2]), args.drop(3).map(::File))
         "eval-zenz" -> evaluateZenz(File(args[1]), File(args[2]), File(args[3]), File(args[4]), args.getOrNull(5)?.toInt() ?: 10)
         else -> {
             System.err.println(
@@ -51,6 +52,7 @@ fun main(args: Array<String>) {
                   convert <outDir> <かな...>     変換を試す
                   zenz <outDir> <gguf> <libkanade_zenz.so> <かな...>        zenz の並べ替えと生成を試す
                   eval-zenz <outDir> <tsv> <gguf> <libkanade_zenz.so> [topK] zenz ありで評価する
+                  whisper <ggml> <libkanade_whisper.so> <wav...>           音声認識を試す（16kHz・モノラル・16bit の wav）
                 """.trimIndent()
             )
             exitProcess(2)
@@ -284,5 +286,28 @@ fun evaluateZenz(outDir: File, tsv: File, model: File, lib: File, topK: Int) {
         println("並べ替え＋生成    ${pct(pass[2])}  ${med(times[1])}")
         println("辞書だけとの違い（並べ替え＋生成）: 改善 ${changed.count { it.startsWith("改善") }}、悪化 ${changed.count { it.startsWith("悪化") }}")
         changed.take(30).forEach { println("  $it") }
+    }
+}
+
+fun whisperTry(model: File, lib: File, wavs: List<File>) {
+    System.load(lib.absolutePath)
+    var t = System.nanoTime()
+    val whisper = dev.mooma.kanade.whisper.WhisperModel.open(model.absolutePath, threads = 4) ?: error("whisper を読めない: $model")
+    println("読み込み ${"%.0f".format((System.nanoTime() - t) / 1e6)}ms")
+    whisper.use { w ->
+        for (wav in wavs) {
+            val bytes = wav.readBytes()
+            // 44 バイトの見出しのあとが 16bit PCM（作った wav は素直な形なのでそれで足りる）
+            val n = (bytes.size - 44) / 2
+            val pcm = FloatArray(n) { i ->
+                val lo = bytes[44 + 2 * i].toInt() and 0xFF
+                val hi = bytes[45 + 2 * i].toInt()
+                ((hi shl 8) or lo).toShort() / 32768f
+            }
+            t = System.nanoTime()
+            val text = w.transcribe(pcm)
+            println("${wav.name}（${"%.1f".format(n / 16000.0)}秒の音声）: ${"%.0f".format((System.nanoTime() - t) / 1e6)}ms")
+            println("  $text")
+        }
     }
 }
