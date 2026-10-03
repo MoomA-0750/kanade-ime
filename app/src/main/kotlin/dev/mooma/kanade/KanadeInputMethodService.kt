@@ -630,7 +630,7 @@ class KanadeInputMethodService : InputMethodService() {
         val streamingReady = settings.voiceStreaming && SherpaRecognizer.reazon.isReady(this)
         val message = when {
             !VoiceInput.hasPermission(this) -> "マイクの権限がない（設定画面で許可）"
-            finalRecognizer() == null -> "音声認識のモデルがない（設定画面で落とす）"
+            VoiceCatalog.finalModel(this, settings) == null -> "音声認識のモデルがありません（設定画面で落とします）"
             !VoiceInput.start(this) -> "録音を始められない"
             else -> null
         }
@@ -748,23 +748,12 @@ class KanadeInputMethodService : InputMethodService() {
                 voiceStreaming = false
             }
         }
-        when (finalRecognizer()) {
-            "WHISPER" -> VoiceInput.transcribe(this, pcm, settings.voiceModel, settings.voiceThreads) { text, _ -> finish(text, "whisper") }
-            "SENSEVOICE" -> SherpaRecognizer.senseVoice.recognize(this, pcm, settings.voiceThreads) { text -> finish(text, "sensevoice") }
-            "PARAKEET" -> SherpaRecognizer.parakeet.recognize(this, pcm, settings.voiceThreads) { text -> finish(text, "parakeet") }
-            else -> SherpaRecognizer.reazon.recognize(this, pcm, settings.voiceThreads) { text -> finish(text, "reazon") }
+        val model = VoiceCatalog.finalModel(this, settings)
+        if (model == null) {
+            finish(null, "none")
+            return
         }
-    }
-
-    /** 確定の文を作る認識。設定で選んだものが取得済みでなければ、取得済みのほかのもの。どれもなければ null */
-    private fun finalRecognizer(): String? {
-        fun ready(name: String) = when (name) {
-            "WHISPER" -> settings.voiceModel.isReady(this)
-            "SENSEVOICE" -> SherpaRecognizer.senseVoice.isReady(this)
-            "PARAKEET" -> SherpaRecognizer.parakeet.isReady(this)
-            else -> SherpaRecognizer.reazon.isReady(this)
-        }
-        return (listOf(settings.voiceFinal) + listOf("PARAKEET", "WHISPER", "SENSEVOICE", "REAZON")).firstOrNull { ready(it) }
+        model.recognize(this, pcm, settings.voiceThreads) { text -> finish(text, model.id) }
     }
 
     /** 聞き続けるモードで認識した文を入れる。入力中の文字があれば、それが確定するまで待つ */

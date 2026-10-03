@@ -49,9 +49,17 @@ class KanadeSettings(context: Context) {
         get() = prefs.getInt(KEY_VOICE_KEY, android.view.KeyEvent.KEYCODE_F12)
         set(value) = prefs.edit().putInt(KEY_VOICE_KEY, value).apply()
 
-    /** 確定の文を作る認識: WHISPER（選んだ whisper のモデル）・REAZON・SENSEVOICE・PARAKEET */
+    /**
+     * 確定の文を作るモデル（設定画面の「モデル」で適用したもの。[VoiceCatalog] の id）。
+     * 前の版の値（WHISPER・REAZON・SENSEVOICE・PARAKEET）は読み替える
+     */
     var voiceFinal: String
-        get() = prefs.getString(KEY_VOICE_FINAL, "WHISPER") ?: "WHISPER"
+        get() = when (val v = prefs.getString(KEY_VOICE_FINAL, null)) {
+            null -> if (prefs.contains(KEY_VOICE_MODEL)) "whisper-" + voiceModel.name.lowercase() else "parakeet"
+            "WHISPER" -> "whisper-" + voiceModel.name.lowercase()
+            "REAZON", "SENSEVOICE", "PARAKEET" -> v.lowercase()
+            else -> v
+        }
         set(value) = prefs.edit().putString(KEY_VOICE_FINAL, value).apply()
 
     /** 話しながら文字を出す（ReazonSpeech）。切ると、離してから確定の認識で文字にするだけ */

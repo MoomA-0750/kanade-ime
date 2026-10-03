@@ -71,7 +71,8 @@ object VoiceInput {
     private val worker = java.util.concurrent.Executors.newSingleThreadScheduledExecutor { Thread(it, "kanade-whisper") }
     private var unloadTask: java.util.concurrent.ScheduledFuture<*>? = null
     @Volatile private var model: WhisperModel? = null
-    @Volatile private var loadedModel: VoiceModel? = null
+    /** 読んでいるモデルのファイル（同梱の whisper も、取り込んだ whisper.cpp のモデルも、ファイルで見分ける） */
+    @Volatile private var loadedFile: File? = null
     @Volatile private var recorder: AudioRecord? = null
     private var recordThread: Thread? = null
     private val samples = ShortArrayBuilder()
@@ -159,10 +160,9 @@ object VoiceInput {
     }
 
     /** whisper で音声を文字にする（設定画面の試験からも使う）。[onResult] には文字（失敗・空なら null）と、認識にかかった ms を渡す */
-    fun transcribe(context: Context, pcm: FloatArray, voiceModel: VoiceModel, threads: Int, onResult: (String?, Long) -> Unit) {
-        val app = context.applicationContext
+    fun transcribe(context: Context, pcm: FloatArray, modelFile: File, threads: Int, onResult: (String?, Long) -> Unit) {
         worker.execute {
-            val m = load(app, voiceModel, threads)
+            val m = load(modelFile, threads)
             if (m == null || pcm.size < WhisperModel.SAMPLE_RATE / 4) {
                 onResult(null, 0)
                 return@execute
@@ -183,23 +183,23 @@ object VoiceInput {
         unloadTask = worker.schedule({
             model?.close()
             model = null
-            loadedModel = null
+            loadedFile = null
         }, IDLE_UNLOAD_MINUTES, java.util.concurrent.TimeUnit.MINUTES)
     }
 
-    /** 選んだモデルを読む（別のモデルに変わっていたら読み直す）。worker のスレッドから呼ぶ */
-    private fun load(context: Context, voiceModel: VoiceModel, threads: Int): WhisperModel? {
-        if (loadedModel == voiceModel && model != null) return model
+    /** モデルを読む（別のファイルに変わっていたら読み直す）。worker のスレッドから呼ぶ */
+    private fun load(file: File, threads: Int): WhisperModel? {
+        if (loadedFile == file && model != null) return model
         model?.close()
         model = null
-        loadedModel = null
-        if (!voiceModel.isReady(context)) return null
+        loadedFile = null
+        if (!file.exists()) return null
         return runCatching {
             System.loadLibrary("kanade_whisper")
-            WhisperModel.open(voiceModel.path(context).absolutePath, threads)
+            WhisperModel.open(file.absolutePath, threads)
         }.getOrNull()?.also {
             model = it
-            loadedModel = voiceModel
+            loadedFile = file
         }
     }
 

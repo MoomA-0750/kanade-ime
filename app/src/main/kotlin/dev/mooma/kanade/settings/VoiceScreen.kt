@@ -1,6 +1,8 @@
 package dev.mooma.kanade.settings
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.view.KeyEvent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -17,15 +19,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -40,75 +45,40 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.nativeKeyCode
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.nativeKeyCode
-import androidx.compose.ui.input.key.key
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import dev.mooma.kanade.CustomModelType
 import dev.mooma.kanade.ModelDownloader
-import dev.mooma.kanade.SherpaRecognizer
-import dev.mooma.kanade.VoiceInput
-import dev.mooma.kanade.VoiceModel
-
-/**
- * 音声認識のモデル1つ（whisper の各モデル・sherpa-onnx の各モデル）を、画面から同じ形で扱うためのもの
- */
-class ModelEntry(
-    val key: String,
-    val name: String,
-    val size: String,
-    val description: String,
-    val ready: (Context) -> Boolean,
-    val items: (Context) -> List<ModelDownloader.Item>,
-    /** ファイルから取り込む（複数のファイルからなるものは、まとめて選ぶ） */
-    val multipleFiles: Boolean,
-    val import: (Context, List<Uri>) -> Boolean,
-)
-
-private fun whisperEntry(m: VoiceModel, size: String, description: String) = ModelEntry(
-    "WHISPER_${m.name}", m.label.substringBefore('（'), size, description,
-    ready = { m.isReady(it) },
-    items = { listOf(ModelDownloader.Item(m.url, m.path(it), m.bytes)) },
-    multipleFiles = false,
-    import = { c, uris -> uris.firstOrNull()?.let { m.importFrom(c, it) {} } == true },
-)
-
-private fun sherpaEntry(r: SherpaRecognizer, size: String, description: String) = ModelEntry(
-    r.label, r.label, size, description,
-    ready = { r.isReady(it) },
-    items = { r.downloadItems(it) },
-    multipleFiles = true,
-    import = { c, uris -> r.importFrom(c, uris) > 0 },
-)
-
-val MODEL_ENTRIES = listOf(
-    sherpaEntry(SherpaRecognizer.parakeet, "656MB", "NVIDIA の日本語専用。精度が高く（公開の評価で whisper small の半分以下の誤り）、句読点が付く"),
-    sherpaEntry(SherpaRecognizer.reazon, "73MB", "日本語向けで速い。話している途中の文字を出すのに使う。句読点は付かない"),
-    sherpaEntry(SherpaRecognizer.senseVoice, "239MB", "中・英・日・韓。速く、句読点が付く"),
-    whisperEntry(VoiceModel.SMALL, "190MB", "多言語。句読点が付く。日本語の精度はいまひとつ"),
-    whisperEntry(VoiceModel.KOTOBA, "538MB", "日本語向けの whisper。精度が高いが重い"),
-    whisperEntry(VoiceModel.TURBO, "574MB", "多言語の whisper。精度が高いが重い"),
-)
+import dev.mooma.kanade.R
+import dev.mooma.kanade.VoiceCatalog
+import dev.mooma.kanade.VoiceModelSpec
+import dev.mooma.kanade.VoiceTag
 
 /** モデルの取得の進み具合（画面を移っても残るよう、画面の外に置く） */
 object DownloadUi {
-    var name by mutableStateOf<String?>(null)
+    /** 落としているモデルの id */
+    var id by mutableStateOf<String?>(null)
     var done by mutableLongStateOf(0L)
     var total by mutableLongStateOf(0L)
     var message by mutableStateOf<String?>(null)
     /** 取得が終わるたびに増える（取得済みの表示を読み直す） */
     var finished by mutableIntStateOf(0)
 
-    fun start(context: Context, entry: ModelEntry) {
+    fun start(context: Context, model: VoiceModelSpec) {
         if (ModelDownloader.running) {
             ModelDownloader.cancel()
             return
         }
-        val items = entry.items(context)
+        val items = model.download?.invoke(context) ?: return
         val main = context.mainExecutor
-        name = entry.name
+        id = model.id
         total = items.sumOf { it.bytes }
         done = 0
         message = null
@@ -117,8 +87,8 @@ object DownloadUi {
             progress = { i, got, _ -> main.execute { done = items.take(i).sumOf { it.bytes } + got } },
             done = { error ->
                 main.execute {
-                    message = "${entry.name}: ${error ?: "落とし終えた"}"
-                    name = null
+                    message = "${model.name}: ${error ?: "ダウンロードしました"}"
+                    id = null
                     finished++
                 }
             },
@@ -126,20 +96,26 @@ object DownloadUi {
     }
 }
 
+/** Wi-Fi（または従量制でない回線）につながっているか */
+private fun onUnmeteredNetwork(context: Context): Boolean {
+    val cm = context.getSystemService(ConnectivityManager::class.java)
+    val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
+    return caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+}
+
 /** 音声入力 */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ColumnScope.VoiceScreen() {
     val context = LocalContext.current
     val settings = rememberSettings()
-    // 取得・取り込みが終わったら、取得済みの表示を読み直す
+    // 取得・取り込み・削除のたびに、一覧と取得済みの表示を読み直す
     var refresh by remember { mutableIntStateOf(0) }
     val tick = DownloadUi.finished + refresh
 
     Section(
-        "使い方",
-        "録音キーを押している間だけ録音し、離すと端末の中で文字にして入れる（音声は外へ送らない）。" +
-            "短く押すと聞き続けるモードになり、話し終わるたびに入れる（もう一度押すか、1分話さなければ終わる）",
+        "録音キー",
+        "録音キーを押している間だけ録音し、離すと端末の中で文字にして入れます（音声は外へ送りません）。" +
+            "短く押すと聞き続けるモードになり、話し終わるたびに入れます（もう一度押すか、1分話さないと終わります）。",
     ) {
         var keyDialog by remember { mutableStateOf(false) }
         var voiceKey by rememberPref({ settings.voiceKey }, { settings.voiceKey = it })
@@ -147,47 +123,15 @@ fun ColumnScope.VoiceScreen() {
             Text("録音キー", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             FilledTonalButton(onClick = { keyDialog = true }) { Text(keyName(voiceKey)) }
         }
-        Note("画面キーボードでは 🎤 のキー")
+        Note("画面キーボードでは マイクのキーを使います。")
         if (keyDialog) VoiceKeyDialog(voiceKey, onPick = { voiceKey = it; keyDialog = false }, onDismiss = { keyDialog = false })
     }
 
-    Section("確定の文を作る認識", "入力欄に入る文字を作る。話している途中の文字は、いつも ReazonSpeech で出す") {
-        var final by rememberPref({ settings.voiceFinal }, { settings.voiceFinal = it })
-        val whisperModel = settings.voiceModel
-        val options = listOf(
-            "PARAKEET" to "parakeet-ja（日本語向け・高精度・句読点あり）",
-            "REAZON" to "ReazonSpeech（速い。句読点は話して入れる）",
-            "SENSEVOICE" to "SenseVoice（速い・句読点あり）",
-            "WHISPER" to "whisper（下で選んだモデル・句読点あり）",
-        )
-        val ready = remember(tick) {
-            mapOf(
-                "PARAKEET" to SherpaRecognizer.parakeet.isReady(context),
-                "REAZON" to SherpaRecognizer.reazon.isReady(context),
-                "SENSEVOICE" to SherpaRecognizer.senseVoice.isReady(context),
-                "WHISPER" to whisperModel.isReady(context),
-            )
-        }
-        RadioRows(options.map { (k, label) -> k to (label + if (ready[k] == true) "" else "・未取得") }, final, { final = it })
-        var whisper by rememberPref({ settings.voiceModel }, { settings.voiceModel = it })
-        if (final == "WHISPER") {
-            Text("whisper のモデル", style = MaterialTheme.typography.labelLarge)
-            ConnectedChoices(listOf(VoiceModel.SMALL to "small", VoiceModel.KOTOBA to "kotoba", VoiceModel.TURBO to "turbo"), whisper, { whisper = it })
-        }
-        if (ready[final] != true) Note("選んだものを落としていないので、落としてあるほかの認識を使う")
-    }
-
-    Section("モデル", "Wi-Fi で落とす。落としている間は設定画面を開いたままにする（止まっても次は続きから）") {
-        DownloadProgress()
-        MODEL_ENTRIES.forEachIndexed { i, entry ->
-            if (i > 0) HorizontalDivider()
-            ModelRow(entry, tick, onImported = { refresh++ })
-        }
-    }
+    ModelsSection(tick, onChanged = { refresh++ })
 
     Section("話し方") {
         var streaming by rememberPref({ settings.voiceStreaming }, { settings.voiceStreaming = it })
-        SwitchRow("話しながら文字を出す", streaming, { streaming = it }, "ReazonSpeech で途中の文字を出す")
+        SwitchRow("話しながら文字を出す", streaming, { streaming = it }, "ReazonSpeech で、話している途中の文字を出します。")
         var spoken by rememberPref({ settings.spokenPunctuation }, { settings.spokenPunctuation = it })
         SwitchRow(
             "話して句読点を入れる", spoken, { spoken = it },
@@ -198,134 +142,242 @@ fun ColumnScope.VoiceScreen() {
         ConnectedChoices(listOf(2, 4, 6, 8).map { it to "$it" }, threads, { threads = it })
     }
 
-    Section("見本の音声で測る", "8.8 秒の日本語（音声合成）を、落としてあるモデルすべてにかけて、時間と結果を見る") {
-        SampleBench(settings.voiceThreads)
+    Section("見本の音声で測る", "8.8 秒の日本語（音声合成）を、ダウンロード済みのモデルすべてにかけて、時間と結果を見ます。") {
+        SampleBench(settings.voiceThreads, tick)
+    }
+}
+
+/** モデルの一覧。各モデルを「適用」すると、確定の文をそのモデルで作る */
+@Composable
+private fun ModelsSection(tick: Int, onChanged: () -> Unit) {
+    val context = LocalContext.current
+    val settings = rememberSettings()
+    var applied by rememberPref({ settings.voiceFinal }, { settings.voiceFinal = it })
+    val models = remember(tick) { VoiceCatalog.all(context) }
+    val ready = remember(tick) { models.associate { it.id to it.isReady(context) } }
+    var confirmDownload by remember { mutableStateOf<VoiceModelSpec?>(null) }
+    var confirmDelete by remember { mutableStateOf<VoiceModelSpec?>(null) }
+    var picked by remember { mutableStateOf<List<Uri>?>(null) }
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris -> if (uris.isNotEmpty()) picked = uris }
+
+    fun download(model: VoiceModelSpec) {
+        if (DownloadUi.id == null && !onUnmeteredNetwork(context)) confirmDownload = model else DownloadUi.start(context, model)
+    }
+
+    val inUse = remember(tick, applied) { VoiceCatalog.finalModel(context, settings) }
+    Section(
+        "モデル",
+        "入力欄に入る文字を作るモデルを「適用」で選びます。話している途中の文字は、いつも ReazonSpeech で出します。",
+    ) {
+        if (inUse != null && inUse.id != applied) {
+            Note("適用したモデルがダウンロードされていないので、${inUse.name} を使っています。")
+        }
+        if (inUse == null) Note("モデルがまだありません。どれかをダウンロードしてください。")
+        DownloadUi.message?.let { Note(it) }
+    }
+    for (model in models) {
+        ModelCard(
+            model,
+            ready = ready[model.id] == true,
+            applied = model.id == inUse?.id,
+            onApply = { applied = model.id },
+            onDownload = { download(model) },
+            onDelete = { confirmDelete = model },
+        )
+    }
+    OutlinedButton(onClick = { pick.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) {
+        Icon(painterResource(R.drawable.sym_upload_file), contentDescription = null, modifier = Modifier.size(20.dp))
+        Text("リストにないモデルを取り込む", Modifier.padding(start = 8.dp))
+    }
+
+    confirmDownload?.let { model ->
+        val mb = Math.round((model.download?.invoke(context)?.sumOf { it.bytes } ?: 0L) / 1e6)
+        AlertDialog(
+            onDismissRequest = { confirmDownload = null },
+            title = { Text("Wi-Fi につながっていません") },
+            text = { Text("モバイルデータで ${model.name}（約 ${mb}MB）をダウンロードしますか？") },
+            confirmButton = {
+                TextButton(onClick = {
+                    DownloadUi.start(context, model)
+                    confirmDownload = null
+                }) { Text("ダウンロードする") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDownload = null }) { Text("やめる") } },
+        )
+    }
+    confirmDelete?.let { model ->
+        AlertDialog(
+            onDismissRequest = { confirmDelete = null },
+            title = { Text("${model.name} を削除しますか？") },
+            text = { Text(if (model.custom) "取り込んだファイルを消し、一覧から外します。" else "ダウンロードしたファイルを消します。もう一度ダウンロードすれば使えます。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    model.delete(context)
+                    confirmDelete = null
+                    onChanged()
+                }) { Text("削除する", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("やめる") } },
+        )
+    }
+    picked?.let { uris ->
+        ImportDialog(uris, onDone = { id ->
+            picked = null
+            if (id != null) {
+                applied = id
+                onChanged()
+            }
+        })
     }
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun DownloadProgress() {
-    val name = DownloadUi.name
-    if (name != null) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("$name を落としている… ${DownloadUi.done / 1_000_000}MB / ${DownloadUi.total / 1_000_000}MB", style = MaterialTheme.typography.bodyMedium)
-            LinearWavyProgressIndicator(
-                progress = { if (DownloadUi.total > 0) DownloadUi.done.toFloat() / DownloadUi.total else 0f },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
-    DownloadUi.message?.let { Note(it) }
-}
-
-@Composable
-private fun ModelRow(entry: ModelEntry, tick: Int, onImported: () -> Unit) {
-    val context = LocalContext.current
-    val ready = remember(tick) { entry.ready(context) }
-    var importMessage by remember { mutableStateOf<String?>(null) }
-    val onResult = { uris: List<Uri> ->
-        if (uris.isNotEmpty()) {
-            importMessage = "写している…"
-            val main = context.mainExecutor
-            Thread {
-                val ok = runCatching { entry.import(context, uris) }.getOrDefault(false)
-                main.execute {
-                    importMessage = if (ok) "取り込んだ" else "取り込めなかった（名前と大きさが合うファイルか確かめる）"
-                    onImported()
+private fun ModelCard(model: VoiceModelSpec, ready: Boolean, applied: Boolean, onApply: () -> Unit, onDownload: () -> Unit, onDelete: () -> Unit) {
+    val downloading = DownloadUi.id == model.id
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(
+            containerColor = if (applied && ready) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+        ),
+    ) {
+        Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(model.name, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                if (applied && ready) {
+                    Icon(painterResource(R.drawable.sym_check_circle), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    Text("使用中", Modifier.padding(start = 4.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                 }
-            }.start()
-        }
-    }
-    val single = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> onResult(listOfNotNull(uri)) }
-    val multiple = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris -> onResult(uris) }
-    val downloading = DownloadUi.name == entry.name
-
-    Column(Modifier.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("${entry.name}（${entry.size}）", style = MaterialTheme.typography.titleSmall)
-                Note(entry.description)
             }
-            Surface(
-                shape = MaterialTheme.shapes.small,
-                color = if (ready) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
-            ) {
-                Text(
-                    if (ready) "取得済み" else "未取得",
-                    Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (ready) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                for (tag in model.tags.sortedBy { it.kind.ordinal }) Tag(tag)
+            }
+            model.note?.let { Note(it) }
+            if (downloading) {
+                Text("${DownloadUi.done / 1_000_000}MB / ${DownloadUi.total / 1_000_000}MB", style = MaterialTheme.typography.bodyMedium)
+                LinearWavyProgressIndicator(
+                    progress = { if (DownloadUi.total > 0) DownloadUi.done.toFloat() / DownloadUi.total else 0f },
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
-        }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (!ready || downloading) {
-                Button(onClick = { DownloadUi.start(context, entry) }, enabled = downloading || DownloadUi.name == null) {
-                    Text(if (downloading) "やめる" else "ダウンロード")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                when {
+                    downloading -> OutlinedButton(onClick = onDownload) { Text("やめる") }
+                    !ready -> Button(onClick = onDownload, enabled = DownloadUi.id == null) {
+                        Icon(painterResource(R.drawable.sym_download), contentDescription = null, modifier = Modifier.size(18.dp))
+                        Text("ダウンロード", Modifier.padding(start = 6.dp))
+                    }
+                    !applied -> Button(onClick = onApply) { Text("適用") }
+                }
+                if (ready && !downloading) {
+                    TextButton(onClick = onDelete) { Text("削除") }
                 }
             }
-            if (!ready) {
-                OutlinedButton(onClick = { if (entry.multipleFiles) multiple.launch(arrayOf("*/*")) else single.launch(arrayOf("*/*")) }) {
-                    Text("ファイルから取り込む")
-                }
-            }
         }
-        importMessage?.let { Note(it) }
     }
 }
 
-/** 落としてあるモデルを順に見本の音声にかける。sherpa のモデルは2回かけて、2回目（読み込み済み）の速さを出す */
+/** モデルの札。種類ごとに色を分けて、並べたときに比べやすくする */
+@Composable
+private fun Tag(tag: VoiceTag) {
+    val scheme = MaterialTheme.colorScheme
+    val (bg, fg) = when (tag.kind) {
+        VoiceTag.Kind.LANGUAGE -> scheme.secondaryContainer to scheme.onSecondaryContainer
+        VoiceTag.Kind.FORMAT -> scheme.surfaceContainerHighest to scheme.onSurface
+        VoiceTag.Kind.ACCURACY -> scheme.primaryContainer to scheme.onPrimaryContainer
+        VoiceTag.Kind.SPEED -> scheme.tertiaryContainer to scheme.onTertiaryContainer
+        VoiceTag.Kind.PUNCTUATION -> scheme.surfaceContainerHighest to scheme.onSurface
+        VoiceTag.Kind.ROLE -> scheme.inversePrimary to scheme.onSurface
+        VoiceTag.Kind.SIZE -> Color.Transparent to scheme.onSurfaceVariant
+    }
+    Surface(
+        shape = MaterialTheme.shapes.small,
+        color = bg,
+        border = if (tag.kind == VoiceTag.Kind.SIZE) androidx.compose.foundation.BorderStroke(1.dp, scheme.outlineVariant) else null,
+    ) {
+        Text(tag.text, Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, color = fg)
+    }
+}
+
+/** リストにないモデルを取り込む。選んだファイルの名前から形式を見当つけ、名前と形式を確かめてもらう */
+@Composable
+private fun ImportDialog(uris: List<Uri>, onDone: (String?) -> Unit) {
+    val context = LocalContext.current
+    val names = remember(uris) { uris.mapNotNull { VoiceCatalog.displayName(context, it) } }
+    // 名前は、tokens.txt 以外の（モデルの）ファイルの名前から
+    var name by remember {
+        mutableStateOf(names.firstOrNull { !it.lowercase().startsWith("tokens") }?.substringBeforeLast('.') ?: "取り込んだモデル")
+    }
+    var type by remember { mutableStateOf(VoiceCatalog.guessType(names)) }
+    var copying by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val missing = VoiceCatalog.missing(type, names)
+    AlertDialog(
+        onDismissRequest = { if (!copying) onDone(null) },
+        title = { Text("モデルを取り込む") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Note("選んだファイル: ${names.joinToString("、")}")
+                OutlinedTextField(name, { name = it }, label = { Text("名前") }, singleLine = true)
+                Text("形式", style = MaterialTheme.typography.labelLarge)
+                RadioRows(CustomModelType.entries.map { it to "${it.label}\n${it.help}" }, type, { type = it })
+                if (missing.isNotEmpty()) Note("足りないファイル: ${missing.joinToString("、")}（ファイル名に encoder・decoder・joiner・tokens などが入っているもので見分けます）")
+                error?.let { Note(it) }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = missing.isEmpty() && name.isNotBlank() && !copying,
+                onClick = {
+                    copying = true
+                    val main = context.mainExecutor
+                    Thread {
+                        val result = runCatching { VoiceCatalog.importCustom(context, uris, name.trim(), type) }
+                        main.execute {
+                            copying = false
+                            result.onSuccess { onDone(it) }.onFailure { error = "取り込めませんでした: ${it.message}" }
+                        }
+                    }.start()
+                },
+            ) { Text(if (copying) "取り込んでいます…" else "取り込む") }
+        },
+        dismissButton = { TextButton(onClick = { onDone(null) }, enabled = !copying) { Text("やめる") } },
+    )
+}
+
+/** ダウンロード済みのモデルを順に見本の音声にかける */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun SampleBench(threads: Int) {
+private fun SampleBench(threads: Int, tick: Int) {
     val context = LocalContext.current
     var running by remember { mutableStateOf(false) }
     var lines by remember { mutableStateOf(listOf<String>()) }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Button(onClick = {
-            running = true
-            lines = listOf("$threads スレッド")
-            val main = context.mainExecutor
-            val pcm = readSampleWav(context)
-            val steps = ArrayList<(() -> Unit) -> Unit>()
-            for (r in listOf(SherpaRecognizer.reazon, SherpaRecognizer.senseVoice, SherpaRecognizer.parakeet)) {
-                if (!r.isReady(context)) continue
-                steps += { next ->
-                    val started = System.nanoTime()
-                    r.recognize(context, pcm, threads) { first ->
-                        val firstMs = (System.nanoTime() - started) / 1_000_000
-                        val again = System.nanoTime()
-                        r.recognize(context, pcm, threads) { _ ->
-                            val ms = (System.nanoTime() - again) / 1_000_000
-                            main.execute {
-                                lines = lines + "${r.label}: ${ms}ms（初回は読み込み込みで ${firstMs}ms）\n${first ?: "（認識できなかった）"}"
-                                next()
-                            }
-                        }
-                    }
-                }
-            }
-            for (m in VoiceModel.entries) {
-                if (!m.isReady(context)) continue
-                steps += { next ->
-                    val started = System.nanoTime()
-                    VoiceInput.transcribe(context, pcm, m, threads) { text, ms ->
-                        val total = (System.nanoTime() - started) / 1_000_000
-                        main.execute {
-                            lines = lines + "whisper ${m.name}: ${ms}ms（読み込み込みで ${total}ms）\n${text ?: "（認識できなかった）"}"
-                            next()
-                        }
-                    }
-                }
-            }
-            if (steps.isEmpty()) {
-                lines = listOf("モデルがまだない")
-                running = false
+            val models = VoiceCatalog.all(context).filter { it.isReady(context) }
+            if (models.isEmpty()) {
+                lines = listOf("ダウンロード済みのモデルがありません。")
                 return@Button
             }
+            running = true
+            lines = listOf("$threads スレッド（初回は読み込みの時間を含みます）")
+            val main = context.mainExecutor
+            val pcm = readSampleWav(context)
             fun run(i: Int) {
-                if (i < steps.size) steps[i] { run(i + 1) } else running = false
+                if (i >= models.size) {
+                    running = false
+                    return
+                }
+                val m = models[i]
+                val started = System.nanoTime()
+                m.recognize(context, pcm, threads) { text ->
+                    val ms = (System.nanoTime() - started) / 1_000_000
+                    main.execute {
+                        lines = lines + "${m.name}: ${ms}ms\n${text ?: "（認識できませんでした）"}"
+                        run(i + 1)
+                    }
+                }
             }
             run(0)
         }, enabled = !running) { Text("測る") }
@@ -374,7 +426,7 @@ private fun VoiceKeyDialog(current: Int, onPick: (Int) -> Unit, onDismiss: () ->
                     .focusable()
                     .verticalScroll(rememberScrollState()),
             ) {
-                Note("物理キーボードのキーを押すとそれにする。一覧からも選べる")
+                Note("物理キーボードのキーを押すと、そのキーにします。一覧からも選べます。")
                 RadioRows(choices.map { it to keyName(it) }, current, onPick)
             }
         },
