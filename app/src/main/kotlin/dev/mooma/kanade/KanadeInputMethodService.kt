@@ -238,7 +238,15 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     /** カーソルの位置（重ねる窓を置く場所） */
-    private val anchor = CursorAnchor()
+    private val anchor = CursorAnchor().apply {
+        keyboardTop = {
+            keyboardView?.takeIf { isInputViewShown && it.isShown && it.height > 0 }?.let {
+                val loc = IntArray(2)
+                it.getLocationOnScreen(loc)
+                loc[1]
+            }
+        }
+    }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)

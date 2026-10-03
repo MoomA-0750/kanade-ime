@@ -13,6 +13,11 @@ import android.view.inputmethod.CursorAnchorInfo
 class CursorAnchor {
     private var info: CursorAnchorInfo? = null
 
+    /**
+     * 画面キーボードを出しているとき、その上端（画面の座標）。重ねる窓は IME の窓の下になって隠れるので、ここより上に置く
+     */
+    var keyboardTop: () -> Int? = { null }
+
     fun update(info: CursorAnchorInfo?) {
         this.info = info
     }
@@ -33,18 +38,21 @@ class CursorAnchor {
 
     /**
      * 大きさ [w]×[h] の窓の左上の位置。カーソルの行の下に出し、はみ出すなら行の上に出す。
-     * カーソルが分からなければ画面下の中央
+     * カーソルが分からなければ（Termux など）画面下の中央。画面キーボードを出していれば、その上端を画面の下として扱う
      */
     fun place(context: Context, wm: WindowManager, w: Int, h: Int, a: RectF?): Pair<Int, Int> {
         val screen = wm.currentWindowMetrics.bounds
         val density = context.resources.displayMetrics.density
         val gap = (4 * density).toInt()
+        val keyboard = keyboardTop()
+        val bottom = keyboard ?: screen.height()
         if (a == null) {
-            return maxOf(0, (screen.width() - w) / 2) to screen.height() - h - (48 * density).toInt()
+            val margin = if (keyboard != null) gap else (48 * density).toInt()
+            return maxOf(0, (screen.width() - w) / 2) to maxOf(0, bottom - h - margin)
         }
         val x = a.left.toInt().coerceIn(0, maxOf(0, screen.width() - w))
         val below = a.bottom.toInt() + gap
-        val y = if (below + h <= screen.height()) below else maxOf(0, a.top.toInt() - h - gap)
+        val y = if (below + h <= bottom) below else maxOf(0, minOf(a.top.toInt(), bottom) - h - gap)
         return x to y
     }
 }
