@@ -275,6 +275,7 @@ class SettingsActivity : Activity() {
         root.addView(heading("音声入力"))
         root.addView(note(
             "録音キーを押している間だけ録音し、離すと端末内の whisper で文字にして入れる（音声は外へ送らない）。" +
+                "録音キー（画面キーボードの 🎤）を短く押すと聞き続けるモードになり、話し終わるたびに文字にして入れる（キーボードで打ちながら使える。もう一度押すか、1分話さなければ終わる）。" +
                 "モデルは大きいので APK に入れていない。「ダウンロード」で落とす（Wi-Fi で。落としている間は設定画面を開いたままにする。途中で止まっても次は続きから）。手元のファイルは「ファイルから取り込む」で写せる" +
                 "（ネットにつなぐのはモデルを落とすときだけ）。速さは「見本の音声で測る」で確かめられる"
         ))
@@ -347,6 +348,11 @@ class SettingsActivity : Activity() {
             "話しながら文字を出すには ReazonSpeech（約 73MB、4 つのファイル）を取り込む。話している途中は ReazonSpeech の結果を出し、" +
                 "離したら whisper（取り込んであれば）で句読点の付いた文にして確定する。whisper がなければ ReazonSpeech の結果で確定する"
         ))
+        root.addView(CheckBox(this).apply {
+            text = "話して句読点を入れる（くてん→。 とうてん→、 かいぎょう→改行、はてなマーク→？ びっくりマーク→！ かぎかっこ／かぎかっことじ→「」 かっこ／かっことじ→（） なかぐろ→・）"
+            isChecked = settings.spokenPunctuation
+            setOnCheckedChangeListener { _, checked -> settings.spokenPunctuation = checked }
+        })
         root.addView(CheckBox(this).apply {
             text = "話しながら文字を出す（ReazonSpeech）"
             isChecked = settings.voiceStreaming

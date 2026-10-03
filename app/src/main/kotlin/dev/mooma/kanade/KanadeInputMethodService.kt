@@ -19,6 +19,9 @@ import dev.mooma.kanade.core.KeyInput
 import dev.mooma.kanade.core.convert.Reranker
 import dev.mooma.kanade.core.dict.Snippets
 import dev.mooma.kanade.core.dict.UserDictionary
+import dev.mooma.kanade.core.voice.SpokenPunctuation
+import dev.mooma.kanade.core.voice.VoiceEndpointer
+import dev.mooma.kanade.whisper.WhisperModel
 import dev.mooma.kanade.zenz.ZenzModel
 import java.util.concurrent.Executors
 
@@ -134,7 +137,7 @@ class KanadeInputMethodService : InputMethodService() {
     /** 画面キーボードの 🎤（押している間だけ録音。物理キーボードの録音キーと同じ） */
     private fun softVoice(down: Boolean) {
         if (secureField) return
-        if (down) startVoice() else stopVoice()
+        voiceKey(down)
     }
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
@@ -259,9 +262,15 @@ class KanadeInputMethodService : InputMethodService() {
         if (VoiceInput.isRecording) {
             VoiceInput.cancel()
             main.removeCallbacks(partialTick)
+            main.removeCallbacks(continuousTick)
             modeIndicator?.dismiss()
             partialText = null
         }
+        // 入力欄が替わったら聞き続けるモードも終える（別の欄に入れない）
+        continuous = false
+        keyboardView?.voiceActive = false
+        endpointer.reset()
+        pendingVoice.clear()
         engine.reset()
         hideBar()
         super.onFinishInput()
@@ -295,8 +304,8 @@ class KanadeInputMethodService : InputMethodService() {
         val keyCode = event.keyCode
         if (secureField) return false
         if (keyCode == settings.voiceKey) {
-            // 押している間だけ録音する（押しっぱなしの繰り返しは無視）
-            if (event.repeatCount == 0) startVoice()
+            // 押している間だけ録音する（押しっぱなしの繰り返しは無視）。短く押すと聞き続ける
+            if (event.repeatCount == 0) voiceKey(true)
             log(event, "voice")
             return true
         }
@@ -323,7 +332,7 @@ class KanadeInputMethodService : InputMethodService() {
         val keyCode = event.keyCode
         if (secureField) return false
         if (keyCode == settings.voiceKey) {
-            stopVoice()
+            voiceKey(false)
             log(event, "voice")
             return true
         }
@@ -395,6 +404,8 @@ class KanadeInputMethodService : InputMethodService() {
             }
         }
         ic?.endBatchEdit()
+        // 聞き続けるモードで、入力中の文字の確定を待っていた音声の文を入れる
+        if (pendingVoice.isNotEmpty()) flushPendingVoice()
     }
 
     /** 並べ替えを裏で回す。新しい要求が来たら、走っている古い推論は止める */
@@ -481,17 +492,115 @@ class KanadeInputMethodService : InputMethodService() {
     private val partialTick = object : Runnable {
         override fun run() {
             if (!VoiceInput.isRecording || !voiceStreaming) return
-            if (!partialBusy) {
+            // 聞き続けるモードでは、話している間だけ途中の文字を出す
+            if (!partialBusy && (!continuous || endpointer.inSpeech)) {
                 partialBusy = true
                 StreamingRecognizer.recognize(this@KanadeInputMethodService, VoiceInput.snapshot(), settings.voiceThreads) { text ->
                     main.post {
                         partialBusy = false
-                        if (VoiceInput.isRecording && text != null) showPartial(text)
+                        if (VoiceInput.isRecording && text != null && (!continuous || endpointer.inSpeech)) showPartial(text)
                     }
                 }
             }
             main.postDelayed(this, PARTIAL_INTERVAL_MS)
         }
+    }
+
+    /**
+     * 聞き続けるモード（録音キー・🎤 を短く押したとき。iPhone や Pixel の音声入力と同じ）。
+     * 録音を続け、話し終わり（無音）ごとに区切って文字にし、カーソルの位置に入れる。キーボードでの入力と並べて使える
+     * （入力中の文字があれば、それが確定してから入れる）。もう一度押すか、1分話さなければ終わる
+     */
+    private var continuous = false
+    private val endpointer = VoiceEndpointer()
+    private var vadIndex = 0
+    private var lastSpeechAt = 0L
+    private var voiceKeyDownAt = 0L
+    private var voiceKeyStopped = false
+    /** 入力中の文字があって入れられずに待っている、認識した文 */
+    private val pendingVoice = StringBuilder()
+    private val continuousTick = object : Runnable {
+        override fun run() {
+            if (!continuous || !VoiceInput.isRecording) return
+            val n = VoiceInput.sampleCount()
+            if (n > vadIndex) {
+                val ms = (n - vadIndex) * 1000 / WhisperModel.SAMPLE_RATE
+                val event = endpointer.feed(VoiceInput.rms(vadIndex, n), ms)
+                vadIndex = n
+                val now = android.os.SystemClock.uptimeMillis()
+                when (event) {
+                    VoiceEndpointer.Event.START -> lastSpeechAt = now
+                    VoiceEndpointer.Event.END -> {
+                        lastSpeechAt = now
+                        val pcm = VoiceInput.take()
+                        vadIndex = 0
+                        recognizeUtterance(pcm, continuousMode = true)
+                    }
+                    null -> if (!endpointer.inSpeech) {
+                        // 話していない間の音は溜めない（話し始めの直前の 0.5 秒だけ残す）
+                        val keep = WhisperModel.SAMPLE_RATE / 2
+                        if (n > keep * 2) {
+                            VoiceInput.trimTo(keep)
+                            vadIndex = keep
+                        }
+                    }
+                }
+                if (!endpointer.inSpeech && now - lastSpeechAt > CONTINUOUS_IDLE_MS) {
+                    stopContinuous("🎤 終わり（1分話さなかった）")
+                    return
+                }
+            }
+            main.postDelayed(this, VAD_INTERVAL_MS)
+        }
+    }
+
+    /** 録音キー・🎤 を押した（[down]）・離した。長押しは押している間だけ録音、短く押すと聞き続けるモードの入り・切り */
+    private fun voiceKey(down: Boolean) {
+        val now = android.os.SystemClock.uptimeMillis()
+        if (down) {
+            if (continuous) {
+                stopContinuous("🎤 終わり")
+                voiceKeyStopped = true
+                return
+            }
+            voiceKeyStopped = false
+            startVoice()
+            // 録音の準備に時間がかかることがあるので、短く押したかは録音が始まってから数える
+            voiceKeyDownAt = android.os.SystemClock.uptimeMillis()
+            return
+        }
+        if (voiceKeyStopped) {
+            voiceKeyStopped = false
+            return
+        }
+        if (!VoiceInput.isRecording) return
+        if (now - voiceKeyDownAt < TAP_MS) startContinuous() else stopVoice()
+    }
+
+    private fun startContinuous() {
+        continuous = true
+        endpointer.reset()
+        VoiceInput.trimTo(0)
+        vadIndex = 0
+        lastSpeechAt = android.os.SystemClock.uptimeMillis()
+        partialText = null
+        keyboardView?.voiceActive = true
+        showIndicatorText("🎤 聞いています（もう一度押すと終わり）", 1500)
+        main.postDelayed(continuousTick, VAD_INTERVAL_MS)
+    }
+
+    /** 聞き続けるモードを終える。話している途中の音声があれば文字にして入れる */
+    private fun stopContinuous(message: String) {
+        continuous = false
+        keyboardView?.voiceActive = false
+        main.removeCallbacks(continuousTick)
+        main.removeCallbacks(partialTick)
+        val speaking = endpointer.inSpeech
+        endpointer.reset()
+        val pcm = VoiceInput.stopRecording()
+        if (speaking && pcm != null) recognizeUtterance(pcm, continuousMode = true)
+        if (partialText != null && !speaking) clearPartial()
+        showIndicatorText(message, 1200)
     }
 
     private fun startVoice() {
@@ -517,37 +626,68 @@ class KanadeInputMethodService : InputMethodService() {
         if (voiceStreaming) main.postDelayed(partialTick, PARTIAL_INTERVAL_MS)
     }
 
-    /** 話している途中の文字を未確定文字列（または Termux などでは帯）に出す */
-    private fun showPartial(text: String) {
+    /**
+     * 話している途中の文字を出す。押している間の録音では未確定文字列（Termux などでは帯）に、
+     * 聞き続けるモードではキーボードの入力とぶつからないよう帯に出す（入力中の文字があれば出さない）
+     */
+    private fun showPartial(text0: String) {
         if (engine.isComposing) return
+        val text = spoken(text0)
         partialText = text
-        if (previewInBar) {
+        if (previewInBar || continuous) {
             showBar { it.showPreview("🎤 $text") }
         } else {
             currentInputConnection?.setComposingText(text, 1)
         }
     }
 
+    private fun clearPartial() {
+        if (previewInBar || continuous) {
+            if (!engine.isComposing) hideBar()
+        } else if (!engine.isComposing) {
+            currentInputConnection?.setComposingText("", 1)
+            currentInputConnection?.finishComposingText()
+        }
+        partialText = null
+    }
+
+    /** 話して入れる句読点（「くてん」→「。」など）。設定で切れる */
+    private fun spoken(text: String) = if (settings.spokenPunctuation) SpokenPunctuation.apply(text) else text
+
     private fun stopVoice() {
         val pcm = VoiceInput.stopRecording() ?: return
         main.removeCallbacks(partialTick)
         showIndicatorText("…", 0)
+        recognizeUtterance(pcm, continuousMode = false)
+    }
+
+    /** ひと区切りの音声を文字にして入れる */
+    private fun recognizeUtterance(pcm: FloatArray, continuousMode: Boolean) {
         val started = System.nanoTime()
         val generation = inputGeneration
+        val partialAtStart = partialText
         val finish = { text: String?, engineName: String ->
             main.post {
-                modeIndicator?.dismiss()
+                if (!continuousMode) modeIndicator?.dismiss()
                 if (generation != inputGeneration) {
                     // 認識しているあいだに入力欄が替わった。別の入力欄には入れない
                     log("voice: 入力欄が替わったので捨てた")
-                    partialText = null
-                    voiceStreaming = false
+                    if (!continuousMode) {
+                        partialText = null
+                        voiceStreaming = false
+                    }
                     return@post
                 }
                 val ms = (System.nanoTime() - started) / 1_000_000
                 // 確定の文が作れなければ、話している途中に出していた文を使う
-                val final = text ?: partialText
+                val final = text?.let { spoken(it) } ?: partialAtStart
                 log("voice: $engineName ${ms}ms ${final ?: "（認識できなかった）"}")
+                if (continuousMode) {
+                    // 次の区切りの途中の文字をまだ出していなければ、帯を消す
+                    if (!endpointer.inSpeech) clearPartial()
+                    if (final != null) insertVoiceText(final)
+                    return@post
+                }
                 val ic = currentInputConnection
                 // 認識しているあいだに打ち始めていたら、その文字を先に確定する（未確定を上書きしないため）
                 val typing = engine.isComposing
@@ -573,6 +713,20 @@ class KanadeInputMethodService : InputMethodService() {
         }
     }
 
+    /** 聞き続けるモードで認識した文を入れる。入力中の文字があれば、それが確定するまで待つ */
+    private fun insertVoiceText(text: String) {
+        pendingVoice.append(text)
+        flushPendingVoice()
+    }
+
+    private fun flushPendingVoice() {
+        if (pendingVoice.isEmpty() || engine.isComposing) return
+        val text = pendingVoice.toString()
+        pendingVoice.clear()
+        currentInputConnection?.commitText(text, 1)
+        lastCommitAt = android.os.SystemClock.uptimeMillis()
+        engine.leftContext = (engine.leftContext + text).takeLast(InputEngine.MAX_CONTEXT)
+    }
     private fun showIndicatorText(text: String, durationMs: Long) {
         if (!OverlayBar.permitted(this)) return
         val m = modeIndicator ?: ModeIndicator(window?.window?.context ?: this, anchor).also { modeIndicator = it }
@@ -652,6 +806,11 @@ class KanadeInputMethodService : InputMethodService() {
 
         /** 話しながら途中の文字を出し直す間隔 */
         const val PARTIAL_INTERVAL_MS = 600L
+        /** 録音キーをこれより短く押したら、聞き続けるモード */
+        const val TAP_MS = 300L
+        const val VAD_INTERVAL_MS = 100L
+        /** 聞き続けるモードで、これだけ話さなければ終える */
+        const val CONTINUOUS_IDLE_MS = 60_000L
 
         /** 変換中に選んでいる文節の背景（薄い青。明るい画面でも暗い画面でも字が読める程度に） */
         val FOCUS_COLOR = Color.argb(0x60, 0x40, 0x80, 0xE0)

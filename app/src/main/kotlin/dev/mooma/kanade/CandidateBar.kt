@@ -74,6 +74,9 @@ class CandidateBar(context: Context, private val onSelect: (Int) -> Unit = {}) :
 
     /** 候補の一覧。数字は選んでいる候補がいる頁（9件ずつ）にだけ付ける（数字キーで選べるもの） */
     fun showCandidates(candidates: List<String>, selected: Int, preview: String? = null, labels: List<String?> = emptyList()) {
+        previewOnly = false
+        this.preview.isSingleLine = true
+        this.preview.ellipsize = TextUtils.TruncateAt.START
         showPreviewLine(preview)
         if (candidates != shown) rebuild(candidates)
         val pageStart = selected / PAGE * PAGE
@@ -102,10 +105,20 @@ class CandidateBar(context: Context, private val onSelect: (Int) -> Unit = {}) :
 
     /** 未確定文字列の代わりに、入力中の文字だけを出す。[cursor] が文字列の途中ならそこに縦線を入れる */
     fun showPreview(text: String, cursor: Int = -1) {
-        showPreviewLine(if (cursor in 0 until text.length) text.substring(0, cursor) + "│" + text.substring(cursor) else text)
+        val t = if (cursor in 0 until text.length) text.substring(0, cursor) + "│" + text.substring(cursor) else text
+        // 長い文（音声入力の途中など）は折り返して全部出す。それでも長すぎれば頭を省く
+        previewOnly = true
+        preview.isSingleLine = false
+        preview.maxLines = PREVIEW_MAX_LINES
+        preview.ellipsize = null
+        showPreviewLine(if (t.length > PREVIEW_MAX_CHARS) "…" + t.takeLast(PREVIEW_MAX_CHARS) else t)
         scroll.visibility = View.GONE
         footer.visibility = View.GONE
     }
+
+    /** 入力中の文字だけを出しているか（候補の一覧は出していない）。そのときは窓を広く取る */
+    var previewOnly = false
+        private set
 
     private fun showPreviewLine(text: String?) {
         preview.visibility = if (text == null) View.GONE else View.VISIBLE
@@ -156,5 +169,7 @@ class CandidateBar(context: Context, private val onSelect: (Int) -> Unit = {}) :
         /** 数字キーで選べる数（エンジンと同じ） */
         const val PAGE = dev.mooma.kanade.core.InputEngine.PAGE
         const val VISIBLE_ROWS = 9
+        const val PREVIEW_MAX_LINES = 6
+        const val PREVIEW_MAX_CHARS = 300
     }
 }

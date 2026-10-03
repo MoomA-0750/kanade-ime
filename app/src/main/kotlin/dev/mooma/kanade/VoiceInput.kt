@@ -111,6 +111,31 @@ object VoiceInput {
     /** 録音中の、ここまでの音声（話しながら途中の文字を出すため） */
     fun snapshot(): FloatArray = synchronized(samples) { WhisperModel.pcm16ToFloat(samples.array, samples.size) }
 
+    /** 録ってある音声の長さ（サンプル数） */
+    fun sampleCount(): Int = synchronized(samples) { samples.size }
+
+    /** [from]〜[to] サンプルの音の大きさ（RMS、-1〜1 の音で） */
+    fun rms(from: Int, to: Int): Double = synchronized(samples) {
+        val end = minOf(to, samples.size)
+        if (end <= from) return 0.0
+        var sum = 0.0
+        for (i in from until end) {
+            val v = samples.array[i] / 32768.0
+            sum += v * v
+        }
+        kotlin.math.sqrt(sum / (end - from))
+    }
+
+    /** 録音は続けたまま、ここまでの音声を取り出して空にする（聞き続けるモードのひと区切り） */
+    fun take(): FloatArray = synchronized(samples) {
+        val pcm = WhisperModel.pcm16ToFloat(samples.array, samples.size)
+        samples.clear()
+        pcm
+    }
+
+    /** 録音は続けたまま、最後の [keep] サンプルだけ残す（話していない間の音を溜めない。話し始めの直前は残す） */
+    fun trimTo(keep: Int) = synchronized(samples) { samples.keepLast(keep) }
+
     /** 録音をやめて、録った音声を返す（録音していなければ null） */
     fun stopRecording(): FloatArray? {
         val r = recorder ?: return null
@@ -189,6 +214,12 @@ object VoiceInput {
         var size = 0
         fun clear() {
             size = 0
+        }
+
+        fun keepLast(keep: Int) {
+            if (size <= keep) return
+            System.arraycopy(array, size - keep, array, 0, keep)
+            size = keep
         }
 
         fun append(buf: ShortArray, n: Int) {

@@ -38,7 +38,7 @@ class OverlayBar(private val context: Context, private val anchor: CursorAnchor,
     fun show(anchorOffset: Int = 0, update: (CandidateBar) -> Unit) {
         update(bar)
         bar.measure(
-            View.MeasureSpec.makeMeasureSpec(maxWidth(), View.MeasureSpec.AT_MOST),
+            View.MeasureSpec.makeMeasureSpec(maxWidth(bar.previewOnly), View.MeasureSpec.AT_MOST),
             View.MeasureSpec.makeMeasureSpec(wm.currentWindowMetrics.bounds.height(), View.MeasureSpec.AT_MOST),
         )
         params.width = bar.measuredWidth
@@ -60,9 +60,12 @@ class OverlayBar(private val context: Context, private val anchor: CursorAnchor,
         }
     }
 
-    private fun maxWidth(): Int {
+    /** 候補の一覧は 480dp まで。入力中の文字だけ（音声入力の途中の長い文など）は画面の幅近くまで広げる */
+    private fun maxWidth(wide: Boolean): Int {
         val screen = wm.currentWindowMetrics.bounds
-        return minOf(screen.width(), (480 * context.resources.displayMetrics.density).toInt())
+        val density = context.resources.displayMetrics.density
+        return if (wide) minOf(screen.width() - (16 * density).toInt(), (900 * density).toInt())
+        else minOf(screen.width(), (480 * density).toInt())
     }
 
     companion object {

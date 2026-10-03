@@ -78,6 +78,7 @@ class SoftKeyboardView(
     private val keyPressed = if (dark) Color.rgb(0x55, 0x55, 0x5C) else Color.rgb(0xC8, 0xCA, 0xD2)
     private val modOnce = if (dark) Color.rgb(0x2E, 0x5C, 0x8A) else Color.rgb(0xB8, 0xD4, 0xF5)
     private val modLocked = if (dark) Color.rgb(0x1F, 0x8A, 0x5A) else Color.rgb(0x9F, 0xE0, 0xBC)
+    private val voiceOn = if (dark) Color.rgb(0x8A, 0x2E, 0x2E) else Color.rgb(0xF5, 0xB8, 0xB8)
     private val fg = if (dark) Color.rgb(0xEE, 0xEE, 0xEE) else Color.rgb(0x22, 0x22, 0x22)
     private val dim = if (dark) Color.rgb(0x9A, 0x9A, 0xA0) else Color.rgb(0x80, 0x80, 0x88)
 
@@ -109,6 +110,13 @@ class SoftKeyboardView(
             if (field == value) return
             field = value
             requestLayout()
+        }
+
+    /** 聞き続けるモード中（🎤 のキーの色を変える） */
+    var voiceActive = false
+        set(value) {
+            field = value
+            invalidate()
         }
 
     /** 録音キーの名前（🎤 のキーに小さく出す） */
@@ -184,6 +192,7 @@ class SoftKeyboardView(
         val keyMods = (listOfNotNull(key.center) + key.corners.values).mapNotNull { (it as? Action.Modifier)?.mod }
         keyPaint.color = when {
             pressed || keyMods.any { it in held } -> keyPressed
+            key.center == Action.Voice && voiceActive -> voiceOn
             keyMods.any { mods[it] == Latch.LOCKED } -> modLocked
             keyMods.any { mods[it] == Latch.ONCE } -> modOnce
             else -> keyBg

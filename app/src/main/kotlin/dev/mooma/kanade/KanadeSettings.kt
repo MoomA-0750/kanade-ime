@@ -83,6 +83,11 @@ class KanadeSettings(context: Context) {
         get() = prefs.getInt(KEY_SOFT_KEYBOARD_BOTTOM, 0)
         set(value) = prefs.edit().putInt(KEY_SOFT_KEYBOARD_BOTTOM, value).apply()
 
+    /** 話して句読点を入れる（「くてん」→「。」など） */
+    var spokenPunctuation: Boolean
+        get() = prefs.getBoolean(KEY_SPOKEN_PUNCT, true)
+        set(value) = prefs.edit().putBoolean(KEY_SPOKEN_PUNCT, value).apply()
+
     var lastJapanese: Boolean
         get() = prefs.getBoolean(KEY_LAST_MODE, false)
         set(value) = prefs.edit().putBoolean(KEY_LAST_MODE, value).apply()
@@ -103,6 +108,7 @@ class KanadeSettings(context: Context) {
         const val KEY_SOFT_KEYBOARD = "soft_keyboard"
         const val KEY_SOFT_KEYBOARD_HEIGHT = "soft_keyboard_height"
         const val KEY_SOFT_KEYBOARD_BOTTOM = "soft_keyboard_bottom"
+        const val KEY_SPOKEN_PUNCT = "spoken_punctuation"
         const val KEY_PUNCTUATION = "punctuation"
         const val KEY_VOICE_MODEL = "voice_model"
         const val KEY_LEARNING = "learning"
