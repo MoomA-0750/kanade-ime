@@ -78,6 +78,28 @@ class SoftKeyboardView(
     private val palette = KeyboardPalette.of(context)
     private val icons = HashMap<Int, android.graphics.drawable.Drawable>()
 
+    /** 押したときのピル型への変形（0: ふつうの角、1: 両端が丸いピル型）と、その動き */
+    private val pill = HashMap<Key, Float>()
+    private val pillAnimators = HashMap<Key, android.animation.ValueAnimator>()
+
+    /** 押したら素早くピル型に、離したらゆっくり元の形へ戻す（Material 3 Expressive の形の変化） */
+    private fun animatePill(key: Key, pressed: Boolean) {
+        pillAnimators.remove(key)?.cancel()
+        val from = pill[key] ?: 0f
+        val to = if (pressed) 1f else 0f
+        if (from == to) return
+        pillAnimators[key] = android.animation.ValueAnimator.ofFloat(from, to).apply {
+            duration = if (pressed) PILL_IN_MS else PILL_OUT_MS
+            interpolator = if (pressed) android.view.animation.DecelerateInterpolator() else android.view.animation.OvershootInterpolator(1.2f)
+            addUpdateListener {
+                val v = it.animatedValue as Float
+                if (v <= 0f && !pressed) pill.remove(key) else pill[key] = v
+                invalidate()
+            }
+            start()
+        }
+    }
+
     private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val centerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = palette.text
@@ -197,7 +219,9 @@ class SoftKeyboardView(
             else -> palette.key to palette.text
         }
         keyPaint.color = fill
-        canvas.drawRoundRect(rect, KEY_RADIUS_DP * density, KEY_RADIUS_DP * density, keyPaint)
+        val base = KEY_RADIUS_DP * density
+        val radius = base + (minOf(rect.width(), rect.height()) / 2 - base) * (pill[key] ?: 0f).coerceAtLeast(0f)
+        canvas.drawRoundRect(rect, radius, radius, keyPaint)
         val cx = rect.centerX()
         val icon = iconOf(center)
         if (icon != null) {
@@ -310,6 +334,7 @@ class SoftKeyboardView(
                 val (key, rect) = keyRects.entries.firstOrNull { it.value.contains(x, y) }?.toPair() ?: return true
                 val t = Touch(key, rect, x, y)
                 touches[id] = t
+                animatePill(key, pressed = true)
                 (key.center as? Action.Modifier)?.let {
                     t.heldMod = it.mod
                     held[it.mod] = false
@@ -345,6 +370,7 @@ class SoftKeyboardView(
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
                 val t = touches.remove(id) ?: return true
                 handler.removeCallbacksAndMessages(id)
+                if (touches.values.none { it.key === t.key }) animatePill(t.key, pressed = false)
                 t.dir = direction(t, event.getX(i), event.getY(i))
                 val mod = t.heldMod
                 if (t.key.center == Action.Voice) {
@@ -364,6 +390,7 @@ class SoftKeyboardView(
             }
             MotionEvent.ACTION_CANCEL -> {
                 touches.keys.forEach { handler.removeCallbacksAndMessages(it) }
+                touches.values.forEach { animatePill(it.key, pressed = false) }
                 if (touches.values.any { it.key.center == Action.Voice }) onVoice(false)
                 touches.clear()
                 held.clear()
@@ -512,6 +539,8 @@ class SoftKeyboardView(
         private const val DRAG_STEP_DP = 12f
         /** キーの角の丸み（Material 3 の medium に近い） */
         private const val KEY_RADIUS_DP = 10f
+        private const val PILL_IN_MS = 90L
+        private const val PILL_OUT_MS = 280L
         private const val REPEAT_MS = 50L
         private const val DOUBLE_TAP_MS = 350L
 

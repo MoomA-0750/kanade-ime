@@ -52,8 +52,9 @@ class KeyboardPalette(
                     accent = c(android.R.color.system_accent1_200), onAccent = c(android.R.color.system_accent1_800),
                     voice = c(android.R.color.system_accent3_200), onVoice = c(android.R.color.system_accent3_800),
                 ) else KeyboardPalette(
-                    background = mix(c(android.R.color.system_neutral2_100), c(android.R.color.system_accent1_100), 0.35f),
-                    key = mix(c(android.R.color.system_neutral2_10), c(android.R.color.system_accent1_50), 0.3f), functionKey = c(android.R.color.system_accent2_100),
+                    // ライトでは地と機能のキーが近くなりやすいので、地を少し明るく（95 寄り）、機能のキーを1段暗く（80）する
+                    background = mix(c(android.R.color.system_neutral2_50), c(android.R.color.system_accent1_100), 0.35f),
+                    key = mix(c(android.R.color.system_neutral2_10), c(android.R.color.system_accent1_50), 0.3f), functionKey = c(android.R.color.system_accent2_200),
                     pressed = c(android.R.color.system_neutral1_200), text = c(android.R.color.system_neutral1_900), dim = c(android.R.color.system_neutral2_700),
                     modOnce = c(android.R.color.system_accent1_100), onModOnce = c(android.R.color.system_accent1_900),
                     accent = c(android.R.color.system_accent1_600), onAccent = c(android.R.color.system_neutral1_0),
@@ -67,7 +68,7 @@ class KeyboardPalette(
                 accent = Color.rgb(0xB8, 0xC4, 0xFF), onAccent = Color.rgb(0x1C, 0x2D, 0x61),
                 voice = Color.rgb(0xE5, 0xBA, 0xD8), onVoice = Color.rgb(0x44, 0x26, 0x3F),
             ) else KeyboardPalette(
-                background = Color.rgb(0xDC, 0xDF, 0xF0), key = Color.rgb(0xF7, 0xF8, 0xFF), functionKey = Color.rgb(0xDF, 0xE1, 0xF9),
+                background = Color.rgb(0xE8, 0xEA, 0xF7), key = Color.rgb(0xF7, 0xF8, 0xFF), functionKey = Color.rgb(0xC3, 0xC6, 0xDD),
                 pressed = Color.rgb(0xC7, 0xC6, 0xCD), text = Color.rgb(0x1A, 0x1B, 0x21), dim = Color.rgb(0x45, 0x46, 0x4F),
                 modOnce = Color.rgb(0xDC, 0xE1, 0xFF), onModOnce = Color.rgb(0x04, 0x17, 0x4B),
                 accent = Color.rgb(0x4C, 0x5C, 0x92), onAccent = Color.WHITE,
