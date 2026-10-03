@@ -120,11 +120,50 @@ class KanadeInputMethodService : InputMethodService() {
     /** 画面キーボード */
     private var keyboardView: SoftKeyboardView? = null
 
-    override fun onCreateInputView(): View =
-        SoftKeyboardView(this, ::softKey, { handle(KeyInput.ToggleJapanese) }, ::softVoice).also {
-            keyboardView = it
-            applyKeyboardSettings()
+    /** 絵文字パネル（画面キーボードの代わりに同じ場所へ出す） */
+    private var emojiPanel: EmojiPanelView? = null
+
+    override fun onCreateInputView(): View {
+        val keyboard = SoftKeyboardView(this, ::softKey, { handle(KeyInput.ToggleJapanese) }, ::softVoice, ::showEmojiPanel)
+        keyboardView = keyboard
+        val panel = EmojiPanelView(
+            this,
+            onEmoji = ::commitEmoji,
+            onBackspace = { softKey(KeyEvent.KEYCODE_DEL, 0) },
+            onSpace = { softKey(KeyEvent.KEYCODE_SPACE, 0) },
+            onClose = ::hideEmojiPanel,
+        ).apply { visibility = View.GONE }
+        emojiPanel = panel
+        applyKeyboardSettings()
+        return android.widget.FrameLayout(this).apply {
+            addView(keyboard)
+            addView(panel, android.widget.FrameLayout.LayoutParams(android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.MATCH_PARENT))
         }
+    }
+
+    /** 絵文字パネルを開く。キーボードは見えなくするだけにして、高さはそのまま使う */
+    private fun showEmojiPanel() {
+        val keyboard = keyboardView ?: return
+        val panel = emojiPanel ?: return
+        panel.japanese = engine.japanese
+        panel.setPadding(0, 0, 0, keyboard.bottomSpace)
+        // キーボードと同じ高さにする（MATCH_PARENT だと、IME の窓いっぱいまで伸びる）
+        panel.layoutParams = panel.layoutParams.apply { height = keyboard.height }
+        keyboard.visibility = View.INVISIBLE
+        panel.visibility = View.VISIBLE
+    }
+
+    private fun hideEmojiPanel() {
+        emojiPanel?.visibility = View.GONE
+        keyboardView?.visibility = View.VISIBLE
+    }
+
+    /** 絵文字を入れる。入力中の文字があれば先に確定する */
+    private fun commitEmoji(emoji: String) {
+        apply(engine.commitAll())
+        currentInputConnection?.commitText(emoji, 1)
+        lastCommitAt = android.os.SystemClock.uptimeMillis()
+    }
 
     private fun applyKeyboardSettings() {
         val k = keyboardView ?: return
@@ -251,6 +290,7 @@ class KanadeInputMethodService : InputMethodService() {
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         applyKeyboardSettings()
+        hideEmojiPanel()
         log("start-input-view pkg=${info?.packageName} restarting=$restarting")
     }
 

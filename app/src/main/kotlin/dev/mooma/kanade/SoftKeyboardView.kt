@@ -26,6 +26,8 @@ class SoftKeyboardView(
     private val onToggleJapanese: () -> Unit,
     /** 🎤 のキーを押した（true）・離した（false）。押している間だけ録音する */
     private val onVoice: (Boolean) -> Unit,
+    /** 絵文字パネルを開く */
+    private val onEmoji: () -> Unit,
 ) : View(context) {
 
     /** 払う方向（上から時計回り） */
@@ -48,6 +50,8 @@ class SoftKeyboardView(
         data object ToggleJapanese : Action
         /** 押している間だけ録音（物理キーボードの録音キーと同じ） */
         data object Voice : Action
+        /** 絵文字パネルを開く */
+        data object Emoji : Action
     }
 
     class Key(val width: Float, val center: Action?, val corners: Map<Dir, Action> = emptyMap())
@@ -129,6 +133,9 @@ class SoftKeyboardView(
 
     /** 画面の下のナビゲーションバー（ジェスチャーの線・切り替えボタン）の高さ。その分だけ下を空ける */
     private var bottomInset = 0
+
+    /** キーの下に空けている高さ（絵文字パネルも同じだけ空ける） */
+    val bottomSpace: Int get() = bottomInset + (extraBottomDp * density).toInt()
 
     init {
         setOnApplyWindowInsetsListener { _, insets ->
@@ -229,7 +236,7 @@ class SoftKeyboardView(
 
     /** 修飾・Esc・Tab・⌫・あ/A・🎤 は機能のキーの色にする */
     private fun isFunctionKey(action: Action) = when (action) {
-        is Action.Modifier, Action.ToggleJapanese, Action.Voice -> true
+        is Action.Modifier, Action.ToggleJapanese, Action.Voice, Action.Emoji -> true
         is Action.Code -> true
         is Action.Text -> false
     }
@@ -256,6 +263,7 @@ class SoftKeyboardView(
             else -> null
         }
         Action.Voice -> R.drawable.sym_mic
+        Action.Emoji -> R.drawable.sym_mood
         is Action.Text -> if (action.char == ' ') R.drawable.sym_space_bar else null
         Action.ToggleJapanese -> null
     }
@@ -288,6 +296,7 @@ class SoftKeyboardView(
         is Action.Modifier -> action.mod.label
         Action.ToggleJapanese -> if (japanese) "あ" else "A"
         Action.Voice -> "🎤"
+        Action.Emoji -> "☺"
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -440,6 +449,7 @@ class SoftKeyboardView(
             is Action.Modifier -> toggleModifier(action.mod)
             Action.ToggleJapanese -> onToggleJapanese()
             Action.Voice -> Unit
+            Action.Emoji -> onEmoji()
             is Action.Code -> {
                 onKey(action.keyCode, currentMeta())
                 afterKey(consume)
@@ -572,7 +582,8 @@ class SoftKeyboardView(
                         Dir.SE to code(KeyEvent.KEYCODE_PAGE_DOWN, "⇟", repeat = true),
                     ),
                 ),
-                Key(0.9f, Action.ToggleJapanese),
+                // 絵文字パネルは あ/A のキーを上に払って開く
+                Key(0.9f, Action.ToggleJapanese, mapOf(Dir.N to Action.Emoji)),
                 Key(0.8f, Action.Voice),
                 Key(1.1f, code(KeyEvent.KEYCODE_ENTER, "⏎")),
             )

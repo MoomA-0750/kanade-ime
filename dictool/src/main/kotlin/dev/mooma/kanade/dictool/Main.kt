@@ -5,6 +5,7 @@ import dev.mooma.kanade.core.convert.Reranker
 import dev.mooma.kanade.zenz.ZenzModel
 import dev.mooma.kanade.core.dict.ConnectionMatrix
 import dev.mooma.kanade.core.dict.DictionaryBuilder
+import dev.mooma.kanade.core.dict.EmojiPanelData
 import dev.mooma.kanade.core.dict.PosTable
 import dev.mooma.kanade.core.dict.SymbolTable
 import dev.mooma.kanade.core.convert.Segmenter
@@ -27,6 +28,10 @@ const val SHERPA_AAR_SHA256 = "b22c3fc1b6a45666d28892bb2f7694beeb77a8362d7ebd77c
 
 /** 辞書以外に取る Mozc のデータ（記号・絵文字）。src/data からのパス */
 val MOZC_EXTRA_FILES = listOf("symbol/symbol.tsv", "emoji/emoji_data.tsv")
+
+/** 絵文字パネルの並び（Unicode の emoji-test.txt）。版とハッシュを固定する（Android 16 が Emoji 16.0 まで描ける） */
+const val EMOJI_TEST_URL = "https://unicode.org/Public/emoji/16.0/emoji-test.txt"
+const val EMOJI_TEST_SHA256 = "24f0c534e86cf142e2496953e8f0e46a3e702392911eddcd29c6cced85139697"
 
 /** zenz のモデル。リビジョンとハッシュを固定する */
 const val ZENZ_URL = "https://huggingface.co/Miwa-Keita/zenz-v3.2-xsmall-gguf/resolve/4f5423f0fad41a73b1242eb96fe5c12ae4fdca83/ggml-model-Q5_K_M.gguf"
@@ -105,6 +110,19 @@ fun fetchModel(cacheDir: File): File {
     return f
 }
 
+/** Unicode の emoji-test.txt を取得する（無いときだけ） */
+fun fetchEmojiTest(cacheDir: File): File {
+    val f = File(cacheDir, "emoji-test-16.0.txt")
+    if (!f.exists() || sha256(f) != EMOJI_TEST_SHA256) {
+        println("取得: $EMOJI_TEST_URL")
+        val tmp = File(cacheDir, "emoji-test-16.0.txt.part")
+        URI(EMOJI_TEST_URL).toURL().openStream().use { input -> tmp.outputStream().use { input.copyTo(it) } }
+        check(sha256(tmp) == EMOJI_TEST_SHA256) { "emoji-test.txt のハッシュが合わない" }
+        tmp.renameTo(f)
+    }
+    return f
+}
+
 /** sherpa-onnx の AAR を取得する（無いときだけ）。app の依存として .cache から読む */
 fun fetchSherpa(cacheDir: File): File {
     val dir = File(cacheDir, "sherpa-aar").apply { mkdirs() }
@@ -147,6 +165,8 @@ fun assets(cacheDir: File, outDir: File) {
     }
     model.copyTo(File(outDir, "zenz.gguf"), overwrite = true)
     fetchSherpa(cacheDir)
+    // 画面キーボードの絵文字パネル（グループごとの並び）
+    File(outDir, "emoji-panel.tsv").writeText(EmojiPanelData.fromUnicodeTest(fetchEmojiTest(cacheDir).readLines()).write())
 }
 
 fun build(mozcDir: File, outDir: File) {
