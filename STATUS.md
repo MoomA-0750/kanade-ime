@@ -25,6 +25,8 @@
 
 - 音声の確定の文を whisper・ReazonSpeech・SenseVoice・parakeet-ja から選べる（2026-10-04）。調べた選択肢は `docs/RESEARCH-voice.md`
 
+- 設定画面を Jetpack Compose・Material 3 Expressive に作り直した（2026-10-04）。スマホの幅では1カラム（一覧→中身）、600dp 以上は2カラム。足りない権限・有効化があるときだけ、一覧の上に案内を出す
+
 ## 未完了・次の手順
 
 - Fold 7 での計測を受けて: whisper のモデル（small／kotoba／turbo）の既定を決める

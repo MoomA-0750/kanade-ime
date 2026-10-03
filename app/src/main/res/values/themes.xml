@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 設定画面の窓（中身は Compose で描く。起動の一瞬に見える背景の色だけ合わせる） -->
+    <style name="Theme.Kanade" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

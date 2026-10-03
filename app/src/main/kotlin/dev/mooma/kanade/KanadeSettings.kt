@@ -49,12 +49,12 @@ class KanadeSettings(context: Context) {
         get() = prefs.getInt(KEY_VOICE_KEY, android.view.KeyEvent.KEYCODE_F12)
         set(value) = prefs.edit().putInt(KEY_VOICE_KEY, value).apply()
 
-    /** 話しながら文字を出す（ReazonSpeech）。切ると、離してから whisper で文字にするだけ */
     /** 確定の文を作る認識: WHISPER（選んだ whisper のモデル）・REAZON・SENSEVOICE・PARAKEET */
     var voiceFinal: String
         get() = prefs.getString(KEY_VOICE_FINAL, "WHISPER") ?: "WHISPER"
         set(value) = prefs.edit().putString(KEY_VOICE_FINAL, value).apply()
 
+    /** 話しながら文字を出す（ReazonSpeech）。切ると、離してから確定の認識で文字にするだけ */
     var voiceStreaming: Boolean
         get() = prefs.getBoolean(KEY_VOICE_STREAMING, true)
         set(value) = prefs.edit().putBoolean(KEY_VOICE_STREAMING, value).apply()

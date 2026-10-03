@@ -11,8 +11,12 @@
 ```sh
 export JAVA_HOME=~/.local/opt/jdk-21.0.12.1+1
 ./gradlew :core:test            # 変換ロジックの単体テスト（UI なし、JVM）
-./gradlew :app:assembleDebug    # app/build/outputs/apk/debug/app-debug.apk
+./gradlew :app:assembleRelease  # app/build/outputs/apk/release/app-release.apk（実機に入れるのはこれ。debug の鍵で署名してある）
+./gradlew :app:assembleDebug    # app/build/outputs/apk/debug/app-debug.apk（エミュレータでの試験用。run-as が使える）
 ```
+
+- 実機には release を入れる。設定画面（Jetpack Compose）は debug だとほぼインタプリタで動くので、エミュレータで起動に 10 秒かかった（release は 2〜3 秒）。どちらも debug の鍵なので、入れ替えて入れられる
+- 設定画面は material3 1.5.0-alpha18（Material 3 Expressive の部品が公開されている最後の、AGP 8.13・compileSdk 36 で使える版）。alpha19 以降と compose-bom 2026.08 以降は AGP 9.1・compileSdk 37 が要る
 
 - 既定のネイティブは arm64-v8a（実機）だけ。to-fu のエミュレータ（x86_64）で試すときは `./gradlew :app:assembleDebug -Pkanade.abis=arm64-v8a,x86_64`
 - 初回の `assembleDebug` は、Mozc の辞書（約 130MB）と zenz のモデル（21MB）を `.cache/` へ取得し、辞書を変換してから assets に入れる（`prepareKanadeAssets`）。2回目以降は取得も変換もしない
