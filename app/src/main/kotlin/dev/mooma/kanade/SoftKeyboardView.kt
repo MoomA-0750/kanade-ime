@@ -2,9 +2,7 @@ package dev.mooma.kanade
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.res.Configuration
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Handler
@@ -72,24 +70,18 @@ class SoftKeyboardView(
 
     private val density = resources.displayMetrics.density
     private val scaledDensity = resources.displayMetrics.scaledDensity
-    private val dark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-    private val bg = if (dark) Color.rgb(0x1B, 0x1B, 0x1E) else Color.rgb(0xE4, 0xE5, 0xEA)
-    private val keyBg = if (dark) Color.rgb(0x33, 0x33, 0x38) else Color.WHITE
-    private val keyPressed = if (dark) Color.rgb(0x55, 0x55, 0x5C) else Color.rgb(0xC8, 0xCA, 0xD2)
-    private val modOnce = if (dark) Color.rgb(0x2E, 0x5C, 0x8A) else Color.rgb(0xB8, 0xD4, 0xF5)
-    private val modLocked = if (dark) Color.rgb(0x1F, 0x8A, 0x5A) else Color.rgb(0x9F, 0xE0, 0xBC)
-    private val voiceOn = if (dark) Color.rgb(0x8A, 0x2E, 0x2E) else Color.rgb(0xF5, 0xB8, 0xB8)
-    private val fg = if (dark) Color.rgb(0xEE, 0xEE, 0xEE) else Color.rgb(0x22, 0x22, 0x22)
-    private val dim = if (dark) Color.rgb(0x9A, 0x9A, 0xA0) else Color.rgb(0x80, 0x80, 0x88)
+    /** 色は Material 3 の役割に合わせる（端末の壁紙の色。設定画面と同じ） */
+    private val palette = KeyboardPalette.of(context)
+    private val icons = HashMap<Int, android.graphics.drawable.Drawable>()
 
     private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val centerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = fg
+        color = palette.text
         textAlign = Paint.Align.CENTER
         textSize = 19 * scaledDensity
     }
     private val cornerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = dim
+        color = palette.dim
         textAlign = Paint.Align.CENTER
         textSize = 11 * scaledDensity
     }
@@ -171,7 +163,7 @@ class SoftKeyboardView(
     }
 
     override fun onDraw(canvas: Canvas) {
-        canvas.drawColor(bg)
+        canvas.drawColor(palette.background)
         keyRects.clear()
         val unit = (width - gap) / 10f
         rows.forEachIndexed { r, row ->
@@ -189,19 +181,31 @@ class SoftKeyboardView(
 
     private fun drawKey(canvas: Canvas, key: Key, rect: RectF) {
         val pressed = touches.values.any { it.key === key }
-        val keyMods = (listOfNotNull(key.center) + key.corners.values).mapNotNull { (it as? Action.Modifier)?.mod }
-        keyPaint.color = when {
-            pressed || keyMods.any { it in held } -> keyPressed
-            key.center == Action.Voice && voiceActive -> voiceOn
-            keyMods.any { mods[it] == Latch.LOCKED } -> modLocked
-            keyMods.any { mods[it] == Latch.ONCE } -> modOnce
-            else -> keyBg
+        val center = key.center!!
+        val keyMods = (listOf(center) + key.corners.values).mapNotNull { (it as? Action.Modifier)?.mod }
+        // 地と文字の色（Material 3 の役割: 文字のキー・機能のキー・強調（Enter・固定した修飾）・1打だけの修飾）
+        val (fill, ink) = when {
+            pressed || keyMods.any { it in held } -> palette.pressed to palette.text
+            center == Action.Voice && voiceActive -> palette.voice to palette.onVoice
+            keyMods.any { mods[it] == Latch.LOCKED } -> palette.accent to palette.onAccent
+            keyMods.any { mods[it] == Latch.ONCE } -> palette.modOnce to palette.onModOnce
+            center is Action.Code && center.keyCode == KeyEvent.KEYCODE_ENTER -> palette.accent to palette.onAccent
+            isFunctionKey(center) -> palette.functionKey to palette.text
+            else -> palette.key to palette.text
         }
-        canvas.drawRoundRect(rect, 6 * density, 6 * density, keyPaint)
+        keyPaint.color = fill
+        canvas.drawRoundRect(rect, KEY_RADIUS_DP * density, KEY_RADIUS_DP * density, keyPaint)
         val cx = rect.centerX()
-        val cy = rect.centerY() - (centerPaint.descent() + centerPaint.ascent()) / 2
-        canvas.drawText(label(key.center!!, center = true), cx, cy, centerPaint)
-        if (key.center == Action.Voice && voiceKeyLabel.isNotEmpty()) {
+        val icon = iconOf(center)
+        if (icon != null) {
+            val size = minOf(22 * density, rect.height() * 0.45f)
+            drawIcon(canvas, icon, cx, rect.centerY(), size, ink, mirrored = center is Action.Code && center.keyCode == KeyEvent.KEYCODE_FORWARD_DEL)
+        } else {
+            centerPaint.color = ink
+            val cy = rect.centerY() - (centerPaint.descent() + centerPaint.ascent()) / 2
+            canvas.drawText(label(center, center = true), cx, cy, centerPaint)
+        }
+        if (center == Action.Voice && voiceKeyLabel.isNotEmpty()) {
             canvas.drawText(voiceKeyLabel, cx, rect.bottom - 5 * density, cornerPaint)
         }
         val dx = rect.width() / 2 - 9 * density
@@ -217,8 +221,64 @@ class SoftKeyboardView(
                 Dir.W -> -dx to 0f
                 Dir.NW -> -dx to -dy
             }
-            val y = rect.centerY() + oy - (cornerPaint.descent() + cornerPaint.ascent()) / 2
-            canvas.drawText(label(action, center = false), rect.centerX() + ox, y, cornerPaint)
+            val cornerIcon = iconOf(action)
+            if (cornerIcon != null) {
+                drawIcon(
+                    canvas, cornerIcon, cx + ox, rect.centerY() + oy, 12 * density, palette.dim,
+                    mirrored = action is Action.Code && action.keyCode == KeyEvent.KEYCODE_FORWARD_DEL,
+                )
+            } else {
+                val y = rect.centerY() + oy - (cornerPaint.descent() + cornerPaint.ascent()) / 2
+                canvas.drawText(label(action, center = false), cx + ox, y, cornerPaint)
+            }
+        }
+    }
+
+    /** 修飾・Esc・Tab・⌫・あ/A・🎤 は機能のキーの色にする */
+    private fun isFunctionKey(action: Action) = when (action) {
+        is Action.Modifier, Action.ToggleJapanese, Action.Voice -> true
+        is Action.Code -> true
+        is Action.Text -> false
+    }
+
+    /** Material Symbols で描くキー。文字で書くもの（Ctrl・Alt・Fn・Esc・あ/A・英数字）は null */
+    private fun iconOf(action: Action): Int? = when (action) {
+        is Action.Code -> when (action.keyCode) {
+            KeyEvent.KEYCODE_DEL, KeyEvent.KEYCODE_FORWARD_DEL -> R.drawable.sym_backspace
+            KeyEvent.KEYCODE_ENTER -> R.drawable.sym_keyboard_return
+            KeyEvent.KEYCODE_TAB -> R.drawable.sym_keyboard_tab
+            KeyEvent.KEYCODE_DPAD_LEFT -> R.drawable.sym_arrow_back
+            KeyEvent.KEYCODE_DPAD_RIGHT -> R.drawable.sym_arrow_forward
+            KeyEvent.KEYCODE_DPAD_UP -> R.drawable.sym_arrow_upward
+            KeyEvent.KEYCODE_DPAD_DOWN -> R.drawable.sym_arrow_downward
+            KeyEvent.KEYCODE_MOVE_HOME -> R.drawable.sym_first_page
+            KeyEvent.KEYCODE_MOVE_END -> R.drawable.sym_last_page
+            KeyEvent.KEYCODE_PAGE_UP -> R.drawable.sym_keyboard_double_arrow_up
+            KeyEvent.KEYCODE_PAGE_DOWN -> R.drawable.sym_keyboard_double_arrow_down
+            else -> null
+        }
+        is Action.Modifier -> when (action.mod) {
+            Mod.SHIFT -> if (mods[Mod.SHIFT] == Latch.LOCKED) R.drawable.sym_shift_lock else R.drawable.sym_shift
+            Mod.META -> R.drawable.sym_keyboard_command_key
+            else -> null
+        }
+        Action.Voice -> R.drawable.sym_mic
+        is Action.Text -> if (action.char == ' ') R.drawable.sym_space_bar else null
+        Action.ToggleJapanese -> null
+    }
+
+    private fun drawIcon(canvas: Canvas, id: Int, cx: Float, cy: Float, size: Float, tint: Int, mirrored: Boolean = false) {
+        val d = icons.getOrPut(id) { context.getDrawable(id)!!.mutate() }
+        val half = (size / 2).toInt()
+        d.setBounds(cx.toInt() - half, cy.toInt() - half, cx.toInt() + half, cy.toInt() + half)
+        d.setTint(tint)
+        if (mirrored) {
+            canvas.save()
+            canvas.scale(-1f, 1f, cx, cy)
+            d.draw(canvas)
+            canvas.restore()
+        } else {
+            d.draw(canvas)
         }
     }
 
@@ -412,6 +472,8 @@ class SoftKeyboardView(
 
     companion object {
         private const val REPEAT_DELAY_MS = 400L
+        /** キーの角の丸み（Material 3 の medium に近い） */
+        private const val KEY_RADIUS_DP = 10f
         private const val REPEAT_MS = 50L
         private const val DOUBLE_TAP_MS = 350L
 
