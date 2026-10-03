@@ -23,7 +23,8 @@ import dev.mooma.kanade.core.dict.EmojiPanelData
  * 画面キーボードの絵文字パネル。上に検索の欄とグループのタブ（最近使ったもの＋Unicode のグループ）、真ん中に絵文字の一覧、
  * 下にキーボードへ戻る・空白・Backspace。色は画面キーボードと同じ（Material 3）。
  * 検索の欄を押すと検索モードになり、パネルは検索の欄と結果の1行だけに縮み、その下に画面キーボードが出る
- * （打った文字は IME が [typeSearch]・[backspaceSearch] でここへ渡す）。
+ * （IME は検索中、変換の結果をここへ回す: 入力中の文字は [setSearchComposing]、確定は [commitSearch]、
+ * 変換の候補は [showSearchCandidates]。IME が使わなかったキーは [typeSearch]・[backspaceSearch]）。
  */
 @SuppressLint("ViewConstructor")
 class EmojiPanelView(
@@ -34,6 +35,8 @@ class EmojiPanelView(
     private val onClose: () -> Unit,
     /** 検索モードに入った（true）・出た（false）。IME はパネルの高さとキーボードを切り替える */
     private val onSearchMode: (Boolean) -> Unit,
+    /** 検索の欄で変換の候補を選んだ */
+    private val onSearchCandidate: (Int) -> Unit,
 ) : LinearLayout(context) {
     private val palette = KeyboardPalette.of(context)
     private val density = resources.displayMetrics.density
@@ -66,6 +69,11 @@ class EmojiPanelView(
     var searching = false
         private set
     private var query = ""
+    /** 検索の欄で変換中・入力中の文字（IME から） */
+    private var composing = ""
+    /** 変換の候補を出しているか（出している間は結果の行に候補を並べる） */
+    private var candidates: List<String>? = null
+    private var selectedCandidate = 0
     private val queryView = TextView(context)
     private val results = LinearLayout(context).apply { orientation = HORIZONTAL }
 
@@ -173,6 +181,8 @@ class EmojiPanelView(
         if (searching) return
         searching = true
         query = ""
+        composing = ""
+        candidates = null
         browseViews.forEach { it.visibility = GONE }
         searchViews.forEach { it.visibility = VISIBLE }
         refreshSearch()
@@ -194,6 +204,30 @@ class EmojiPanelView(
         refreshSearch()
     }
 
+    fun setSearchComposing(text: String) {
+        composing = text
+        refreshSearch()
+    }
+
+    fun commitSearch(text: String) {
+        query += text
+        composing = ""
+        candidates = null
+        refreshSearch()
+    }
+
+    fun showSearchCandidates(list: List<String>, selected: Int) {
+        candidates = list
+        selectedCandidate = selected
+        refreshSearch()
+    }
+
+    fun hideSearchCandidates() {
+        if (candidates == null) return
+        candidates = null
+        refreshSearch()
+    }
+
     fun backspaceSearch() {
         if (query.isEmpty()) return
         query = query.dropLast(1)
@@ -201,16 +235,34 @@ class EmojiPanelView(
     }
 
     private fun refreshSearch() {
-        val kana = EmojiPanelData.toKana(query.lowercase())
-        // ローマ字は、かなにしたものも並べて見せる（どちらでも探している）
+        val full = query + composing
+        val kana = EmojiPanelData.toKana(full.lowercase())
+        // 直接入力のローマ字は、かなにしたものも並べて見せる（どちらでも探している）。変換中の文字には下線
         queryView.text = when {
-            query.isEmpty() -> "ローマ字・かな・英語で検索"
-            kana != query.lowercase() && kana.none { it in 'a'..'z' } -> "$query（$kana）"
-            else -> query
+            full.isEmpty() -> "ローマ字・かな・英語で検索"
+            composing.isEmpty() && kana != full.lowercase() && kana.none { it in 'a'..'z' } -> "$full（$kana）"
+            else -> android.text.SpannableString(full).apply {
+                if (composing.isNotEmpty()) setSpan(android.text.style.UnderlineSpan(), query.length, full.length, 0)
+            }
         }
-        queryView.setTextColor(if (query.isEmpty()) palette.dim else palette.text)
+        queryView.setTextColor(if (full.isEmpty()) palette.dim else palette.text)
         results.removeAllViews()
-        val found = data.search(query).filter { glyphPaint.hasGlyph(it) }
+        // 変換中は、結果の行に変換の候補を並べる
+        candidates?.let { list ->
+            list.forEachIndexed { i, c ->
+                results.addView(TextView(context).apply {
+                    this.text = c
+                    gravity = Gravity.CENTER
+                    setTextColor(palette.text)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+                    setPadding(dp(14), 0, dp(14), 0)
+                    if (i == selectedCandidate) background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(palette.modOnce) }
+                    setOnClickListener { onSearchCandidate(i) }
+                }, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
+            }
+            return
+        }
+        val found = data.search(full).filter { glyphPaint.hasGlyph(it) }
         if (query.isNotEmpty() && found.isEmpty()) {
             results.addView(TextView(context).apply {
                 text = "見つかりません"

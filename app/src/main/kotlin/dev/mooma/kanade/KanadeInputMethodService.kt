@@ -133,6 +133,7 @@ class KanadeInputMethodService : InputMethodService() {
             onSpace = { softKey(KeyEvent.KEYCODE_SPACE, 0) },
             onClose = ::hideEmojiPanel,
             onSearchMode = ::emojiSearchMode,
+            onSearchCandidate = ::onCandidateTapped,
         ).apply { visibility = View.GONE }
         emojiPanel = panel
         applyKeyboardSettings()
@@ -147,10 +148,34 @@ class KanadeInputMethodService : InputMethodService() {
     /** 絵文字の一覧を見ているときのパネルの高さ（キーボードと同じ） */
     private var emojiPanelHeight = 0
 
+    /** 絵文字を検索しているか（このあいだ、IME の変換の結果はアプリではなく検索の欄へ回す） */
+    private val emojiSearching: Boolean get() = emojiPanel?.let { it.searching && it.visibility == View.VISIBLE } == true
+
+    /** 検索中の IME の出力を、検索の欄に回す（変換・候補はふつうの入力と同じに効く） */
+    private fun applyToSearch(commands: List<ImeCommand>) {
+        val panel = emojiPanel ?: return
+        for (command in commands) {
+            when (command) {
+                is ImeCommand.SetComposing -> panel.setSearchComposing(command.text)
+                is ImeCommand.Commit -> panel.commitSearch(command.text)
+                is ImeCommand.ShowCandidates -> panel.showSearchCandidates(command.candidates, command.selected)
+                ImeCommand.HideCandidates -> panel.hideSearchCandidates()
+                is ImeCommand.RequestRerank -> requestRerank(command)
+                is ImeCommand.ModeChanged -> {
+                    settings.lastJapanese = command.japanese
+                    updateStatusIcon()
+                }
+                is ImeCommand.ReplaceBeforeCursor -> panel.commitSearch(command.typed.toString())
+            }
+        }
+    }
+
     /** 絵文字の検索モード: パネルを検索の欄と結果だけにし、その下にキーボードを出す（打った文字は検索に回す） */
     private fun emojiSearchMode(on: Boolean) {
         val keyboard = keyboardView ?: return
         val panel = emojiPanel ?: return
+        // 検索の欄で入力中だった文字は捨てる（アプリへは入れない）
+        if (!on && engine.isComposing) engine.reset()
         if (on) {
             panel.setPadding(0, 0, 0, 0)
             panel.layoutParams = panel.layoutParams.apply { height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT }
@@ -166,6 +191,8 @@ class KanadeInputMethodService : InputMethodService() {
     private fun showEmojiPanel() {
         val keyboard = keyboardView ?: return
         val panel = emojiPanel ?: return
+        // 入力中の文字があれば、アプリに確定してから開く
+        apply(engine.commitAll())
         panel.japanese = engine.japanese
         panel.setPadding(0, 0, 0, keyboard.bottomSpace)
         // キーボードと同じ高さにする
@@ -184,20 +211,19 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     /**
-     * 絵文字の検索中は、画面キーボードで打ったキーを検索の言葉へ回す（アプリへは送らない）。回したら true
+     * 絵文字の検索中に、IME が使わなかったキー（直接入力の文字・入力中でないときの Backspace など）を検索の言葉へ回す
      */
-    private fun routeToEmojiSearch(keyCode: Int, meta: Int): Boolean {
-        val panel = emojiPanel ?: return false
-        if (!panel.searching || panel.visibility != View.VISIBLE) return false
-        when (keyCode) {
+    private fun searchFallback(e: KeyEvent) {
+        val panel = emojiPanel ?: return
+        if (e.action != KeyEvent.ACTION_DOWN || KeyEvent.isModifierKey(e.keyCode)) return
+        when (e.keyCode) {
             KeyEvent.KEYCODE_DEL -> panel.backspaceSearch()
             KeyEvent.KEYCODE_ESCAPE, KeyEvent.KEYCODE_ENTER -> panel.endSearch()
             else -> {
-                val c = android.view.KeyCharacterMap.load(android.view.KeyCharacterMap.VIRTUAL_KEYBOARD).get(keyCode, meta)
-                if (c > 0 && (meta and (KeyEvent.META_CTRL_ON or KeyEvent.META_ALT_ON or KeyEvent.META_META_ON)) == 0) panel.typeSearch(c.toChar())
+                val c = e.unicodeChar
+                if (c > 0 && !e.isCtrlPressed && !e.isAltPressed && !e.isMetaPressed) panel.typeSearch(c.toChar())
             }
         }
-        return true
     }
 
     /** 絵文字を入れる。入力中の文字があれば先に確定する */
@@ -234,7 +260,6 @@ class KanadeInputMethodService : InputMethodService() {
      * IME で使わなかったキーは、そのままアプリへ送る
      */
     private fun softKey(keyCode: Int, meta: Int) {
-        if (routeToEmojiSearch(keyCode, meta)) return
         val now = android.os.SystemClock.uptimeMillis()
         fun event(action: Int, code: Int, m: Int) = KeyEvent(
             now, now, action, code, 0, m, android.view.KeyCharacterMap.VIRTUAL_KEYBOARD, 0,
@@ -243,7 +268,8 @@ class KanadeInputMethodService : InputMethodService() {
         val ic = currentInputConnection
         fun send(e: KeyEvent) {
             val handled = if (e.action == KeyEvent.ACTION_DOWN) handleKeyDown(e) else handleKeyUp(e)
-            if (!handled) ic?.sendKeyEvent(e)
+            // 絵文字の検索中は、IME が使わなかったキーもアプリへは送らず検索に回す
+            if (!handled) if (emojiSearching) searchFallback(e) else ic?.sendKeyEvent(e)
         }
         // 押した修飾を順に押し、キーを押して離し、修飾を逆順に離す
         val held = SOFT_MODIFIERS.filter { (_, bits) -> meta and bits != 0 }
@@ -432,8 +458,8 @@ class KanadeInputMethodService : InputMethodService() {
     private fun handle(input: KeyInput): Boolean {
         if (input is KeyInput.Text && engine.japanese && !engine.isComposing) {
             // 入力の始まりに、カーソルの前後の文を言語モデルの文脈として取る（端末アプリなど帯に出すアプリでは取らない）
-            engine.leftContext = if (previewInBar) "" else currentInputConnection?.getTextBeforeCursor(InputEngine.MAX_CONTEXT, 0)?.toString().orEmpty()
-            engine.rightContext = if (previewInBar) "" else currentInputConnection?.getTextAfterCursor(InputEngine.MAX_CONTEXT, 0)?.toString().orEmpty()
+            engine.leftContext = if (previewInBar || emojiSearching) "" else currentInputConnection?.getTextBeforeCursor(InputEngine.MAX_CONTEXT, 0)?.toString().orEmpty()
+            engine.rightContext = if (previewInBar || emojiSearching) "" else currentInputConnection?.getTextAfterCursor(InputEngine.MAX_CONTEXT, 0)?.toString().orEmpty()
         }
         val result = engine.handle(input)
         apply(result.commands)
@@ -442,6 +468,10 @@ class KanadeInputMethodService : InputMethodService() {
 
     private fun apply(commands: List<ImeCommand>) {
         if (commands.isEmpty()) return
+        if (emojiSearching) {
+            applyToSearch(commands)
+            return
+        }
         val ic = currentInputConnection
         ic?.beginBatchEdit()
         for (command in commands) {
