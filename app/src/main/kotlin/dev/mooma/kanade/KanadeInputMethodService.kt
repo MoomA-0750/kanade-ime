@@ -84,6 +84,8 @@ class KanadeInputMethodService : InputMethodService() {
         super.onCreate()
         settings = KanadeSettings(this)
         keyLog = KeyLog(this)
+        clipboardHistory = ClipboardHistory(this)
+        clipboardManager.addPrimaryClipChangedListener(clipListener)
         candidateSource = ConversionResources.candidateSource(this)
         engine.candidateSource = candidateSource
         learningFile = java.io.File(filesDir, "learning.tsv")
@@ -95,6 +97,7 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     override fun onDestroy() {
+        clipboardManager.removePrimaryClipChangedListener(clipListener)
         overlay?.hide()
         modeIndicator?.dismiss()
         zenzThread.shutdownNow()
@@ -190,11 +193,52 @@ class KanadeInputMethodService : InputMethodService() {
         override fun switchToQwerty() = switchLayout()
     }
 
-    /** クリップボード（まだなければ空の View） */
-    private fun createClipboardView(): View = View(this)
+    /** クリップボードの履歴（コピーされるたびに足す。設定で切れる） */
+    private lateinit var clipboardHistory: ClipboardHistory
+    private val clipboardManager by lazy { getSystemService(android.content.ClipboardManager::class.java) }
+    /** Kanade 自身がクリップボードに入れたもの（画像の貼り付けの代わり）は、履歴に足さない */
+    private var ignoreNextClip = false
+    private val clipListener = android.content.ClipboardManager.OnPrimaryClipChangedListener {
+        if (ignoreNextClip) {
+            ignoreNextClip = false
+            return@OnPrimaryClipChangedListener
+        }
+        if (!settings.clipboardHistory) return@OnPrimaryClipChangedListener
+        // 画像を写すことがあるので、裏のスレッドで
+        saveThread.execute { runCatching { clipboardHistory.capture(clipboardManager) } }
+    }
+    private var clipboardPanel: ClipboardPanelView? = null
+
+    private fun createClipboardView(): View =
+        ClipboardPanelView(this, clipboardHistory, onPaste = ::pasteClip, onClose = ::hideEmojiPanel).also { clipboardPanel = it }
+
+    /** クリップボードの項目を貼り付ける。画像は、入力欄が受け付けるなら画像として、受け付けなければクリップボードに入れて知らせる */
+    private fun pasteClip(item: ClipboardHistory.Item) {
+        apply(engine.commitAll())
+        val ic = currentInputConnection ?: return
+        if (item.text != null) {
+            ic.commitText(item.text, 1)
+            lastCommitAt = android.os.SystemClock.uptimeMillis()
+            return
+        }
+        val uri = clipboardHistory.imageUri(item) ?: return
+        val mime = item.mime ?: "image/png"
+        val accepted = currentInputEditorInfo?.contentMimeTypes.orEmpty().any { android.content.ClipDescription.compareMimeTypes(mime, it) }
+        val committed = accepted && runCatching {
+            val info = android.view.inputmethod.InputContentInfo(uri, android.content.ClipDescription("Kanade", arrayOf(mime)), null)
+            ic.commitContent(info, InputConnection.INPUT_CONTENT_GRANT_READ_URI_PERMISSION, null)
+        }.getOrDefault(false)
+        if (!committed) {
+            ignoreNextClip = true
+            clipboardManager.setPrimaryClip(android.content.ClipData.newUri(contentResolver, "Kanade", uri))
+            clipboardPanel?.showMessage("この入力欄は画像を直接受け付けないので、クリップボードに入れました。入力欄を長押しして貼り付けてください。")
+        }
+    }
 
     private fun showClipboard() {
         apply(engine.commitAll())
+        clipboardPanel?.showMessage(if (settings.clipboardHistory) null else "クリップボードの履歴は、設定でオフになっています。")
+        clipboardPanel?.refresh()
         host?.show(InputViewHost.Mode.CLIPBOARD)
     }
 

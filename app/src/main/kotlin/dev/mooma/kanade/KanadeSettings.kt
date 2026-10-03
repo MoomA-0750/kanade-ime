@@ -111,6 +111,11 @@ class KanadeSettings(context: Context) {
         get() = prefs.getBoolean(KEY_FLICK_TOGGLE, true)
         set(value) = prefs.edit().putBoolean(KEY_FLICK_TOGGLE, value).apply()
 
+    /** コピーした文字・画像を履歴に残す（画面キーボードのクリップボード） */
+    var clipboardHistory: Boolean
+        get() = prefs.getBoolean(KEY_CLIPBOARD_HISTORY, true)
+        set(value) = prefs.edit().putBoolean(KEY_CLIPBOARD_HISTORY, value).apply()
+
     var lastJapanese: Boolean
         get() = prefs.getBoolean(KEY_LAST_MODE, false)
         set(value) = prefs.edit().putBoolean(KEY_LAST_MODE, value).apply()
@@ -133,6 +138,7 @@ class KanadeSettings(context: Context) {
         const val KEY_SOFT_KEYBOARD_BOTTOM = "soft_keyboard_bottom"
         const val KEY_SOFT_KEYBOARD_LAYOUT = "soft_keyboard_layout"
         const val KEY_FLICK_TOGGLE = "flick_toggle"
+        const val KEY_CLIPBOARD_HISTORY = "clipboard_history"
         const val KEY_SPOKEN_PUNCT = "spoken_punctuation"
         const val KEY_VOICE_FINAL = "voice_final"
         const val KEY_PUNCTUATION = "punctuation"

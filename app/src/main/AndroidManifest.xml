@@ -30,6 +30,13 @@
                 android:resource="@xml/method" />
         </service>
 
+        <!-- クリップボードの履歴の画像を、貼り付け先のアプリに読ませる（外からは開けず、貼り付けのときだけ権限を渡す） -->
+        <provider
+            android:name=".ClipboardImageProvider"
+            android:authorities="${applicationId}.clipboard"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+
         <activity
             android:name=".SettingsActivity"
             android:label="@string/settings_title"

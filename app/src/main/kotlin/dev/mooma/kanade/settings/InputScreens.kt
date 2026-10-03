@@ -119,6 +119,11 @@ fun ColumnScope.KeyboardScreen() {
         }
     }
 
+    Section("クリップボード", "あ/A のキーを下に払う（フリックでは ☺ を左に払う）と、コピーした文字や画像の履歴が出ます。押すと貼り付け、長押しでピン留め・切り抜き・削除ができます。パスワードなど機密の印が付いたコピーは残しません。") {
+        var on by rememberPref({ settings.clipboardHistory }, { settings.clipboardHistory = it })
+        SwitchRow("コピーの履歴を残す", on, { on = it })
+    }
+
     Section("大きさ") {
         var height by rememberPref({ settings.softKeyboardHeight }, { settings.softKeyboardHeight = it })
         SliderRow("高さ", height, 60..300, 10, { height = it }) { "$it%" }
