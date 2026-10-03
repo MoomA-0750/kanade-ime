@@ -82,6 +82,27 @@ class FlickKeyboardView(
     private val icons = HashMap<Int, android.graphics.drawable.Drawable>()
     private val handler = Handler(Looper.getMainLooper())
 
+    /** 押したときのピル型への変形（0: ふつうの角、1: ピル型）と、その動き（QWERTY と同じ） */
+    private val pill = HashMap<Cell, Float>()
+    private val pillAnimators = HashMap<Cell, android.animation.ValueAnimator>()
+
+    private fun animatePill(cell: Cell, pressed: Boolean) {
+        pillAnimators.remove(cell)?.cancel()
+        val from = pill[cell] ?: 0f
+        val to = if (pressed) 1f else 0f
+        if (from == to) return
+        pillAnimators[cell] = android.animation.ValueAnimator.ofFloat(from, to).apply {
+            duration = if (pressed) 90L else 280L
+            interpolator = if (pressed) android.view.animation.DecelerateInterpolator() else android.view.animation.OvershootInterpolator(1.2f)
+            addUpdateListener {
+                val v = it.animatedValue as Float
+                if (v <= 0f && !pressed) pill.remove(cell) else pill[cell] = v
+                invalidate()
+            }
+            start()
+        }
+    }
+
     /** 高さの倍率（画面キーボードと同じ設定） */
     var heightPercent = 100
         set(value) {
@@ -147,6 +168,9 @@ class FlickKeyboardView(
 
     /** キーの位置を決める。広い画面では左右に分ける */
     private fun layoutCells(w: Int) {
+        pillAnimators.values.forEach { it.cancel() }
+        pillAnimators.clear()
+        pill.clear()
         cells.clear()
         val wide = ScreenWidth.isWide(context, w)
         val left = listOf("undo", "left", "emoji", "mode")
@@ -195,8 +219,9 @@ class FlickKeyboardView(
             else -> palette.key to palette.text
         }
         keyPaint.color = fill
-        // 押している間はピル型（画面キーボードと同じ）
-        val r = if (touch != null) minOf(cell.rect.width(), cell.rect.height()) / 2 else 10 * density
+        // 押すとピル型に変わり、離すと弾むように戻る（画面キーボードの QWERTY と同じ）
+        val base = 10 * density
+        val r = base + (minOf(cell.rect.width(), cell.rect.height()) / 2 - base) * (pill[cell] ?: 0f).coerceAtLeast(0f)
         canvas.drawRoundRect(cell.rect, r, r, keyPaint)
         val cx = cell.rect.centerX()
         val cy = cell.rect.centerY()
@@ -281,6 +306,7 @@ class FlickKeyboardView(
                 val cell = cells.firstOrNull { it.rect.contains(event.getX(i), event.getY(i)) } ?: return true
                 val t = Touch(cell, event.getX(i), event.getY(i))
                 touches[id] = t
+                animatePill(cell, pressed = true)
                 performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
                 scheduleRepeat(id, t)
                 invalidate()
@@ -304,6 +330,7 @@ class FlickKeyboardView(
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
                 val t = touches.remove(id) ?: return true
                 handler.removeCallbacksAndMessages(id)
+                if (touches.values.none { it.cell === t.cell }) animatePill(t.cell, pressed = false)
                 t.dir = direction(t, event.getX(i), event.getY(i))
                 if (t.voiceStarted) actions.voice(false) else if (!t.repeated) fire(t)
                 invalidate()
@@ -311,6 +338,7 @@ class FlickKeyboardView(
             MotionEvent.ACTION_CANCEL -> {
                 touches.keys.forEach { handler.removeCallbacksAndMessages(it) }
                 if (touches.values.any { it.voiceStarted }) actions.voice(false)
+                touches.values.forEach { animatePill(it.cell, pressed = false) }
                 touches.clear()
                 invalidate()
             }
