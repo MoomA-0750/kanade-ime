@@ -43,25 +43,15 @@ object ConversionResources {
     @Synchronized
     fun zenz(context: Context): ZenzModel? {
         val app = context.applicationContext
-        // 設定で small を選び、取り込んであれば small。そうでなければ APK に入れた xsmall
-        val wantSmall = KanadeSettings(app).zenzSmall && ZenzSmall.isReady(app)
-        if (zenz != null && loadedSmall == wantSmall) return zenz
-        // 前のモデルは閉じない（IME のスレッドが推論中かもしれず、閉じると落ちる。替えるのはまれなので、プロセスが終わるまで残す）
-        zenz = null
+        zenz?.let { return it }
+        // 以前の版で取り込めた small（74MB）は使わなくなったので消す（xsmall と体感が変わらず遅いだけだったため）
+        runCatching { java.io.File(app.getExternalFilesDir("models"), "zenz-v3.2-small-Q5_K_M.gguf").delete() }
         return runCatching {
             System.loadLibrary("kanade_zenz")
-            val model = if (wantSmall) ZenzSmall.path(app) else copyModel(app)
             val threads = Runtime.getRuntime().availableProcessors().coerceIn(1, 4)
-            ZenzModel.open(model.absolutePath, threads = threads)
-        }.getOrNull().also {
-            zenz = it
-            loadedSmall = wantSmall
-        }
+            ZenzModel.open(copyModel(app).absolutePath, threads = threads)
+        }.getOrNull().also { zenz = it }
     }
-
-    /** いま読んでいる zenz が small か（設定画面の表示用） */
-    @Volatile var loadedSmall = false
-        private set
 
     /**
      * gzip で入れた asset（`name.kgz`）をアプリ内へ展開して mmap する。展開は APK を入れ直したとき（更新時刻が変わったとき）だけ。
@@ -101,31 +91,5 @@ object ConversionResources {
             tmp.renameTo(dest)
         }
         return dest
-    }
-}
-
-/**
- * zenz-v3.2-small（74MB）。xsmall（APK に同梱）より正解率が少し高い（手元の評価で 92%→94%）が、3〜4 倍遅い。
- * 端末で試せるよう、whisper と同じくブラウザで取得して設定画面で取り込む
- */
-object ZenzSmall {
-    const val URL = "https://huggingface.co/Miwa-Keita/zenz-v3.2-small-gguf/resolve/c67e03e07d215c869f591b274c1631170d3e11fe/ggml-model-Q5_K_M.gguf"
-    const val BYTES = 73_871_936L
-
-    fun path(context: Context) = File(context.getExternalFilesDir("models"), "zenz-v3.2-small-Q5_K_M.gguf")
-
-    fun isReady(context: Context) = path(context).let { it.exists() && it.length() == BYTES }
-
-    /** 選んだファイルをアプリ内へ写す。大きさが合わなければ false。UI スレッドから呼ばないこと */
-    fun importFrom(context: Context, uri: android.net.Uri): Boolean {
-        val dest = path(context)
-        dest.parentFile?.mkdirs()
-        val tmp = File(dest.path + ".part")
-        context.contentResolver.openInputStream(uri)?.use { input -> tmp.outputStream().use { input.copyTo(it, 1 shl 20) } } ?: return false
-        if (tmp.length() != BYTES) {
-            tmp.delete()
-            return false
-        }
-        return tmp.renameTo(dest)
     }
 }

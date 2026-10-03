@@ -69,7 +69,7 @@ Samsung DeX で使う、物理キーボード最適化に全振りした Android
 | 辞書 | Mozc OSS 辞書（`src/data/dictionary_oss`）。ビルド時に自前の LOUDS 形式へ変換し、APK に同梱する。アプリ内のライセンス表示に IPAdic・ICOT の文面を入れる |
 | ラティス・探索 | Kotlin で LOUDS トライ＋ビタビ（N-best）。UI なしで JVM の単体テストを回せる純 Kotlin モジュールにする |
 | zenz | azooKey フォークの llama.cpp を submodule にし、CMake で arm64-v8a 向けに静的リンク。CPU 推論、4スレッド |
-| モデル | zenz-v3.2-xsmall（Q5_K_M、21MB、Apache-2.0）から始め、精度が足りなければ small（74MB）へ。リポジトリには入れず取得手順を書く |
+| モデル | zenz-v3.2-xsmall（Q5_K_M、21MB、Apache-2.0）に決定（2026-10-03、本人。small（74MB）は手元の評価で 92%→94% と差が小さく 3〜4 倍遅いだけなので、端末で選べるようにしていたのもやめた）。リポジトリには入れず取得手順を書く |
 | zenz の使い方 | まず「辞書の N-best 上位を zenz で採点し、元の順位と混ぜる」と「貪欲生成の1候補を足す」。左文脈は `getTextBeforeCursor` で40文字。要求に番号を振り、古い推論は取り消す。発展形として Zenzai の制約付き再探索を Kotlin へ移植する |
 | 参考実装 | Sumire（KazumaProject/JapaneseKeyboard、MIT）の LOUDS・ビタビ・`zenz_bridge.cpp`。依存はせず、必要な部分を読んで書くか、出典と MIT 表示を残して取り込む |
 

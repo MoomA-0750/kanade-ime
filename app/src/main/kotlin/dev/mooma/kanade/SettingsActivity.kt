@@ -197,44 +197,6 @@ class SettingsActivity : Activity() {
         root.addView(heading("試し打ち"))
         root.addView(EditText(this).apply { hint = "ここで入力を試す" })
 
-        root.addView(heading("zenz（変換の並べ替え）"))
-        root.addView(note(
-            "APK には xsmall（21MB）が入っている。small（74MB）は正解率が少し高い（手元の評価で 92%→94%）が 3〜4 倍遅い。" +
-                "試すなら「ブラウザで取得」で落として「取得したファイルを選ぶ」で取り込み、「small を使う」を入れる（次の入力から替わる）"
-        ))
-        val zenzStatus = TextView(this).apply { textSize = 13f }
-        fun refreshZenz() {
-            zenzStatus.text = "small: ${if (ZenzSmall.isReady(this)) "取り込み済み" else "未取り込み"}"
-        }
-        refreshZenz()
-        root.addView(zenzStatus)
-        root.addView(CheckBox(this).apply {
-            text = "small を使う"
-            isChecked = settings.zenzSmall
-            setOnCheckedChangeListener { _, checked -> settings.zenzSmall = checked }
-        })
-        root.addView(LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            addView(Button(this@SettingsActivity).apply {
-                text = "ブラウザで取得"
-                setOnClickListener { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(ZenzSmall.URL))) }
-            })
-            addView(Button(this@SettingsActivity).apply {
-                text = "取得したファイルを選ぶ"
-                setOnClickListener {
-                    @Suppress("DEPRECATION")
-                    startActivityForResult(
-                        Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*"),
-                        REQUEST_ZENZ,
-                    )
-                }
-            })
-        })
-        onZenzImported = { ok ->
-            refreshZenz()
-            if (!ok) zenzStatus.append("（取り込めなかった。ggml-model-Q5_K_M.gguf の 74MB のものか確かめる）")
-        }
-
         root.addView(heading("変換の試験"))
         root.addView(note("ひらがなの読みを入れて、辞書と zenz の結果と時間を見る"))
         val readingInput = EditText(this).apply { hint = "例: きょうはいいてんきですね" }
@@ -306,7 +268,6 @@ class SettingsActivity : Activity() {
 
     private lateinit var voiceStatus: TextView
     private var voiceKeyButton: Button? = null
-    private var onZenzImported: (Boolean) -> Unit = {}
 
     /** 音声入力: マイクの権限、モデルの取得、録音キー、見本の音声での計測 */
     private fun addVoiceSection(root: LinearLayout) {
@@ -466,13 +427,6 @@ class SettingsActivity : Activity() {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
         val uri = data?.data
-        if (requestCode == REQUEST_ZENZ && resultCode == RESULT_OK && uri != null) {
-            Thread {
-                val ok = runCatching { ZenzSmall.importFrom(this, uri) }.getOrDefault(false)
-                runOnUiThread { onZenzImported(ok) }
-            }.start()
-            return
-        }
         if (requestCode == REQUEST_REAZON && resultCode == RESULT_OK && data != null) {
             val uris = data.clipData?.let { c -> (0 until c.itemCount).map { c.getItemAt(it).uri } } ?: listOfNotNull(data.data)
             voiceStatus.text = "写している…"
@@ -610,6 +564,5 @@ class SettingsActivity : Activity() {
     private companion object {
         const val REQUEST_MODEL = 10
         const val REQUEST_REAZON = 11
-        const val REQUEST_ZENZ = 12
     }
 }

@@ -64,7 +64,7 @@ object ConversionBench {
         fun pct(n: Int) = "$n/${cases.size}（${"%.1f".format(100.0 * n / cases.size)}%）"
         fun stat(l: List<Double>) = l.sorted().let { "中央値 ${"%.1f".format(it[it.size / 2])}ms・95% ${"%.1f".format(it[it.size * 95 / 100])}ms" }
         return buildString {
-            appendLine("評価セット ${cases.size}件、zenz ${if (ConversionResources.loadedSmall) "small" else "xsmall"}、スレッド ${Runtime.getRuntime().availableProcessors().coerceIn(1, 4)}")
+            appendLine("評価セット ${cases.size}件、zenz xsmall、スレッド ${Runtime.getRuntime().availableProcessors().coerceIn(1, 4)}")
             appendLine("辞書だけ: ${pct(hits[0])}、${stat(times[0])}")
             appendLine("zenz 生成: ${stat(times[1])}")
             appendLine("zenz 並べ替え: ${pct(hits[1])}、${stat(times[2])}")

@@ -68,11 +68,6 @@ class KanadeSettings(context: Context) {
         get() = prefs.getLong(KEY_LEARNING_RESET, 0L)
         set(value) = prefs.edit().putLong(KEY_LEARNING_RESET, value).apply()
 
-    /** zenz を small（取り込んだもの）にする。既定は APK に入れた xsmall */
-    var zenzSmall: Boolean
-        get() = prefs.getBoolean(KEY_ZENZ_SMALL, false)
-        set(value) = prefs.edit().putBoolean(KEY_ZENZ_SMALL, value).apply()
-
     /** 画面キーボード: AUTO（物理キーボードがないときだけ）・ALWAYS・NEVER */
     var softKeyboard: String
         get() = prefs.getString(KEY_SOFT_KEYBOARD, "AUTO") ?: "AUTO"
@@ -111,7 +106,6 @@ class KanadeSettings(context: Context) {
         const val KEY_PUNCTUATION = "punctuation"
         const val KEY_VOICE_MODEL = "voice_model"
         const val KEY_LEARNING = "learning"
-        const val KEY_ZENZ_SMALL = "zenz_small"
         const val KEY_LEARNING_RESET = "learning_reset_at"
         const val KEY_VOICE_KEY = "voice_key"
         const val KEY_VOICE_THREADS = "voice_threads"
