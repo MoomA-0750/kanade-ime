@@ -8,18 +8,17 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 
 /**
- * IME の画面（入力欄の下に出す部分）の入れ物。上から「パネル（絵文字・クリップボード）」「ツールバー」「キーボード」と並べ、
- * 今の場面に合わせて出し分ける。
- * - キーボード: ツールバー＋キーボード（QWERTY かフリック）
- * - 絵文字・クリップボード: パネルだけ（ツールバー＋キーボードと同じ高さ）
+ * IME の画面（入力欄の下に出す部分）の入れ物。上に「パネル（絵文字・クリップボード）」、下に「キーボード（QWERTY かフリック）」を置き、
+ * 今の場面に合わせて出し分ける（ツールバーは置かない。絵文字などはキーを払って開く）。
+ * - キーボード: キーボードだけ
+ * - 絵文字・クリップボード: パネルだけ（キーボードと同じ高さ）
  * - 絵文字の検索: パネル（検索の欄と結果の1行）＋キーボード
  */
 @SuppressLint("ViewConstructor")
 class InputViewHost(
     context: Context,
-    val toolbar: KeyboardToolbar,
     private val qwerty: SoftKeyboardView,
-    private val flick: View,
+    private val flick: FlickKeyboardView,
     val emoji: EmojiPanelView,
     val clipboard: View,
 ) : LinearLayout(context) {
@@ -32,12 +31,12 @@ class InputViewHost(
     var flickLayout = false
         set(value) {
             field = value
-            toolbar.flick = value
             show(mode)
         }
 
     private val panels = FrameLayout(context)
     private val keyboards = FrameLayout(context)
+    private var lastKeyboardHeight = 0
 
     /** 今のキーボード（QWERTY かフリック） */
     val keyboard: View get() = if (flickLayout) flick else qwerty
@@ -51,25 +50,22 @@ class InputViewHost(
         keyboards.addView(qwerty)
         keyboards.addView(flick)
         addView(panels, LayoutParams(LayoutParams.MATCH_PARENT, 0))
-        addView(toolbar, LayoutParams(LayoutParams.MATCH_PARENT, (KeyboardToolbar.HEIGHT_DP * resources.displayMetrics.density).toInt()))
         addView(keyboards, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         show(Mode.KEYBOARD)
     }
 
     /** キーボードの下に空けている高さ（ナビゲーションバーなど）。パネルも同じだけ空ける */
-    private fun bottomSpace() = qwerty.bottomSpace
+    private fun bottomSpace() = if (flickLayout) flick.bottomSpace else qwerty.bottomSpace
 
     fun show(next: Mode) {
-        // パネルの高さは、ツールバー＋キーボードの高さ（出ている今の高さを使う）
-        val fullHeight = if (mode == Mode.KEYBOARD && toolbar.height > 0) toolbar.height + keyboards.height else lastFullHeight
-        if (fullHeight > 0) lastFullHeight = fullHeight
+        // パネルの高さは、キーボードの高さ（出ている今の高さを使う）
+        if (mode == Mode.KEYBOARD && keyboards.height > 0) lastKeyboardHeight = keyboards.height
         mode = next
         qwerty.visibility = if (flickLayout) GONE else VISIBLE
         flick.visibility = if (flickLayout) VISIBLE else GONE
         when (next) {
             Mode.KEYBOARD -> {
                 panels.visibility = GONE
-                toolbar.visibility = VISIBLE
                 keyboards.visibility = VISIBLE
             }
             Mode.EMOJI, Mode.CLIPBOARD -> {
@@ -77,8 +73,7 @@ class InputViewHost(
                 clipboard.visibility = if (next == Mode.CLIPBOARD) VISIBLE else GONE
                 panels.visibility = VISIBLE
                 panels.setPadding(0, 0, 0, bottomSpace())
-                panels.layoutParams = panels.layoutParams.apply { height = lastFullHeight.takeIf { it > 0 } ?: LayoutParams.WRAP_CONTENT }
-                toolbar.visibility = GONE
+                panels.layoutParams = panels.layoutParams.apply { height = lastKeyboardHeight.takeIf { it > 0 } ?: LayoutParams.WRAP_CONTENT }
                 keyboards.visibility = GONE
             }
             Mode.EMOJI_SEARCH -> {
@@ -87,11 +82,8 @@ class InputViewHost(
                 panels.visibility = VISIBLE
                 panels.setPadding(0, 0, 0, 0)
                 panels.layoutParams = panels.layoutParams.apply { height = LayoutParams.WRAP_CONTENT }
-                toolbar.visibility = GONE
                 keyboards.visibility = VISIBLE
             }
         }
     }
-
-    private var lastFullHeight = 0
 }

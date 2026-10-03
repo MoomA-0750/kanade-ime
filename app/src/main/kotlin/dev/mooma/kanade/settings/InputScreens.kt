@@ -110,6 +110,15 @@ fun ColumnScope.KeyboardScreen() {
         )
     }
 
+    Section("配列", "キーボードの上で切り替えることもできます（QWERTY は Esc を上に払う、フリックは「あa1」を上に払う）。") {
+        var layout by rememberPref({ settings.softKeyboardLayout }, { settings.softKeyboardLayout = it })
+        ConnectedChoices(listOf("QWERTY" to "QWERTY", "FLICK" to "フリック"), layout, { layout = it })
+        if (layout == "FLICK") {
+            var toggle by rememberPref({ settings.flickToggle }, { settings.flickToggle = it })
+            SwitchRow("トグル入力", toggle, { toggle = it }, "同じキーを続けて押すと、次の文字になります（あ→い→う）。オフにするとフリックだけで入力します。")
+        }
+    }
+
     Section("大きさ") {
         var height by rememberPref({ settings.softKeyboardHeight }, { settings.softKeyboardHeight = it })
         SliderRow("高さ", height, 60..300, 10, { height = it }) { "$it%" }

@@ -28,6 +28,10 @@ class SoftKeyboardView(
     private val onVoice: (Boolean) -> Unit,
     /** 絵文字パネルを開く */
     private val onEmoji: () -> Unit,
+    /** クリップボードを開く */
+    private val onClipboard: () -> Unit,
+    /** フリック配列に切り替える */
+    private val onSwitchLayout: () -> Unit,
 ) : View(context) {
 
     /** 払う方向（上から時計回り） */
@@ -52,6 +56,8 @@ class SoftKeyboardView(
         data object Voice : Action
         /** 絵文字パネルを開く */
         data object Emoji : Action
+        data object Clipboard : Action
+        data object SwitchLayout : Action
     }
 
     class Key(val width: Float, val center: Action?, val corners: Map<Dir, Action> = emptyMap())
@@ -260,7 +266,7 @@ class SoftKeyboardView(
 
     /** 修飾・Esc・Tab・⌫・あ/A・🎤 は機能のキーの色にする */
     private fun isFunctionKey(action: Action) = when (action) {
-        is Action.Modifier, Action.ToggleJapanese, Action.Voice, Action.Emoji -> true
+        is Action.Modifier, Action.ToggleJapanese, Action.Voice, Action.Emoji, Action.Clipboard, Action.SwitchLayout -> true
         is Action.Code -> true
         is Action.Text -> false
     }
@@ -288,6 +294,8 @@ class SoftKeyboardView(
         }
         Action.Voice -> R.drawable.sym_mic
         Action.Emoji -> R.drawable.sym_mood
+        Action.Clipboard -> R.drawable.sym_content_paste
+        Action.SwitchLayout -> R.drawable.sym_dialpad
         is Action.Text -> if (action.char == ' ') R.drawable.sym_space_bar else null
         Action.ToggleJapanese -> null
     }
@@ -321,6 +329,8 @@ class SoftKeyboardView(
         Action.ToggleJapanese -> if (japanese) "あ" else "A"
         Action.Voice -> "🎤"
         Action.Emoji -> "☺"
+        Action.Clipboard -> "📋"
+        Action.SwitchLayout -> "⌨"
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -477,6 +487,8 @@ class SoftKeyboardView(
             Action.ToggleJapanese -> onToggleJapanese()
             Action.Voice -> Unit
             Action.Emoji -> onEmoji()
+            Action.Clipboard -> onClipboard()
+            Action.SwitchLayout -> onSwitchLayout()
             is Action.Code -> {
                 onKey(action.keyCode, currentMeta())
                 afterKey(consume)
@@ -590,7 +602,8 @@ class SoftKeyboardView(
                 Key(0.8f, Action.Modifier(Mod.FN)),
                 // Meta（Windows キー・⌘ にあたる。DeX のショートカットなど）は Alt を上に払う
                 Key(0.8f, Action.Modifier(Mod.ALT), mapOf(Dir.N to Action.Modifier(Mod.META))),
-                Key(1f, code(KeyEvent.KEYCODE_ESCAPE, "Esc")),
+                // Esc のキーを上に払うと、フリック配列に切り替える
+                Key(1f, code(KeyEvent.KEYCODE_ESCAPE, "Esc"), mapOf(Dir.N to Action.SwitchLayout)),
                 Key(
                     2.4f, t(' '),
                     mapOf(
@@ -611,8 +624,8 @@ class SoftKeyboardView(
                         Dir.SE to code(KeyEvent.KEYCODE_PAGE_DOWN, "⇟", repeat = true),
                     ),
                 ),
-                // 絵文字パネルは あ/A のキーを上に払って開く
-                Key(0.9f, Action.ToggleJapanese, mapOf(Dir.N to Action.Emoji)),
+                // あ/A のキーを上に払うと絵文字パネル、下に払うとクリップボード
+                Key(0.9f, Action.ToggleJapanese, mapOf(Dir.N to Action.Emoji, Dir.S to Action.Clipboard)),
                 Key(0.8f, Action.Voice),
                 Key(1.1f, code(KeyEvent.KEYCODE_ENTER, "⏎")),
             )

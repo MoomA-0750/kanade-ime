@@ -126,8 +126,14 @@ class KanadeInputMethodService : InputMethodService() {
     /** IME の画面の入れ物（ツールバー・キーボード・パネルを出し分ける） */
     private var host: InputViewHost? = null
 
+    /** フリック配列の画面キーボード */
+    private var flickView: FlickKeyboardView? = null
+
     override fun onCreateInputView(): View {
-        val keyboard = SoftKeyboardView(this, ::softKey, { handle(KeyInput.ToggleJapanese) }, ::softVoice, ::showEmojiPanel)
+        val keyboard = SoftKeyboardView(
+            this, ::softKey, { handle(KeyInput.ToggleJapanese) }, ::softVoice, ::showEmojiPanel,
+            onClipboard = ::showClipboard, onSwitchLayout = ::switchLayout,
+        )
         keyboardView = keyboard
         val panel = EmojiPanelView(
             this,
@@ -139,25 +145,50 @@ class KanadeInputMethodService : InputMethodService() {
             onSearchCandidate = ::onCandidateTapped,
         )
         emojiPanel = panel
-        val toolbar = KeyboardToolbar(
-            this,
-            onEmoji = ::showEmojiPanel,
-            onClipboard = ::showClipboard,
-            onSwitchLayout = ::switchLayout,
-            onVoice = ::softVoice,
-            onSettings = {
-                startActivity(android.content.Intent(this, SettingsActivity::class.java).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
-            },
-        )
-        val h = InputViewHost(this, toolbar, keyboard, createFlickView(), panel, createClipboardView())
+        val flick = FlickKeyboardView(this, flickActions)
+        flickView = flick
+        val h = InputViewHost(this, keyboard, flick, panel, createClipboardView())
         host = h
         h.flickLayout = settings.softKeyboardLayout == "FLICK"
         applyKeyboardSettings()
         return h
     }
 
-    /** フリック配列（まだなければ空の View） */
-    private fun createFlickView(): View = View(this)
+    /** フリック配列のキーでしてもらうこと */
+    private val flickActions = object : FlickKeyboardView.Actions {
+        override fun text(s: String) {
+            for (c in s) {
+                if (handle(KeyInput.Text(c))) continue
+                // 直接入力（英字・数字）では IME が使わないので、そのまま入れる（絵文字の検索中は検索へ）
+                if (emojiSearching) emojiPanel?.typeSearch(c) else currentInputConnection?.commitText(c.toString(), 1)
+            }
+        }
+
+        override fun replaceLast(s: String) {
+            // 入力中なら読みの中で置き換える（消してから打つと、入力中の文字が一瞬空になってアプリとずれる）
+            if (engine.isComposing && handle(KeyInput.ReplaceLast(s))) return
+            when {
+                emojiSearching -> emojiPanel?.backspaceSearch()
+                else -> currentInputConnection?.deleteSurroundingTextInCodePoints(1, 0)
+            }
+            text(s)
+        }
+
+        override fun lastChar(): Char? = when {
+            engine.isComposing -> engine.lastTypedChar
+            emojiSearching -> null
+            else -> currentInputConnection?.getTextBeforeCursor(1, 0)?.lastOrNull()
+        }
+
+        override fun key(keyCode: Int) = softKey(keyCode, 0)
+        override fun setJapanese(on: Boolean) {
+            handle(KeyInput.SetJapanese(on))
+        }
+        override fun emoji() = showEmojiPanel()
+        override fun clipboard() = showClipboard()
+        override fun voice(down: Boolean) = softVoice(down)
+        override fun switchToQwerty() = switchLayout()
+    }
 
     /** クリップボード（まだなければ空の View） */
     private fun createClipboardView(): View = View(this)
@@ -242,10 +273,22 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     private fun applyKeyboardSettings() {
-        val k = keyboardView ?: return
-        k.japanese = engine.japanese
-        k.heightPercent = settings.softKeyboardHeight
-        k.extraBottomDp = settings.softKeyboardBottom
+        // 設定画面で配列を変えていたら、それにする
+        host?.let { h ->
+            val flick = settings.softKeyboardLayout == "FLICK"
+            if (h.flickLayout != flick) h.flickLayout = flick
+        }
+        keyboardView?.let { k ->
+            k.japanese = engine.japanese
+            k.heightPercent = settings.softKeyboardHeight
+            k.extraBottomDp = settings.softKeyboardBottom
+        }
+        flickView?.let { f ->
+            f.syncJapanese(engine.japanese)
+            f.toggleInput = settings.flickToggle
+            f.heightPercent = settings.softKeyboardHeight
+            f.extraBottomDp = settings.softKeyboardBottom
+        }
     }
 
     /** 画面キーボードの 🎤（押している間だけ録音。物理キーボードの録音キーと同じ） */
@@ -385,7 +428,7 @@ class KanadeInputMethodService : InputMethodService() {
         // 入力欄が替わったら聞き続けるモードも終える（別の欄に入れない）
         continuous = false
         keyboardView?.voiceActive = false
-        host?.toolbar?.voiceActive = false
+        flickView?.voiceActive = false
         endpointer.reset()
         pendingVoice.clear()
         voiceSegments.clear()
@@ -722,7 +765,7 @@ class KanadeInputMethodService : InputMethodService() {
         partialText = null
         voiceSegments.clear()
         keyboardView?.voiceActive = true
-        host?.toolbar?.voiceActive = true
+        flickView?.voiceActive = true
         showIndicatorText("🎤 聞いています（もう一度押すと終わります）", 1500)
         main.postDelayed(continuousTick, VAD_INTERVAL_MS)
     }
@@ -731,7 +774,7 @@ class KanadeInputMethodService : InputMethodService() {
     private fun stopContinuous(message: String) {
         continuous = false
         keyboardView?.voiceActive = false
-        host?.toolbar?.voiceActive = false
+        flickView?.voiceActive = false
         main.removeCallbacks(continuousTick)
         main.removeCallbacks(partialTick)
         val speaking = endpointer.inSpeech
@@ -937,6 +980,7 @@ class KanadeInputMethodService : InputMethodService() {
 
     private fun updateStatusIcon() {
         keyboardView?.japanese = engine.japanese
+        flickView?.syncJapanese(engine.japanese)
         if (engine.japanese) showStatusIcon(R.drawable.ic_mode_ja) else hideStatusIcon()
     }
 

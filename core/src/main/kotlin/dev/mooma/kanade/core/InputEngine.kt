@@ -31,6 +31,11 @@ sealed interface KeyInput {
     data class SetJapanese(val on: Boolean) : KeyInput
     data object ToggleJapanese : KeyInput
     data class ConvertWidth(val target: WidthTarget) : KeyInput
+    /**
+     * 入力中の読みの、カーソルの前の1文字を [text] に置き換える（フリック入力のトグル・濁点）。
+     * 入力中でなければ使わない（consumed=false）
+     */
+    data class ReplaceLast(val text: String) : KeyInput
     /** 上記以外（Ctrl 併用など）。未確定があれば確定してからアプリへ渡す */
     data object Other : KeyInput
 }
@@ -201,6 +206,17 @@ class InputEngine(
     private val reading: String get() = units.joinToString("") { it.text }
 
     /** 未確定文字列として出すもの */
+    /**
+     * 入力中の読みの、カーソルの前の最後の1文字（変換中は null）。フリック入力の濁点・トグル入力で使う
+     * （[composingText] はライブ変換の結果を返すので、読みはこちらで見る）
+     */
+    val lastTypedChar: Char?
+        get() = when {
+            isConverting -> null
+            romaji.pending.isNotEmpty() && !caretInside -> romaji.pending.last()
+            else -> units.take(caret).lastOrNull()?.text?.lastOrNull()
+        }
+
     val composingText: String
         get() {
             if (isConverting) return segs.joinToString("") { it.surface }
@@ -324,6 +340,14 @@ class InputEngine(
                 showReading = false
                 widthBase = null
                 deleteLast()
+            }
+            is KeyInput.ReplaceLast -> {
+                // 消してから打ち直すと、入力中の文字が一瞬空になってアプリとずれるので、読みの中で置き換える
+                showReading = false
+                widthBase = null
+                flushPending()
+                deleteLast()
+                input.text.forEach { typeChar(it) }
             }
             KeyInput.DeleteForward -> {
                 widthBase = null
@@ -468,6 +492,8 @@ class InputEngine(
                 return EngineResult(commands, consumed = true)
             }
             KeyInput.Other -> return EngineResult(commitAll(), consumed = false)
+            // 変換中は置き換えない（確定してから、ふつうに打ち直してもらう）
+            is KeyInput.ReplaceLast -> return EngineResult(emptyList(), consumed = true)
             is KeyInput.SetJapanese, KeyInput.ToggleJapanese -> error("handled above")
         }
         return EngineResult(commands + conversionView(), consumed = true)

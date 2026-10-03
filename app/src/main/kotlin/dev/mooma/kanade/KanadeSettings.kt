@@ -106,6 +106,11 @@ class KanadeSettings(context: Context) {
         get() = prefs.getString(KEY_SOFT_KEYBOARD_LAYOUT, "QWERTY") ?: "QWERTY"
         set(value) = prefs.edit().putString(KEY_SOFT_KEYBOARD_LAYOUT, value).apply()
 
+    /** フリック配列でトグル入力（同じキーを続けて押すと次の文字）も使う。切るとフリックだけ */
+    var flickToggle: Boolean
+        get() = prefs.getBoolean(KEY_FLICK_TOGGLE, true)
+        set(value) = prefs.edit().putBoolean(KEY_FLICK_TOGGLE, value).apply()
+
     var lastJapanese: Boolean
         get() = prefs.getBoolean(KEY_LAST_MODE, false)
         set(value) = prefs.edit().putBoolean(KEY_LAST_MODE, value).apply()
@@ -127,6 +132,7 @@ class KanadeSettings(context: Context) {
         const val KEY_SOFT_KEYBOARD_HEIGHT = "soft_keyboard_height"
         const val KEY_SOFT_KEYBOARD_BOTTOM = "soft_keyboard_bottom"
         const val KEY_SOFT_KEYBOARD_LAYOUT = "soft_keyboard_layout"
+        const val KEY_FLICK_TOGGLE = "flick_toggle"
         const val KEY_SPOKEN_PUNCT = "spoken_punctuation"
         const val KEY_VOICE_FINAL = "voice_final"
         const val KEY_PUNCTUATION = "punctuation"
