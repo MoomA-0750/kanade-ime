@@ -120,6 +120,8 @@ class SoftKeyboardView(
         var repeated = false
         /** この指で押したままにしている修飾 */
         var heldMod: Mod? = null
+        /** Space を横にドラッグして、ここまでに動かしたカーソルの数（右が正） */
+        var dragSteps = 0
     }
     private val touches = HashMap<Int, Touch>()
     private val keyRects = HashMap<Key, RectF>()
@@ -311,6 +313,10 @@ class SoftKeyboardView(
             MotionEvent.ACTION_MOVE -> {
                 for (p in 0 until event.pointerCount) {
                     val t = touches[event.getPointerId(p)] ?: continue
+                    if (isSpace(t.key)) {
+                        dragSpace(event.getPointerId(p), t, event.getX(p))
+                        continue
+                    }
                     val dir = direction(t, event.getX(p), event.getY(p))
                     if (dir != t.dir) {
                         t.dir = dir
@@ -339,6 +345,9 @@ class SoftKeyboardView(
                     if (held.remove(mod) == false) toggleModifier(mod)
                 } else if (t.repeated) {
                     consumeOnceModifiers()
+                } else if (isSpace(t.key) && t.dir.let { it == Dir.W || it == Dir.E }) {
+                    // 短く払った（フリック）なら、その向きに1文字だけ動かす
+                    fire(arrow(if (t.dir == Dir.W) -1 else 1))
                 } else {
                     actionOf(t)?.let { fire(it) }
                 }
@@ -353,6 +362,31 @@ class SoftKeyboardView(
             }
         }
         return true
+    }
+
+    private fun isSpace(key: Key) = (key.center as? Action.Text)?.char == ' '
+
+    private fun arrow(sign: Int) = code(if (sign < 0) KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT, "")
+
+    /**
+     * Space を横にドラッグすると、指の動きに合わせてカーソルを動かす（払い始めの分を除き、[DRAG_STEP_DP] ごとに1文字）。
+     * 修飾（Shift など）が効いていれば、そのまま選択になる
+     */
+    private fun dragSpace(id: Int, t: Touch, x: Float) {
+        val dx = x - t.x0
+        val travel = kotlin.math.abs(dx) - swipeThreshold
+        // 動かし始めたら、長押しの空白の繰り返しはやめる
+        if (travel > 0) handler.removeCallbacksAndMessages(id)
+        val target = if (travel <= 0) 0 else ((travel / (DRAG_STEP_DP * density)).toInt()) * (if (dx < 0) -1 else 1)
+        if (target != t.dragSteps) {
+            val sign = if (target > t.dragSteps) 1 else -1
+            repeat(kotlin.math.abs(target - t.dragSteps)) { fire(arrow(sign), consume = false) }
+            t.dragSteps = target
+            // ドラッグでカーソルを動かしたら、離しても空白は入れない（1打だけの修飾は離したときに外す）
+            t.repeated = true
+            performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+        }
+        t.dir = direction(t, x, t.y0)
     }
 
     private fun direction(t: Touch, x: Float, y: Float): Dir? {
@@ -386,7 +420,8 @@ class SoftKeyboardView(
     private fun scheduleRepeat(id: Int, t: Touch) {
         handler.removeCallbacksAndMessages(id)
         val action = actionOf(t)
-        val repeatable = (action as? Action.Code)?.repeat == true || (action is Action.Text && action.char == ' ' && t.dir != null)
+        // Backspace・矢印などと、文字のキーを長押ししたとき（払っていない真ん中の文字。Space も）に繰り返す
+        val repeatable = (action as? Action.Code)?.repeat == true || (action is Action.Text && t.dir == null)
         if (!repeatable) return
         val tick = object : Runnable {
             override fun run() {
@@ -463,6 +498,8 @@ class SoftKeyboardView(
 
     companion object {
         private const val REPEAT_DELAY_MS = 400L
+        /** Space のドラッグで1文字動かす指の距離 */
+        private const val DRAG_STEP_DP = 12f
         /** キーの角の丸み（Material 3 の medium に近い） */
         private const val KEY_RADIUS_DP = 10f
         private const val REPEAT_MS = 50L
