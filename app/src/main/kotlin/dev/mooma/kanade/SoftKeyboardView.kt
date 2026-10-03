@@ -18,7 +18,7 @@ import kotlin.math.hypot
 /**
  * 物理キーボードがないとき用の画面キーボード（Unexpected Keyboard と同じ考え方の、自前の実装）。
  * - 1つのキーに、真ん中の文字と、四隅・上下左右へ払ったときの文字を持つ（数字や記号は払って出す）
- * - Shift・Ctrl・Alt・Fn は、押すと次の1打だけ効き、2回続けて押すと固定になる
+ * - Shift・Ctrl・Alt・Fn は、押すと次の1打だけ効き、2回続けて押すと固定になる。押したまま別のキーを押す同時押しもできる
  * - Esc・Tab・矢印・Home/End・PgUp/PgDn・Delete・F1〜F12 も出せる
  * 押したキーは [onKey]（キーコードと修飾）か [onToggleJapanese] で IME に渡し、物理キーボードと同じ流れで処理する。
  */
@@ -26,6 +26,8 @@ class SoftKeyboardView(
     context: Context,
     private val onKey: (keyCode: Int, meta: Int) -> Unit,
     private val onToggleJapanese: () -> Unit,
+    /** 🎤 のキーを押した（true）・離した（false）。押している間だけ録音する */
+    private val onVoice: (Boolean) -> Unit,
 ) : View(context) {
 
     /** 払う方向（上から時計回り） */
@@ -35,6 +37,7 @@ class SoftKeyboardView(
         SHIFT("⇧", KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON),
         CTRL("Ctrl", KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON),
         ALT("Alt", KeyEvent.META_ALT_ON or KeyEvent.META_ALT_LEFT_ON),
+        META("◆", KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON),
         FN("Fn", 0),
     }
 
@@ -45,6 +48,8 @@ class SoftKeyboardView(
         data class Code(val keyCode: Int, val label: String, val repeat: Boolean = false) : Action
         data class Modifier(val mod: Mod) : Action
         data object ToggleJapanese : Action
+        /** 押している間だけ録音（物理キーボードの録音キーと同じ） */
+        data object Voice : Action
     }
 
     class Key(val width: Float, val center: Action?, val corners: Map<Dir, Action> = emptyMap())
@@ -55,6 +60,8 @@ class SoftKeyboardView(
     private enum class Latch { ONCE, LOCKED }
     private val mods = HashMap<Mod, Latch>()
     private var lastModTap: Pair<Mod, Long>? = null
+    /** 押したままの修飾キーと、押している間に別のキーを打ったか（打ったなら、離しても1打だけ効く状態にしない） */
+    private val held = HashMap<Mod, Boolean>()
 
     /** 日本語入力中か（あ/A のキーの表示） */
     var japanese = false
@@ -86,7 +93,30 @@ class SoftKeyboardView(
         textSize = 11 * scaledDensity
     }
 
-    private val rowHeight = 52 * density
+    /** 高さの倍率（設定の「画面キーボードの高さ」、% で 60〜150） */
+    var heightPercent = 100
+        set(value) {
+            if (field == value) return
+            field = value
+            requestLayout()
+            invalidate()
+        }
+    private val rowHeight get() = 52 * density * heightPercent / 100
+
+    /** 下に足す余白（dp、設定の「下の余白」）。ナビゲーションバーの分が取れない端末用 */
+    var extraBottomDp = 0
+        set(value) {
+            if (field == value) return
+            field = value
+            requestLayout()
+        }
+
+    /** 録音キーの名前（🎤 のキーに小さく出す） */
+    var voiceKeyLabel = ""
+        set(value) {
+            field = value
+            invalidate()
+        }
     private val gap = 3 * density
     private val swipeThreshold = 16 * density
 
@@ -94,6 +124,8 @@ class SoftKeyboardView(
     private class Touch(val key: Key, val rect: RectF, val x0: Float, val y0: Float) {
         var dir: Dir? = null
         var repeated = false
+        /** この指で押したままにしている修飾 */
+        var heldMod: Mod? = null
     }
     private val touches = HashMap<Int, Touch>()
     private val keyRects = HashMap<Key, RectF>()
@@ -104,18 +136,30 @@ class SoftKeyboardView(
 
     init {
         setOnApplyWindowInsetsListener { _, insets ->
-            val nav = insets.getInsets(android.view.WindowInsets.Type.navigationBars())
-            if (nav.bottom != bottomInset) {
-                bottomInset = nav.bottom
-                requestLayout()
-            }
+            updateBottomInset(insets)
             insets
+        }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        rootWindowInsets?.let { updateBottomInset(it) }
+        requestApplyInsets()
+    }
+
+    /** ナビゲーションバー（ボタン・ジェスチャーの線）と、押せる要素の分の下の高さを取る */
+    private fun updateBottomInset(insets: android.view.WindowInsets) {
+        val t = android.view.WindowInsets.Type.navigationBars() or android.view.WindowInsets.Type.tappableElement()
+        val bottom = maxOf(insets.getInsets(t).bottom, insets.getInsets(android.view.WindowInsets.Type.navigationBars()).bottom)
+        if (bottom != bottomInset) {
+            bottomInset = bottom
+            requestLayout()
         }
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec)
-        setMeasuredDimension(w, (rows.size * rowHeight + gap * 2).toInt() + bottomInset)
+        setMeasuredDimension(w, (rows.size * rowHeight + gap * 2 + extraBottomDp * density).toInt() + bottomInset)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -137,17 +181,20 @@ class SoftKeyboardView(
 
     private fun drawKey(canvas: Canvas, key: Key, rect: RectF) {
         val pressed = touches.values.any { it.key === key }
-        val mod = (key.center as? Action.Modifier)?.mod
+        val keyMods = (listOfNotNull(key.center) + key.corners.values).mapNotNull { (it as? Action.Modifier)?.mod }
         keyPaint.color = when {
-            pressed -> keyPressed
-            mod != null && mods[mod] == Latch.LOCKED -> modLocked
-            mod != null && mods[mod] == Latch.ONCE -> modOnce
+            pressed || keyMods.any { it in held } -> keyPressed
+            keyMods.any { mods[it] == Latch.LOCKED } -> modLocked
+            keyMods.any { mods[it] == Latch.ONCE } -> modOnce
             else -> keyBg
         }
         canvas.drawRoundRect(rect, 6 * density, 6 * density, keyPaint)
         val cx = rect.centerX()
         val cy = rect.centerY() - (centerPaint.descent() + centerPaint.ascent()) / 2
         canvas.drawText(label(key.center!!, center = true), cx, cy, centerPaint)
+        if (key.center == Action.Voice && voiceKeyLabel.isNotEmpty()) {
+            canvas.drawText(voiceKeyLabel, cx, rect.bottom - 5 * density, cornerPaint)
+        }
         val dx = rect.width() / 2 - 9 * density
         val dy = rect.height() / 2 - 9 * density
         for ((dir, action) in key.corners) {
@@ -171,13 +218,14 @@ class SoftKeyboardView(
             val c = action.char
             when {
                 c == ' ' -> "␣"
-                center && c.isLetter() && (mods.containsKey(Mod.SHIFT)) -> c.uppercase()
+                center && c.isLetter() && isOn(Mod.SHIFT) -> c.uppercase()
                 else -> c.toString()
             }
         }
         is Action.Code -> action.label
         is Action.Modifier -> action.mod.label
         Action.ToggleJapanese -> if (japanese) "あ" else "A"
+        Action.Voice -> "🎤"
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -191,6 +239,11 @@ class SoftKeyboardView(
                 val (key, rect) = keyRects.entries.firstOrNull { it.value.contains(x, y) }?.toPair() ?: return true
                 val t = Touch(key, rect, x, y)
                 touches[id] = t
+                (key.center as? Action.Modifier)?.let {
+                    t.heldMod = it.mod
+                    held[it.mod] = false
+                }
+                if (key.center == Action.Voice) onVoice(true)
                 scheduleRepeat(id, t)
                 performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
                 invalidate()
@@ -201,6 +254,14 @@ class SoftKeyboardView(
                     val dir = direction(t, event.getX(p), event.getY(p))
                     if (dir != t.dir) {
                         t.dir = dir
+                        // 修飾キーを払って別の修飾（Alt→Meta）にしたら、押したままの修飾もそれに替える
+                        val mod = (actionOf(t) as? Action.Modifier)?.mod
+                        val old = t.heldMod
+                        if (mod != null && old != null && mod != old) {
+                            held[mod] = held.remove(old) ?: false
+                            t.heldMod = mod
+                            invalidate()
+                        }
                         // 払う方向が変わったら、長押しの繰り返しもその方向の動きで数え直す
                         scheduleRepeat(event.getPointerId(p), t)
                     }
@@ -210,12 +271,24 @@ class SoftKeyboardView(
                 val t = touches.remove(id) ?: return true
                 handler.removeCallbacksAndMessages(id)
                 t.dir = direction(t, event.getX(i), event.getY(i))
-                if (!t.repeated) actionOf(t)?.let { fire(it) }
+                val mod = t.heldMod
+                if (t.key.center == Action.Voice) {
+                    onVoice(false)
+                } else if (mod != null) {
+                    // 押している間に別のキーを打った（同時押し）なら、離すだけ。打たなかったら1打だけ効く・固定の切り替え
+                    if (held.remove(mod) == false) toggleModifier(mod)
+                } else if (t.repeated) {
+                    consumeOnceModifiers()
+                } else {
+                    actionOf(t)?.let { fire(it) }
+                }
                 invalidate()
             }
             MotionEvent.ACTION_CANCEL -> {
                 touches.keys.forEach { handler.removeCallbacksAndMessages(it) }
+                if (touches.values.any { it.key.center == Action.Voice }) onVoice(false)
                 touches.clear()
+                held.clear()
                 invalidate()
             }
         }
@@ -258,7 +331,8 @@ class SoftKeyboardView(
         val tick = object : Runnable {
             override fun run() {
                 if (touches[id] !== t) return
-                actionOf(t)?.let { fire(it) }
+                // 繰り返している間は1打だけの修飾を残す（Shift を1回押して ← を長押しで、続けて選択できるように）。離したときに外す
+                actionOf(t)?.let { fire(it, consume = false) }
                 t.repeated = true
                 handler.postAtTime(this, id, android.os.SystemClock.uptimeMillis() + REPEAT_MS)
             }
@@ -266,17 +340,18 @@ class SoftKeyboardView(
         handler.postAtTime(tick, id, android.os.SystemClock.uptimeMillis() + REPEAT_DELAY_MS)
     }
 
-    private fun fire(action: Action) {
+    private fun fire(action: Action, consume: Boolean = true) {
         when (action) {
             is Action.Modifier -> toggleModifier(action.mod)
             Action.ToggleJapanese -> onToggleJapanese()
+            Action.Voice -> Unit
             is Action.Code -> {
                 onKey(action.keyCode, currentMeta())
-                consumeOnceModifiers()
+                afterKey(consume)
             }
             is Action.Text -> {
                 sendText(action.char)
-                consumeOnceModifiers()
+                afterKey(consume)
             }
         }
         invalidate()
@@ -284,10 +359,10 @@ class SoftKeyboardView(
 
     /** 文字を、物理キーボードと同じキーコードと Shift に直して渡す */
     private fun sendText(c0: Char) {
-        val shift = mods.containsKey(Mod.SHIFT)
+        val shift = isOn(Mod.SHIFT)
         val c = if (shift && c0.isLetter()) c0.uppercaseChar() else c0
         // Fn を押しているときは、数字と - = を F1〜F12 にする
-        if (mods.containsKey(Mod.FN)) {
+        if (isOn(Mod.FN)) {
             FN_KEYS[c]?.let {
                 onKey(it, currentMeta())
                 return
@@ -298,7 +373,15 @@ class SoftKeyboardView(
         onKey(down.keyCode, (down.metaState and KeyEvent.META_SHIFT_MASK) or (currentMeta() and KeyEvent.META_SHIFT_MASK.inv()))
     }
 
-    private fun currentMeta(): Int = mods.keys.fold(0) { acc, m -> acc or m.meta }
+    private fun isOn(mod: Mod) = mods.containsKey(mod) || held.containsKey(mod)
+
+    private fun currentMeta(): Int = (mods.keys + held.keys).fold(0) { acc, m -> acc or m.meta }
+
+    private fun afterKey(consume: Boolean) {
+        // 押したままの修飾キーは「同時押しに使った」印を付ける
+        held.replaceAll { _, _ -> true }
+        if (consume) consumeOnceModifiers()
+    }
 
     private fun toggleModifier(mod: Mod) {
         val now = android.os.SystemClock.uptimeMillis()
@@ -365,19 +448,20 @@ class SoftKeyboardView(
                     ),
                 )
             val row4 = listOf(
-                Key(1.2f, Action.Modifier(Mod.CTRL)),
-                Key(0.9f, Action.Modifier(Mod.FN)),
-                Key(0.9f, Action.Modifier(Mod.ALT)),
+                Key(1.1f, Action.Modifier(Mod.CTRL)),
+                Key(0.8f, Action.Modifier(Mod.FN)),
+                // Meta（Windows キー・⌘ にあたる。DeX のショートカットなど）は Alt を上に払う
+                Key(0.8f, Action.Modifier(Mod.ALT), mapOf(Dir.N to Action.Modifier(Mod.META))),
                 Key(1f, code(KeyEvent.KEYCODE_ESCAPE, "Esc")),
                 Key(
-                    2.6f, t(' '),
+                    2.4f, t(' '),
                     mapOf(
                         Dir.W to code(KeyEvent.KEYCODE_DPAD_LEFT, "←", repeat = true),
                         Dir.E to code(KeyEvent.KEYCODE_DPAD_RIGHT, "→", repeat = true),
                     ),
                 ),
                 Key(
-                    1.2f, code(KeyEvent.KEYCODE_TAB, "⇥"),
+                    1.1f, code(KeyEvent.KEYCODE_TAB, "⇥"),
                     mapOf(
                         Dir.N to code(KeyEvent.KEYCODE_DPAD_UP, "↑", repeat = true),
                         Dir.S to code(KeyEvent.KEYCODE_DPAD_DOWN, "↓", repeat = true),
@@ -389,8 +473,9 @@ class SoftKeyboardView(
                         Dir.SE to code(KeyEvent.KEYCODE_PAGE_DOWN, "⇟", repeat = true),
                     ),
                 ),
-                Key(1f, Action.ToggleJapanese),
-                Key(1.2f, code(KeyEvent.KEYCODE_ENTER, "⏎")),
+                Key(0.9f, Action.ToggleJapanese),
+                Key(0.8f, Action.Voice),
+                Key(1.1f, code(KeyEvent.KEYCODE_ENTER, "⏎")),
             )
             return listOf(row1, row2, row3, row4)
         }

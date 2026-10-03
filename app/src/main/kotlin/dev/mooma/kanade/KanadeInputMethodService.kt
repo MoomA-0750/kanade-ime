@@ -118,10 +118,24 @@ class KanadeInputMethodService : InputMethodService() {
     private var keyboardView: SoftKeyboardView? = null
 
     override fun onCreateInputView(): View =
-        SoftKeyboardView(this, ::softKey) { handle(KeyInput.ToggleJapanese) }.also {
-            it.japanese = engine.japanese
+        SoftKeyboardView(this, ::softKey, { handle(KeyInput.ToggleJapanese) }, ::softVoice).also {
             keyboardView = it
+            applyKeyboardSettings()
         }
+
+    private fun applyKeyboardSettings() {
+        val k = keyboardView ?: return
+        k.japanese = engine.japanese
+        k.heightPercent = settings.softKeyboardHeight
+        k.extraBottomDp = settings.softKeyboardBottom
+        k.voiceKeyLabel = KeyEvent.keyCodeToString(settings.voiceKey).removePrefix("KEYCODE_")
+    }
+
+    /** 画面キーボードの 🎤（押している間だけ録音。物理キーボードの録音キーと同じ） */
+    private fun softVoice(down: Boolean) {
+        if (secureField) return
+        if (down) startVoice() else stopVoice()
+    }
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)
@@ -131,19 +145,35 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     /**
-     * 画面キーボードのキー。物理キーボードと同じ流れで処理し、IME で使わなかったキーはそのままアプリへ送る
-     * （Ctrl+C などのアプリのショートカットや、端末アプリのキー操作が効くように）
+     * 画面キーボードのキー。物理キーボードと同じキーイベントの並びにして、同じ流れで処理する。
+     * 修飾（Shift・Ctrl・Alt・Meta）は、物理キーボードと同じく修飾キー自体の押す・離すも前後に送る
+     * （Android の入力欄は Shift＋矢印の選択などを修飾キーの押下で見る。アプリのショートカットもこれで物理キーボードと同じに効く）。
+     * IME で使わなかったキーは、そのままアプリへ送る
      */
     private fun softKey(keyCode: Int, meta: Int) {
         val now = android.os.SystemClock.uptimeMillis()
-        val down = KeyEvent(
-            now, now, KeyEvent.ACTION_DOWN, keyCode, 0, meta, android.view.KeyCharacterMap.VIRTUAL_KEYBOARD, 0,
+        fun event(action: Int, code: Int, m: Int) = KeyEvent(
+            now, now, action, code, 0, m, android.view.KeyCharacterMap.VIRTUAL_KEYBOARD, 0,
             KeyEvent.FLAG_SOFT_KEYBOARD or KeyEvent.FLAG_KEEP_TOUCH_MODE, android.view.InputDevice.SOURCE_KEYBOARD,
         )
-        val up = KeyEvent.changeAction(down, KeyEvent.ACTION_UP)
         val ic = currentInputConnection
-        if (!handleKeyDown(down)) ic?.sendKeyEvent(down)
-        if (!handleKeyUp(up)) ic?.sendKeyEvent(up)
+        fun send(e: KeyEvent) {
+            val handled = if (e.action == KeyEvent.ACTION_DOWN) handleKeyDown(e) else handleKeyUp(e)
+            if (!handled) ic?.sendKeyEvent(e)
+        }
+        // 押した修飾を順に押し、キーを押して離し、修飾を逆順に離す
+        val held = SOFT_MODIFIERS.filter { (_, bits) -> meta and bits != 0 }
+        var m = 0
+        for ((code, bits) in held) {
+            m = m or bits
+            send(event(KeyEvent.ACTION_DOWN, code, m))
+        }
+        send(event(KeyEvent.ACTION_DOWN, keyCode, meta))
+        send(event(KeyEvent.ACTION_UP, keyCode, meta))
+        for ((code, bits) in held.asReversed()) {
+            m = m and bits.inv()
+            send(event(KeyEvent.ACTION_UP, code, m))
+        }
     }
 
     /**
@@ -212,6 +242,7 @@ class KanadeInputMethodService : InputMethodService() {
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        applyKeyboardSettings()
         log("start-input-view pkg=${info?.packageName} restarting=$restarting")
     }
 
@@ -602,6 +633,14 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     private companion object {
+        /** 画面キーボードの修飾キーと、その meta（左側のキーとして送る） */
+        val SOFT_MODIFIERS = listOf(
+            KeyEvent.KEYCODE_CTRL_LEFT to (KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON),
+            KeyEvent.KEYCODE_ALT_LEFT to (KeyEvent.META_ALT_ON or KeyEvent.META_ALT_LEFT_ON),
+            KeyEvent.KEYCODE_META_LEFT to (KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON),
+            KeyEvent.KEYCODE_SHIFT_LEFT to (KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON),
+        )
+
         /** 自分が確定してから、選択範囲の通知を古いものとして扱う時間 */
         const val STALE_SELECTION_MS = 300L
 

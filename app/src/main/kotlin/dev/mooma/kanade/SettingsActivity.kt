@@ -65,8 +65,9 @@ class SettingsActivity : Activity() {
         root.addView(heading("画面キーボード"))
         root.addView(note(
             "物理キーボードがないときに出す画面キーボード（Unexpected Keyboard と同じ考え方）。キーを払うと隅の文字（数字・記号）が出る。" +
-                "Shift・Ctrl・Alt・Fn は次の1打だけ効き、2回続けて押すと固定。Fn＋数字で F1〜F10、Fn＋- = で F11・F12。" +
-                "Space を左右に払うと矢印、⇥ のキーは上下左右が矢印・四隅が Home/End/PgUp/PgDn、⌫ を右に払うと Delete"
+                "Shift・Ctrl・Alt・Fn は次の1打だけ効き、2回続けて押すと固定。押したまま別のキーを押す同時押しもできる。Alt を上に払うと Meta（◆）。" +
+                "修飾は物理キーボードと同じく修飾キーの押す・離すも送るので、Shift＋矢印の選択やアプリのショートカットがそのまま効く。Fn＋数字で F1〜F10、Fn＋- = で F11・F12。" +
+                "🎤 は押している間だけ録音（録音キーと同じ）。Space を左右に払うと矢印、⇥ のキーは上下左右が矢印・四隅が Home/End/PgUp/PgDn、⌫ を右に払うと Delete"
         ))
         root.addView(android.widget.RadioGroup(this).apply {
             for ((value, label) in listOf("AUTO" to "物理キーボードがないときだけ出す", "ALWAYS" to "いつも出す", "NEVER" to "出さない")) {
@@ -77,6 +78,37 @@ class SettingsActivity : Activity() {
                     setOnCheckedChangeListener { _, checked -> if (checked) settings.softKeyboard = value }
                 })
             }
+        })
+
+        val heightLabel = TextView(this).apply { text = "高さ: ${settings.softKeyboardHeight}%" }
+        root.addView(heightLabel)
+        root.addView(android.widget.SeekBar(this).apply {
+            // 60〜150% を 5% 刻み
+            max = 18
+            progress = (settings.softKeyboardHeight - 60) / 5
+            setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(bar: android.widget.SeekBar, value: Int, fromUser: Boolean) {
+                    settings.softKeyboardHeight = 60 + value * 5
+                    heightLabel.text = "高さ: ${settings.softKeyboardHeight}%"
+                }
+                override fun onStartTrackingTouch(bar: android.widget.SeekBar) {}
+                override fun onStopTrackingTouch(bar: android.widget.SeekBar) {}
+            })
+        })
+        val bottomLabel = TextView(this).apply { text = "下の余白: ${settings.softKeyboardBottom}dp（ナビゲーションバーに重なるときに増やす）" }
+        root.addView(bottomLabel)
+        root.addView(android.widget.SeekBar(this).apply {
+            // 0〜64dp を 4dp 刻み
+            max = 16
+            progress = settings.softKeyboardBottom / 4
+            setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(bar: android.widget.SeekBar, value: Int, fromUser: Boolean) {
+                    settings.softKeyboardBottom = value * 4
+                    bottomLabel.text = "下の余白: ${settings.softKeyboardBottom}dp（ナビゲーションバーに重なるときに増やす）"
+                }
+                override fun onStartTrackingTouch(bar: android.widget.SeekBar) {}
+                override fun onStopTrackingTouch(bar: android.widget.SeekBar) {}
+            })
         })
 
         root.addView(heading("日本語オン/オフのキー（US 配列用）"))
@@ -273,6 +305,7 @@ class SettingsActivity : Activity() {
     }
 
     private lateinit var voiceStatus: TextView
+    private var voiceKeyButton: Button? = null
     private var onZenzImported: (Boolean) -> Unit = {}
 
     /** 音声入力: マイクの権限、モデルの取得、録音キー、見本の音声での計測 */
@@ -330,7 +363,8 @@ class SettingsActivity : Activity() {
         root.addView(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             addView(Button(this@SettingsActivity).apply {
-                text = "録音キーを変える"
+                voiceKeyButton = this
+                text = "録音キー: ${keyName(settings.voiceKey)}（変える）"
                 setOnClickListener { assignVoiceKey() }
             })
             addView(Button(this@SettingsActivity).apply {
@@ -480,16 +514,32 @@ class SettingsActivity : Activity() {
             file.exists() -> "大きさが合わない（${file.length() / 1_000_000}MB / ${m.bytes / 1_000_000}MB）"
             else -> "未取得"
         }
+        voiceKeyButton?.text = "録音キー: ${keyName(settings.voiceKey)}（変える）"
         voiceStatus.text = "マイク: ${if (VoiceInput.hasPermission(this)) "許可済み" else "未許可"}　" +
-            "モデル: ${m.name}（$state）　録音キー: ${KeyEvent.keyCodeToString(settings.voiceKey).removePrefix("KEYCODE_")}　" +
+            "モデル: ${m.name}（$state）　録音キー: ${keyName(settings.voiceKey)}　" +
             "スレッド: ${settings.voiceThreads}　ReazonSpeech: ${StreamingRecognizer.readyCount(this)}/${StreamingRecognizer.FILES.size}"
     }
 
-    /** 次に押したキーを録音キーにする */
+    private fun keyName(keyCode: Int) = KeyEvent.keyCodeToString(keyCode).removePrefix("KEYCODE_")
+
+    /**
+     * 録音キーを選ぶ。物理キーボードがあれば次に押したキーにする。一覧からも選べる（画面キーボードだけのときや、押せないキー用）。
+     * 画面キーボードの 🎤 は、どのキーにしても録音できる
+     */
     private fun assignVoiceKey() {
+        val choices = listOf(
+            KeyEvent.KEYCODE_F12, KeyEvent.KEYCODE_F11, KeyEvent.KEYCODE_F1, KeyEvent.KEYCODE_F2, KeyEvent.KEYCODE_F3,
+            KeyEvent.KEYCODE_F4, KeyEvent.KEYCODE_F5, KeyEvent.KEYCODE_F13, KeyEvent.KEYCODE_SCROLL_LOCK,
+            KeyEvent.KEYCODE_BREAK, KeyEvent.KEYCODE_INSERT, KeyEvent.KEYCODE_ALT_RIGHT, KeyEvent.KEYCODE_CTRL_RIGHT,
+        )
         val dialog = android.app.AlertDialog.Builder(this)
-            .setTitle("録音キー")
-            .setMessage("録音に使うキーを押す（Esc でやめる）。F12 など、ふだん使わないキーがよい")
+            .setTitle("録音キー（今: ${keyName(settings.voiceKey)}）")
+            .setItems(arrayOf("物理キーボードのキーを押して決める（このまま押す。Esc でやめる）") + choices.map { keyName(it) }.toTypedArray()) { _, i ->
+                if (i > 0) {
+                    settings.voiceKey = choices[i - 1]
+                    refreshVoice()
+                }
+            }
             .create()
         dialog.setOnKeyListener { d, keyCode, event ->
             if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener true
