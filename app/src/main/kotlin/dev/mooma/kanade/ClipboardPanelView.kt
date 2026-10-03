@@ -101,7 +101,7 @@ class ClipboardPanelView(
             setPadding(dp(16), dp(8), dp(16), dp(4))
         })
         // 幅に合わせて列の数を決める（スマホは2列、広い画面は4列）
-        val columns = if (resources.configuration.screenWidthDp >= 600) 4 else 2
+        val columns = if (ScreenWidth.isWide(context)) 4 else 2
         val grid = GridLayout(context).apply {
             columnCount = columns
             setPadding(dp(8), 0, dp(8), dp(8))

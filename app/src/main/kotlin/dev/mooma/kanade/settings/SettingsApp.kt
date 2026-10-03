@@ -85,7 +85,10 @@ private val LIST_PANE_WIDTH = 360.dp
 fun SettingsApp(resumeTick: Int) {
     var selected by rememberSaveable { mutableStateOf<Category?>(null) }
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        if (maxWidth >= TWO_PANE_WIDTH) {
+        // 実際の幅（インチ）も見る（表示を小さくした細い画面では2カラムにしない。画面キーボードと同じ決まり）
+        val context = LocalContext.current
+        val px = with(androidx.compose.ui.platform.LocalDensity.current) { maxWidth.roundToPx() }
+        if (maxWidth >= TWO_PANE_WIDTH && dev.mooma.kanade.ScreenWidth.isWide(context, px)) {
             val current = selected ?: Category.INPUT
             Row(Modifier.fillMaxSize()) {
                 ListPane(resumeTick, current, onSelect = { selected = it }, modifier = Modifier.width(LIST_PANE_WIDTH).fillMaxHeight())

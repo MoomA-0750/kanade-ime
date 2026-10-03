@@ -19,7 +19,7 @@ import kotlin.math.hypot
  * 真ん中の 3×4 が文字のキー（押す・上下左右に払うで5文字。同じキーを続けて押すとトグル入力）、
  * 左の列は ↶（トグルを戻す）・◀・☺（押すと絵文字、左に払うとクリップボード、上に払うと音声入力）・あa1（上に払うと QWERTY へ）、
  * 右の列は ⌫・▶・空白（日本語入力中は変換）・⏎。
- * 広い画面（600dp 以上）では、Gboard と同じく左右に分け、真ん中の文字のキーを両側に置く。
+ * 広い画面（[ScreenWidth.isWide]）では、Gboard と同じく左右に分け、真ん中の文字のキーを両側に置く。
  */
 @SuppressLint("ViewConstructor", "ClickableViewAccessibility")
 class FlickKeyboardView(
@@ -148,7 +148,7 @@ class FlickKeyboardView(
     /** キーの位置を決める。広い画面では左右に分ける */
     private fun layoutCells(w: Int) {
         cells.clear()
-        val wide = w / density >= WIDE_DP
+        val wide = ScreenWidth.isWide(context, w)
         val left = listOf("undo", "left", "emoji", "mode")
         val right = listOf("backspace", "right", "space", "enter")
         fun block(x0: Float, width: Float, withLeft: Boolean, withRight: Boolean) {
@@ -422,7 +422,6 @@ class FlickKeyboardView(
     }
 
     private companion object {
-        const val WIDE_DP = 600
         const val TOGGLE_MS = 1000L
     }
 }

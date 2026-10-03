@@ -96,7 +96,7 @@ class EmojiPanelView(
             isHorizontalScrollBarEnabled = false
             addView(tabBar)
         }
-        if (resources.configuration.screenWidthDp >= WIDE_DP) {
+        if (ScreenWidth.isWide(context)) {
             // 幅が十分なら、種類のタブの横に検索の欄を置く（1行にまとめて、絵文字の一覧を広く取る）
             val row = LinearLayout(context).apply {
                 orientation = HORIZONTAL
@@ -407,7 +407,5 @@ class EmojiPanelView(
     private companion object {
         const val KEY_RECENT = "emoji_recent"
         const val MAX_RECENT = 40
-        /** これ以上の幅なら、種類のタブと検索の欄を1行に並べる */
-        const val WIDE_DP = 600
     }
 }
