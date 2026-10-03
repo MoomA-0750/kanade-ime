@@ -20,8 +20,10 @@ import android.widget.TextView
 import dev.mooma.kanade.core.dict.EmojiPanelData
 
 /**
- * 画面キーボードの絵文字パネル。上にグループのタブ（最近使ったもの＋Unicode のグループ）、真ん中に絵文字の一覧、
+ * 画面キーボードの絵文字パネル。上に検索の欄とグループのタブ（最近使ったもの＋Unicode のグループ）、真ん中に絵文字の一覧、
  * 下にキーボードへ戻る・空白・Backspace。色は画面キーボードと同じ（Material 3）。
+ * 検索の欄を押すと検索モードになり、パネルは検索の欄と結果の1行だけに縮み、その下に画面キーボードが出る
+ * （打った文字は IME が [typeSearch]・[backspaceSearch] でここへ渡す）。
  */
 @SuppressLint("ViewConstructor")
 class EmojiPanelView(
@@ -30,6 +32,8 @@ class EmojiPanelView(
     private val onBackspace: () -> Unit,
     private val onSpace: () -> Unit,
     private val onClose: () -> Unit,
+    /** 検索モードに入った（true）・出た（false）。IME はパネルの高さとキーボードを切り替える */
+    private val onSearchMode: (Boolean) -> Unit,
 ) : LinearLayout(context) {
     private val palette = KeyboardPalette.of(context)
     private val density = resources.displayMetrics.density
@@ -55,15 +59,51 @@ class EmojiPanelView(
         }
     private val backLabel = TextView(context)
 
+    /** 一覧を見ているときの部品（検索モードでは隠す） */
+    private val browseViews = ArrayList<View>()
+    /** 検索モードの部品 */
+    private val searchViews = ArrayList<View>()
+    var searching = false
+        private set
+    private var query = ""
+    private val queryView = TextView(context)
+    private val results = LinearLayout(context).apply { orientation = HORIZONTAL }
+
     private fun dp(v: Int) = (v * density).toInt()
 
     init {
         orientation = VERTICAL
         setBackgroundColor(palette.background)
-        addView(HorizontalScrollView(context).apply {
+        // 検索の欄（押すと検索モード）
+        val searchPill = pill().apply {
+            addView(icon(R.drawable.sym_search, palette.dim), LayoutParams(dp(20), dp(20)).apply { setMargins(dp(12), 0, dp(8), 0) })
+            addView(TextView(context).apply {
+                text = "絵文字を検索"
+                setTextColor(palette.dim)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            })
+            setOnClickListener { startSearch() }
+        }
+        val tabs = HorizontalScrollView(context).apply {
             isHorizontalScrollBarEnabled = false
             addView(tabBar)
-        }, LayoutParams(LayoutParams.MATCH_PARENT, dp(44)))
+        }
+        if (resources.configuration.screenWidthDp >= WIDE_DP) {
+            // 幅が十分なら、種類のタブの横に検索の欄を置く（1行にまとめて、絵文字の一覧を広く取る）
+            val row = LinearLayout(context).apply {
+                orientation = HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(tabs, LayoutParams(LayoutParams.WRAP_CONTENT, dp(44)))
+                addView(searchPill, LayoutParams(0, dp(40), 1f).apply { setMargins(dp(8), 0, dp(8), 0) })
+            }
+            addView(row, LayoutParams(LayoutParams.MATCH_PARENT, dp(48)).apply { setMargins(0, dp(4), 0, 0) })
+            browseViews += row
+        } else {
+            addView(searchPill, LayoutParams(LayoutParams.MATCH_PARENT, dp(40)).apply { setMargins(dp(8), dp(6), dp(8), dp(2)) })
+            browseViews += searchPill
+            addView(tabs, LayoutParams(LayoutParams.MATCH_PARENT, dp(44)))
+            browseViews += tabs
+        }
         grid.apply {
             columnWidth = dp(48)
             numColumns = GridView.AUTO_FIT
@@ -79,10 +119,118 @@ class EmojiPanelView(
             adapter = EmojiAdapter()
         }
         addView(grid, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
-        addView(bottomRow(), LayoutParams(LayoutParams.MATCH_PARENT, dp(52)))
+        browseViews += grid
+        val bottom = bottomRow()
+        addView(bottom, LayoutParams(LayoutParams.MATCH_PARENT, dp(52)))
+        browseViews += bottom
+        // 検索モード: 戻る・打った言葉・消す、その下に結果の1行
+        val searchBar = pill().apply {
+            addView(icon(R.drawable.sym_arrow_back, palette.text).apply { setOnClickListener { endSearch() } }, LayoutParams(dp(40), LayoutParams.MATCH_PARENT))
+            queryView.apply {
+                setTextColor(palette.text)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                isSingleLine = true
+            }
+            addView(queryView, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
+            addView(icon(R.drawable.sym_close, palette.dim).apply {
+                setOnClickListener {
+                    query = ""
+                    refreshSearch()
+                }
+            }, LayoutParams(dp(40), LayoutParams.MATCH_PARENT))
+        }
+        addView(searchBar, LayoutParams(LayoutParams.MATCH_PARENT, dp(44)).apply { setMargins(dp(8), dp(6), dp(8), dp(2)) })
+        searchViews += searchBar
+        val resultScroll = HorizontalScrollView(context).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(results)
+        }
+        addView(resultScroll, LayoutParams(LayoutParams.MATCH_PARENT, dp(52)))
+        searchViews += resultScroll
+        searchViews.forEach { it.visibility = GONE }
         buildTabs()
         // 最近使ったものがなければ、最初のグループから
         selectTab(if (recent().isEmpty()) 1 else 0)
+    }
+
+    /** 角の丸い入力欄の形の行（検索の欄） */
+    private fun pill() = LinearLayout(context).apply {
+        orientation = HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        background = GradientDrawable().apply {
+            cornerRadius = dp(22).toFloat()
+            setColor(palette.key)
+        }
+    }
+
+    private fun icon(id: Int, tint: Int) = ImageView(context).apply {
+        setImageResource(id)
+        setColorFilter(tint)
+        scaleType = ImageView.ScaleType.CENTER
+    }
+
+    fun startSearch() {
+        if (searching) return
+        searching = true
+        query = ""
+        browseViews.forEach { it.visibility = GONE }
+        searchViews.forEach { it.visibility = VISIBLE }
+        refreshSearch()
+        onSearchMode(true)
+    }
+
+    fun endSearch() {
+        if (!searching) return
+        searching = false
+        searchViews.forEach { it.visibility = GONE }
+        browseViews.forEach { it.visibility = VISIBLE }
+        selectTab(tab)
+        onSearchMode(false)
+    }
+
+    /** 画面キーボードで打った文字を検索の言葉に足す */
+    fun typeSearch(c: Char) {
+        query += c
+        refreshSearch()
+    }
+
+    fun backspaceSearch() {
+        if (query.isEmpty()) return
+        query = query.dropLast(1)
+        refreshSearch()
+    }
+
+    private fun refreshSearch() {
+        val kana = EmojiPanelData.toKana(query.lowercase())
+        // ローマ字は、かなにしたものも並べて見せる（どちらでも探している）
+        queryView.text = when {
+            query.isEmpty() -> "ローマ字・かな・英語で検索"
+            kana != query.lowercase() && kana.none { it in 'a'..'z' } -> "$query（$kana）"
+            else -> query
+        }
+        queryView.setTextColor(if (query.isEmpty()) palette.dim else palette.text)
+        results.removeAllViews()
+        val found = data.search(query).filter { glyphPaint.hasGlyph(it) }
+        if (query.isNotEmpty() && found.isEmpty()) {
+            results.addView(TextView(context).apply {
+                text = "見つかりません"
+                setTextColor(palette.dim)
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(16), 0, dp(16), 0)
+            }, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
+        }
+        for (e in found) {
+            results.addView(TextView(context).apply {
+                text = e
+                gravity = Gravity.CENTER
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f)
+                setOnClickListener {
+                    onEmoji(e)
+                    remember(e)
+                    performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                }
+            }, LayoutParams(dp(52), LayoutParams.MATCH_PARENT))
+        }
     }
 
     private fun tabLabels(): List<String> = listOf("") + listOf("😀", "👋", "🐻", "🍔", "✈️", "⚽", "💡", "🔣", "🏁").take(data.groups.size)
@@ -207,5 +355,7 @@ class EmojiPanelView(
     private companion object {
         const val KEY_RECENT = "emoji_recent"
         const val MAX_RECENT = 40
+        /** これ以上の幅なら、種類のタブと検索の欄を1行に並べる */
+        const val WIDE_DP = 600
     }
 }

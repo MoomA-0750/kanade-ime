@@ -132,12 +132,33 @@ class KanadeInputMethodService : InputMethodService() {
             onBackspace = { softKey(KeyEvent.KEYCODE_DEL, 0) },
             onSpace = { softKey(KeyEvent.KEYCODE_SPACE, 0) },
             onClose = ::hideEmojiPanel,
+            onSearchMode = ::emojiSearchMode,
         ).apply { visibility = View.GONE }
         emojiPanel = panel
         applyKeyboardSettings()
-        return android.widget.FrameLayout(this).apply {
+        // 上に絵文字パネル、下にキーボード（ふつうはキーボードだけ。絵文字の一覧ではパネルだけ、検索ではパネルの検索の欄とキーボード）
+        return android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            addView(panel, android.widget.LinearLayout.LayoutParams(android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 0))
             addView(keyboard)
-            addView(panel, android.widget.FrameLayout.LayoutParams(android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.MATCH_PARENT))
+        }
+    }
+
+    /** 絵文字の一覧を見ているときのパネルの高さ（キーボードと同じ） */
+    private var emojiPanelHeight = 0
+
+    /** 絵文字の検索モード: パネルを検索の欄と結果だけにし、その下にキーボードを出す（打った文字は検索に回す） */
+    private fun emojiSearchMode(on: Boolean) {
+        val keyboard = keyboardView ?: return
+        val panel = emojiPanel ?: return
+        if (on) {
+            panel.setPadding(0, 0, 0, 0)
+            panel.layoutParams = panel.layoutParams.apply { height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT }
+            keyboard.visibility = View.VISIBLE
+        } else {
+            panel.setPadding(0, 0, 0, keyboard.bottomSpace)
+            panel.layoutParams = panel.layoutParams.apply { height = emojiPanelHeight }
+            keyboard.visibility = View.GONE
         }
     }
 
@@ -147,15 +168,36 @@ class KanadeInputMethodService : InputMethodService() {
         val panel = emojiPanel ?: return
         panel.japanese = engine.japanese
         panel.setPadding(0, 0, 0, keyboard.bottomSpace)
-        // キーボードと同じ高さにする（MATCH_PARENT だと、IME の窓いっぱいまで伸びる）
-        panel.layoutParams = panel.layoutParams.apply { height = keyboard.height }
-        keyboard.visibility = View.INVISIBLE
+        // キーボードと同じ高さにする
+        emojiPanelHeight = keyboard.height
+        panel.layoutParams = panel.layoutParams.apply { height = emojiPanelHeight }
+        keyboard.visibility = View.GONE
         panel.visibility = View.VISIBLE
     }
 
     private fun hideEmojiPanel() {
-        emojiPanel?.visibility = View.GONE
+        emojiPanel?.let {
+            if (it.searching) it.endSearch()
+            it.visibility = View.GONE
+        }
         keyboardView?.visibility = View.VISIBLE
+    }
+
+    /**
+     * 絵文字の検索中は、画面キーボードで打ったキーを検索の言葉へ回す（アプリへは送らない）。回したら true
+     */
+    private fun routeToEmojiSearch(keyCode: Int, meta: Int): Boolean {
+        val panel = emojiPanel ?: return false
+        if (!panel.searching || panel.visibility != View.VISIBLE) return false
+        when (keyCode) {
+            KeyEvent.KEYCODE_DEL -> panel.backspaceSearch()
+            KeyEvent.KEYCODE_ESCAPE, KeyEvent.KEYCODE_ENTER -> panel.endSearch()
+            else -> {
+                val c = android.view.KeyCharacterMap.load(android.view.KeyCharacterMap.VIRTUAL_KEYBOARD).get(keyCode, meta)
+                if (c > 0 && (meta and (KeyEvent.META_CTRL_ON or KeyEvent.META_ALT_ON or KeyEvent.META_META_ON)) == 0) panel.typeSearch(c.toChar())
+            }
+        }
+        return true
     }
 
     /** 絵文字を入れる。入力中の文字があれば先に確定する */
@@ -192,6 +234,7 @@ class KanadeInputMethodService : InputMethodService() {
      * IME で使わなかったキーは、そのままアプリへ送る
      */
     private fun softKey(keyCode: Int, meta: Int) {
+        if (routeToEmojiSearch(keyCode, meta)) return
         val now = android.os.SystemClock.uptimeMillis()
         fun event(action: Int, code: Int, m: Int) = KeyEvent(
             now, now, action, code, 0, m, android.view.KeyCharacterMap.VIRTUAL_KEYBOARD, 0,

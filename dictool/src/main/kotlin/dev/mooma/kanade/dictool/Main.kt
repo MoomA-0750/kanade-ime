@@ -166,7 +166,9 @@ fun assets(cacheDir: File, outDir: File) {
     model.copyTo(File(outDir, "zenz.gguf"), overwrite = true)
     fetchSherpa(cacheDir)
     // 画面キーボードの絵文字パネル（グループごとの並び）
-    File(outDir, "emoji-panel.tsv").writeText(EmojiPanelData.fromUnicodeTest(fetchEmojiTest(cacheDir).readLines()).write())
+    // 検索に使う日本語の言葉は Mozc の emoji_data.tsv（読み・名前・説明）から
+    val japanese = EmojiPanelData.japaneseFromMozc(File(mozcDir, "emoji_data.tsv").readLines())
+    File(outDir, "emoji-panel.tsv").writeText(EmojiPanelData.fromUnicodeTest(fetchEmojiTest(cacheDir).readLines(), japanese).write())
 }
 
 fun build(mozcDir: File, outDir: File) {

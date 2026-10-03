@@ -16,6 +16,7 @@ class KeyboardPalette(
     val key: Int,
     /** 修飾・Esc・Tab・⌫ などの機能のキー（secondaryContainer にあたる） */
     val functionKey: Int,
+    /** 押しているキー（灰色ではなく、壁紙の色を混ぜる） */
     val pressed: Int,
     val text: Int,
     /** 隅の小さな文字 */
@@ -47,7 +48,7 @@ class KeyboardPalette(
                 return if (dark) KeyboardPalette(
                     background = mix(c(android.R.color.system_neutral2_900), c(android.R.color.system_accent1_900), 0.35f),
                     key = mix(c(android.R.color.system_neutral2_800), c(android.R.color.system_accent1_800), 0.3f), functionKey = c(android.R.color.system_accent2_700),
-                    pressed = c(android.R.color.system_neutral1_600), text = c(android.R.color.system_neutral1_100), dim = c(android.R.color.system_neutral2_200),
+                    pressed = mix(c(android.R.color.system_neutral2_600), c(android.R.color.system_accent1_600), 0.45f), text = c(android.R.color.system_neutral1_100), dim = c(android.R.color.system_neutral2_200),
                     modOnce = c(android.R.color.system_accent1_700), onModOnce = c(android.R.color.system_accent1_100),
                     accent = c(android.R.color.system_accent1_200), onAccent = c(android.R.color.system_accent1_800),
                     voice = c(android.R.color.system_accent3_200), onVoice = c(android.R.color.system_accent3_800),
@@ -55,7 +56,7 @@ class KeyboardPalette(
                     // ライトでは地と機能のキーが近くなりやすいので、地を少し明るく（95 寄り）、機能のキーを1段暗く（80）する
                     background = mix(c(android.R.color.system_neutral2_50), c(android.R.color.system_accent1_100), 0.35f),
                     key = mix(c(android.R.color.system_neutral2_10), c(android.R.color.system_accent1_50), 0.3f), functionKey = c(android.R.color.system_accent2_200),
-                    pressed = c(android.R.color.system_neutral1_200), text = c(android.R.color.system_neutral1_900), dim = c(android.R.color.system_neutral2_700),
+                    pressed = mix(c(android.R.color.system_neutral2_200), c(android.R.color.system_accent1_200), 0.5f), text = c(android.R.color.system_neutral1_900), dim = c(android.R.color.system_neutral2_700),
                     modOnce = c(android.R.color.system_accent1_100), onModOnce = c(android.R.color.system_accent1_900),
                     accent = c(android.R.color.system_accent1_600), onAccent = c(android.R.color.system_neutral1_0),
                     voice = c(android.R.color.system_accent3_600), onVoice = c(android.R.color.system_neutral1_0),
@@ -63,13 +64,13 @@ class KeyboardPalette(
             }
             return if (dark) KeyboardPalette(
                 background = Color.rgb(0x18, 0x1C, 0x2C), key = Color.rgb(0x2C, 0x31, 0x45), functionKey = Color.rgb(0x42, 0x45, 0x59),
-                pressed = Color.rgb(0x5D, 0x5E, 0x66), text = Color.rgb(0xE3, 0xE1, 0xE9), dim = Color.rgb(0xC6, 0xC5, 0xD0),
+                pressed = Color.rgb(0x4E, 0x58, 0x7A), text = Color.rgb(0xE3, 0xE1, 0xE9), dim = Color.rgb(0xC6, 0xC5, 0xD0),
                 modOnce = Color.rgb(0x34, 0x44, 0x79), onModOnce = Color.rgb(0xDC, 0xE1, 0xFF),
                 accent = Color.rgb(0xB8, 0xC4, 0xFF), onAccent = Color.rgb(0x1C, 0x2D, 0x61),
                 voice = Color.rgb(0xE5, 0xBA, 0xD8), onVoice = Color.rgb(0x44, 0x26, 0x3F),
             ) else KeyboardPalette(
                 background = Color.rgb(0xE8, 0xEA, 0xF7), key = Color.rgb(0xF7, 0xF8, 0xFF), functionKey = Color.rgb(0xC3, 0xC6, 0xDD),
-                pressed = Color.rgb(0xC7, 0xC6, 0xCD), text = Color.rgb(0x1A, 0x1B, 0x21), dim = Color.rgb(0x45, 0x46, 0x4F),
+                pressed = Color.rgb(0xBC, 0xC5, 0xEC), text = Color.rgb(0x1A, 0x1B, 0x21), dim = Color.rgb(0x45, 0x46, 0x4F),
                 modOnce = Color.rgb(0xDC, 0xE1, 0xFF), onModOnce = Color.rgb(0x04, 0x17, 0x4B),
                 accent = Color.rgb(0x4C, 0x5C, 0x92), onAccent = Color.WHITE,
                 voice = Color.rgb(0x75, 0x54, 0x6F), onVoice = Color.WHITE,
