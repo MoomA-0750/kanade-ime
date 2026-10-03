@@ -86,7 +86,7 @@ class KanadeSettings(context: Context) {
         get() = prefs.getString(KEY_SOFT_KEYBOARD, "AUTO") ?: "AUTO"
         set(value) = prefs.edit().putString(KEY_SOFT_KEYBOARD, value).apply()
 
-    /** 画面キーボードの高さ（%、60〜150） */
+    /** 画面キーボードの高さ（%、60〜300） */
     var softKeyboardHeight: Int
         get() = prefs.getInt(KEY_SOFT_KEYBOARD_HEIGHT, 100)
         set(value) = prefs.edit().putInt(KEY_SOFT_KEYBOARD_HEIGHT, value).apply()

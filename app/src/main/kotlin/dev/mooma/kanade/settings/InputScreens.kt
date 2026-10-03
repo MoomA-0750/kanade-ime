@@ -112,7 +112,7 @@ fun ColumnScope.KeyboardScreen() {
 
     Section("大きさ") {
         var height by rememberPref({ settings.softKeyboardHeight }, { settings.softKeyboardHeight = it })
-        SliderRow("高さ", height, 60..150, 5, { height = it }) { "$it%" }
+        SliderRow("高さ", height, 60..300, 10, { height = it }) { "$it%" }
         var bottom by rememberPref({ settings.softKeyboardBottom }, { settings.softKeyboardBottom = it })
         SliderRow("下の余白", bottom, 0..64, 4, { bottom = it }) { "${it}dp" }
         Note("ナビゲーションバーに重なるときは、下の余白を増やしてください。次にキーボードを出したときから変わります。")

@@ -86,7 +86,7 @@ class SoftKeyboardView(
         textSize = 11 * scaledDensity
     }
 
-    /** 高さの倍率（設定の「画面キーボードの高さ」、% で 60〜150） */
+    /** 高さの倍率（設定の「画面キーボードの高さ」、% で 60〜300） */
     var heightPercent = 100
         set(value) {
             if (field == value) return
@@ -111,12 +111,6 @@ class SoftKeyboardView(
             invalidate()
         }
 
-    /** 録音キーの名前（🎤 のキーに小さく出す） */
-    var voiceKeyLabel = ""
-        set(value) {
-            field = value
-            invalidate()
-        }
     private val gap = 3 * density
     private val swipeThreshold = 16 * density
 
@@ -204,9 +198,6 @@ class SoftKeyboardView(
             centerPaint.color = ink
             val cy = rect.centerY() - (centerPaint.descent() + centerPaint.ascent()) / 2
             canvas.drawText(label(center, center = true), cx, cy, centerPaint)
-        }
-        if (center == Action.Voice && voiceKeyLabel.isNotEmpty()) {
-            canvas.drawText(voiceKeyLabel, cx, rect.bottom - 5 * density, cornerPaint)
         }
         val dx = rect.width() / 2 - 9 * density
         val dy = rect.height() / 2 - 9 * density

@@ -131,7 +131,6 @@ class KanadeInputMethodService : InputMethodService() {
         k.japanese = engine.japanese
         k.heightPercent = settings.softKeyboardHeight
         k.extraBottomDp = settings.softKeyboardBottom
-        k.voiceKeyLabel = KeyEvent.keyCodeToString(settings.voiceKey).removePrefix("KEYCODE_")
     }
 
     /** 画面キーボードの 🎤（押している間だけ録音。物理キーボードの録音キーと同じ） */
