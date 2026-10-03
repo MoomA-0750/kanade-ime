@@ -117,11 +117,14 @@ class KanadeInputMethodService : InputMethodService() {
             c.hardKeyboardHidden != android.content.res.Configuration.HARDKEYBOARDHIDDEN_YES
     }
 
-    /** 画面キーボード */
+    /** 画面キーボード（QWERTY） */
     private var keyboardView: SoftKeyboardView? = null
 
-    /** 絵文字パネル（画面キーボードの代わりに同じ場所へ出す） */
+    /** 絵文字パネル */
     private var emojiPanel: EmojiPanelView? = null
+
+    /** IME の画面の入れ物（ツールバー・キーボード・パネルを出し分ける） */
+    private var host: InputViewHost? = null
 
     override fun onCreateInputView(): View {
         val keyboard = SoftKeyboardView(this, ::softKey, { handle(KeyInput.ToggleJapanese) }, ::softVoice, ::showEmojiPanel)
@@ -134,22 +137,45 @@ class KanadeInputMethodService : InputMethodService() {
             onClose = ::hideEmojiPanel,
             onSearchMode = ::emojiSearchMode,
             onSearchCandidate = ::onCandidateTapped,
-        ).apply { visibility = View.GONE }
+        )
         emojiPanel = panel
+        val toolbar = KeyboardToolbar(
+            this,
+            onEmoji = ::showEmojiPanel,
+            onClipboard = ::showClipboard,
+            onSwitchLayout = ::switchLayout,
+            onVoice = ::softVoice,
+            onSettings = {
+                startActivity(android.content.Intent(this, SettingsActivity::class.java).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+            },
+        )
+        val h = InputViewHost(this, toolbar, keyboard, createFlickView(), panel, createClipboardView())
+        host = h
+        h.flickLayout = settings.softKeyboardLayout == "FLICK"
         applyKeyboardSettings()
-        // 上に絵文字パネル、下にキーボード（ふつうはキーボードだけ。絵文字の一覧ではパネルだけ、検索ではパネルの検索の欄とキーボード）
-        return android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            addView(panel, android.widget.LinearLayout.LayoutParams(android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 0))
-            addView(keyboard)
-        }
+        return h
     }
 
-    /** 絵文字の一覧を見ているときのパネルの高さ（キーボードと同じ） */
-    private var emojiPanelHeight = 0
+    /** フリック配列（まだなければ空の View） */
+    private fun createFlickView(): View = View(this)
+
+    /** クリップボード（まだなければ空の View） */
+    private fun createClipboardView(): View = View(this)
+
+    private fun showClipboard() {
+        apply(engine.commitAll())
+        host?.show(InputViewHost.Mode.CLIPBOARD)
+    }
+
+    /** ツールバーの配列の切り替え（QWERTY ⇄ フリック）。次から使う配列として覚える */
+    private fun switchLayout() {
+        val h = host ?: return
+        h.flickLayout = !h.flickLayout
+        settings.softKeyboardLayout = if (h.flickLayout) "FLICK" else "QWERTY"
+    }
 
     /** 絵文字を検索しているか（このあいだ、IME の変換の結果はアプリではなく検索の欄へ回す） */
-    private val emojiSearching: Boolean get() = emojiPanel?.let { it.searching && it.visibility == View.VISIBLE } == true
+    private val emojiSearching: Boolean get() = host?.mode == InputViewHost.Mode.EMOJI_SEARCH
 
     /** 検索中の IME の出力を、検索の欄に回す（変換・候補はふつうの入力と同じに効く） */
     private fun applyToSearch(commands: List<ImeCommand>) {
@@ -172,42 +198,24 @@ class KanadeInputMethodService : InputMethodService() {
 
     /** 絵文字の検索モード: パネルを検索の欄と結果だけにし、その下にキーボードを出す（打った文字は検索に回す） */
     private fun emojiSearchMode(on: Boolean) {
-        val keyboard = keyboardView ?: return
-        val panel = emojiPanel ?: return
         // 検索の欄で入力中だった文字は捨てる（アプリへは入れない）
         if (!on && engine.isComposing) engine.reset()
-        if (on) {
-            panel.setPadding(0, 0, 0, 0)
-            panel.layoutParams = panel.layoutParams.apply { height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT }
-            keyboard.visibility = View.VISIBLE
-        } else {
-            panel.setPadding(0, 0, 0, keyboard.bottomSpace)
-            panel.layoutParams = panel.layoutParams.apply { height = emojiPanelHeight }
-            keyboard.visibility = View.GONE
-        }
+        host?.show(if (on) InputViewHost.Mode.EMOJI_SEARCH else InputViewHost.Mode.EMOJI)
     }
 
-    /** 絵文字パネルを開く。キーボードは見えなくするだけにして、高さはそのまま使う */
+    /** 絵文字パネルを開く（ツールバー＋キーボードと同じ高さ） */
     private fun showEmojiPanel() {
-        val keyboard = keyboardView ?: return
         val panel = emojiPanel ?: return
         // 入力中の文字があれば、アプリに確定してから開く
         apply(engine.commitAll())
         panel.japanese = engine.japanese
-        panel.setPadding(0, 0, 0, keyboard.bottomSpace)
-        // キーボードと同じ高さにする
-        emojiPanelHeight = keyboard.height
-        panel.layoutParams = panel.layoutParams.apply { height = emojiPanelHeight }
-        keyboard.visibility = View.GONE
-        panel.visibility = View.VISIBLE
+        host?.show(InputViewHost.Mode.EMOJI)
     }
 
+    /** パネルを閉じてキーボードに戻る */
     private fun hideEmojiPanel() {
-        emojiPanel?.let {
-            if (it.searching) it.endSearch()
-            it.visibility = View.GONE
-        }
-        keyboardView?.visibility = View.VISIBLE
+        emojiPanel?.let { if (it.searching) it.endSearch() }
+        host?.show(InputViewHost.Mode.KEYBOARD)
     }
 
     /**
@@ -348,7 +356,7 @@ class KanadeInputMethodService : InputMethodService() {
     /** カーソルの位置（重ねる窓を置く場所） */
     private val anchor = CursorAnchor().apply {
         keyboardTop = {
-            keyboardView?.takeIf { isInputViewShown && it.isShown && it.height > 0 }?.let {
+            host?.takeIf { isInputViewShown && it.isShown && it.height > 0 }?.let {
                 val loc = IntArray(2)
                 it.getLocationOnScreen(loc)
                 loc[1]
@@ -377,6 +385,7 @@ class KanadeInputMethodService : InputMethodService() {
         // 入力欄が替わったら聞き続けるモードも終える（別の欄に入れない）
         continuous = false
         keyboardView?.voiceActive = false
+        host?.toolbar?.voiceActive = false
         endpointer.reset()
         pendingVoice.clear()
         voiceSegments.clear()
@@ -713,6 +722,7 @@ class KanadeInputMethodService : InputMethodService() {
         partialText = null
         voiceSegments.clear()
         keyboardView?.voiceActive = true
+        host?.toolbar?.voiceActive = true
         showIndicatorText("🎤 聞いています（もう一度押すと終わります）", 1500)
         main.postDelayed(continuousTick, VAD_INTERVAL_MS)
     }
@@ -721,6 +731,7 @@ class KanadeInputMethodService : InputMethodService() {
     private fun stopContinuous(message: String) {
         continuous = false
         keyboardView?.voiceActive = false
+        host?.toolbar?.voiceActive = false
         main.removeCallbacks(continuousTick)
         main.removeCallbacks(partialTick)
         val speaking = endpointer.inSpeech

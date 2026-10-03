@@ -101,6 +101,11 @@ class KanadeSettings(context: Context) {
         get() = prefs.getBoolean(KEY_SPOKEN_PUNCT, true)
         set(value) = prefs.edit().putBoolean(KEY_SPOKEN_PUNCT, value).apply()
 
+    /** 画面キーボードの配列: QWERTY・FLICK（ツールバーで切り替える） */
+    var softKeyboardLayout: String
+        get() = prefs.getString(KEY_SOFT_KEYBOARD_LAYOUT, "QWERTY") ?: "QWERTY"
+        set(value) = prefs.edit().putString(KEY_SOFT_KEYBOARD_LAYOUT, value).apply()
+
     var lastJapanese: Boolean
         get() = prefs.getBoolean(KEY_LAST_MODE, false)
         set(value) = prefs.edit().putBoolean(KEY_LAST_MODE, value).apply()
@@ -121,6 +126,7 @@ class KanadeSettings(context: Context) {
         const val KEY_SOFT_KEYBOARD = "soft_keyboard"
         const val KEY_SOFT_KEYBOARD_HEIGHT = "soft_keyboard_height"
         const val KEY_SOFT_KEYBOARD_BOTTOM = "soft_keyboard_bottom"
+        const val KEY_SOFT_KEYBOARD_LAYOUT = "soft_keyboard_layout"
         const val KEY_SPOKEN_PUNCT = "spoken_punctuation"
         const val KEY_VOICE_FINAL = "voice_final"
         const val KEY_PUNCTUATION = "punctuation"
