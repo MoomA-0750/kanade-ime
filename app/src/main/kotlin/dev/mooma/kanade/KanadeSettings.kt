@@ -50,6 +50,11 @@ class KanadeSettings(context: Context) {
         set(value) = prefs.edit().putInt(KEY_VOICE_KEY, value).apply()
 
     /** 話しながら文字を出す（ReazonSpeech）。切ると、離してから whisper で文字にするだけ */
+    /** 確定の文を作る認識: WHISPER（選んだ whisper のモデル）・REAZON・SENSEVOICE・PARAKEET */
+    var voiceFinal: String
+        get() = prefs.getString(KEY_VOICE_FINAL, "WHISPER") ?: "WHISPER"
+        set(value) = prefs.edit().putString(KEY_VOICE_FINAL, value).apply()
+
     var voiceStreaming: Boolean
         get() = prefs.getBoolean(KEY_VOICE_STREAMING, true)
         set(value) = prefs.edit().putBoolean(KEY_VOICE_STREAMING, value).apply()
@@ -109,6 +114,7 @@ class KanadeSettings(context: Context) {
         const val KEY_SOFT_KEYBOARD_HEIGHT = "soft_keyboard_height"
         const val KEY_SOFT_KEYBOARD_BOTTOM = "soft_keyboard_bottom"
         const val KEY_SPOKEN_PUNCT = "spoken_punctuation"
+        const val KEY_VOICE_FINAL = "voice_final"
         const val KEY_PUNCTUATION = "punctuation"
         const val KEY_VOICE_MODEL = "voice_model"
         const val KEY_LEARNING = "learning"

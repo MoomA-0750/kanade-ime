@@ -271,6 +271,8 @@ class KanadeInputMethodService : InputMethodService() {
         keyboardView?.voiceActive = false
         endpointer.reset()
         pendingVoice.clear()
+        voiceSegments.clear()
+        voiceInField = false
         engine.reset()
         hideBar()
         super.onFinishInput()
@@ -309,6 +311,8 @@ class KanadeInputMethodService : InputMethodService() {
             log(event, "voice")
             return true
         }
+        // 聞き続けるモードの途中の文字を入力欄に出していたら、キーがそれに効かないよう先に消す（話している間は出し直す）
+        clearVoiceInField()
         val input = mapper.onKeyDown(event)
         if (input == null) {
             val consume = keyCode == KeyEvent.KEYCODE_ALT_RIGHT && mapper.consumesRightAlt()
@@ -404,8 +408,13 @@ class KanadeInputMethodService : InputMethodService() {
             }
         }
         ic?.endBatchEdit()
-        // 聞き続けるモードで、入力中の文字の確定を待っていた音声の文を入れる
-        if (pendingVoice.isNotEmpty()) flushPendingVoice()
+        // 聞き続けるモードで、入力中の文字の確定を待っていた音声の文を入れ、途中の文字を出し直す
+        if (continuous || voiceSegments.isNotEmpty() || pendingVoice.isNotEmpty()) {
+            if (!engine.isComposing) {
+                flushPendingVoice()
+                showVoiceDisplay()
+            }
+        }
     }
 
     /** 並べ替えを裏で回す。新しい要求が来たら、走っている古い推論は止める */
@@ -495,7 +504,7 @@ class KanadeInputMethodService : InputMethodService() {
             // 聞き続けるモードでは、話している間だけ途中の文字を出す
             if (!partialBusy && (!continuous || endpointer.inSpeech)) {
                 partialBusy = true
-                StreamingRecognizer.recognize(this@KanadeInputMethodService, VoiceInput.snapshot(), settings.voiceThreads) { text ->
+                SherpaRecognizer.reazon.recognize(this@KanadeInputMethodService, VoiceInput.snapshot(), settings.voiceThreads) { text ->
                     main.post {
                         partialBusy = false
                         if (VoiceInput.isRecording && text != null && (!continuous || endpointer.inSpeech)) showPartial(text)
@@ -519,6 +528,10 @@ class KanadeInputMethodService : InputMethodService() {
     private var voiceKeyStopped = false
     /** 入力中の文字があって入れられずに待っている、認識した文 */
     private val pendingVoice = StringBuilder()
+    /** 話し終わって確定の認識を待っている区切りの、途中の文字（古い順） */
+    private val voiceSegments = ArrayDeque<String>()
+    /** 入力欄の未確定文字列が、聞き続けるモードの途中の文字か */
+    private var voiceInField = false
     private val continuousTick = object : Runnable {
         override fun run() {
             if (!continuous || !VoiceInput.isRecording) return
@@ -532,6 +545,8 @@ class KanadeInputMethodService : InputMethodService() {
                     VoiceEndpointer.Event.START -> lastSpeechAt = now
                     VoiceEndpointer.Event.END -> {
                         lastSpeechAt = now
+                        voiceSegments.addLast(partialText.orEmpty())
+                        partialText = null
                         val pcm = VoiceInput.take()
                         vadIndex = 0
                         recognizeUtterance(pcm, continuousMode = true)
@@ -584,6 +599,7 @@ class KanadeInputMethodService : InputMethodService() {
         vadIndex = 0
         lastSpeechAt = android.os.SystemClock.uptimeMillis()
         partialText = null
+        voiceSegments.clear()
         keyboardView?.voiceActive = true
         showIndicatorText("🎤 聞いています（もう一度押すと終わり）", 1500)
         main.postDelayed(continuousTick, VAD_INTERVAL_MS)
@@ -598,18 +614,23 @@ class KanadeInputMethodService : InputMethodService() {
         val speaking = endpointer.inSpeech
         endpointer.reset()
         val pcm = VoiceInput.stopRecording()
-        if (speaking && pcm != null) recognizeUtterance(pcm, continuousMode = true)
-        if (partialText != null && !speaking) clearPartial()
+        if (speaking && pcm != null) {
+            voiceSegments.addLast(partialText.orEmpty())
+            partialText = null
+            recognizeUtterance(pcm, continuousMode = true)
+        } else {
+            partialText = null
+            showVoiceDisplay()
+        }
         showIndicatorText(message, 1200)
     }
 
     private fun startVoice() {
         if (VoiceInput.isRecording) return
-        val whisperReady = settings.voiceModel.isReady(this)
-        val streamingReady = settings.voiceStreaming && StreamingRecognizer.isReady(this)
+        val streamingReady = settings.voiceStreaming && SherpaRecognizer.reazon.isReady(this)
         val message = when {
             !VoiceInput.hasPermission(this) -> "マイクの権限がない（設定画面で許可）"
-            !whisperReady && !streamingReady -> "音声認識のモデルがない（設定画面で取り込む）"
+            finalRecognizer() == null -> "音声認識のモデルがない（設定画面で落とす）"
             !VoiceInput.start(this) -> "録音を始められない"
             else -> null
         }
@@ -634,21 +655,43 @@ class KanadeInputMethodService : InputMethodService() {
         if (engine.isComposing) return
         val text = spoken(text0)
         partialText = text
-        if (previewInBar || continuous) {
+        if (continuous) {
+            showVoiceDisplay()
+        } else if (previewInBar) {
             showBar { it.showPreview("🎤 $text") }
         } else {
             currentInputConnection?.setComposingText(text, 1)
         }
     }
 
-    private fun clearPartial() {
-        if (previewInBar || continuous) {
-            if (!engine.isComposing) hideBar()
-        } else if (!engine.isComposing) {
-            currentInputConnection?.setComposingText("", 1)
-            currentInputConnection?.finishComposingText()
+    /**
+     * 聞き続けるモードの途中の文字（確定を待っている区切り＋話している区切り）を、入力欄の未確定文字列に出す
+     * （Termux など帯に出すアプリでは帯に）。キーボードで打っている間は出さない
+     */
+    private fun showVoiceDisplay() {
+        if (engine.isComposing) return
+        val text = voiceSegments.joinToString("") + (if (continuous && endpointer.inSpeech) partialText.orEmpty() else "")
+        if (previewInBar) {
+            if (text.isEmpty()) hideBar() else showBar { it.showPreview("🎤 $text") }
+            return
         }
-        partialText = null
+        val ic = currentInputConnection ?: return
+        if (text.isEmpty()) {
+            clearVoiceInField()
+        } else {
+            ic.setComposingText(text, 1)
+            voiceInField = true
+        }
+    }
+
+    /** 入力欄に出している途中の文字を消す（キーを押したとき。キーがその文字に効かないように） */
+    private fun clearVoiceInField() {
+        if (!voiceInField) return
+        voiceInField = false
+        currentInputConnection?.let {
+            it.setComposingText("", 1)
+            it.finishComposingText()
+        }
     }
 
     /** 話して入れる句読点（「くてん」→「。」など）。設定で切れる */
@@ -683,9 +726,9 @@ class KanadeInputMethodService : InputMethodService() {
                 val final = text?.let { spoken(it) } ?: partialAtStart
                 log("voice: $engineName ${ms}ms ${final ?: "（認識できなかった）"}")
                 if (continuousMode) {
-                    // 次の区切りの途中の文字をまだ出していなければ、帯を消す
-                    if (!endpointer.inSpeech) clearPartial()
+                    voiceSegments.removeFirstOrNull()
                     if (final != null) insertVoiceText(final)
+                    showVoiceDisplay()
                     return@post
                 }
                 val ic = currentInputConnection
@@ -705,12 +748,23 @@ class KanadeInputMethodService : InputMethodService() {
                 voiceStreaming = false
             }
         }
-        if (settings.voiceModel.isReady(this)) {
-            // 句読点の付いた確定の文は whisper で作る
-            VoiceInput.transcribe(this, pcm, settings.voiceModel, settings.voiceThreads) { text, _ -> finish(text, "whisper") }
-        } else {
-            StreamingRecognizer.recognize(this, pcm, settings.voiceThreads) { text -> finish(text, "reazon") }
+        when (finalRecognizer()) {
+            "WHISPER" -> VoiceInput.transcribe(this, pcm, settings.voiceModel, settings.voiceThreads) { text, _ -> finish(text, "whisper") }
+            "SENSEVOICE" -> SherpaRecognizer.senseVoice.recognize(this, pcm, settings.voiceThreads) { text -> finish(text, "sensevoice") }
+            "PARAKEET" -> SherpaRecognizer.parakeet.recognize(this, pcm, settings.voiceThreads) { text -> finish(text, "parakeet") }
+            else -> SherpaRecognizer.reazon.recognize(this, pcm, settings.voiceThreads) { text -> finish(text, "reazon") }
         }
+    }
+
+    /** 確定の文を作る認識。設定で選んだものが取得済みでなければ、取得済みのほかのもの。どれもなければ null */
+    private fun finalRecognizer(): String? {
+        fun ready(name: String) = when (name) {
+            "WHISPER" -> settings.voiceModel.isReady(this)
+            "SENSEVOICE" -> SherpaRecognizer.senseVoice.isReady(this)
+            "PARAKEET" -> SherpaRecognizer.parakeet.isReady(this)
+            else -> SherpaRecognizer.reazon.isReady(this)
+        }
+        return (listOf(settings.voiceFinal) + listOf("PARAKEET", "WHISPER", "SENSEVOICE", "REAZON")).firstOrNull { ready(it) }
     }
 
     /** 聞き続けるモードで認識した文を入れる。入力中の文字があれば、それが確定するまで待つ */
@@ -723,6 +777,8 @@ class KanadeInputMethodService : InputMethodService() {
         if (pendingVoice.isEmpty() || engine.isComposing) return
         val text = pendingVoice.toString()
         pendingVoice.clear()
+        // 途中の文字を未確定文字列に出していれば、それを置き換えて確定する（残りは showVoiceDisplay で出し直す）
+        voiceInField = false
         currentInputConnection?.commitText(text, 1)
         lastCommitAt = android.os.SystemClock.uptimeMillis()
         engine.leftContext = (engine.leftContext + text).takeLast(InputEngine.MAX_CONTEXT)

@@ -23,9 +23,12 @@
 
 - モデルは設定画面のボタンで直接落とす（2026-10-03、本人の判断で INTERNET を付けた。続きから落とせる）
 
+- 音声の確定の文を whisper・ReazonSpeech・SenseVoice・parakeet-ja から選べる（2026-10-04）。調べた選択肢は `docs/RESEARCH-voice.md`
+
 ## 未完了・次の手順
 
 - Fold 7 での計測を受けて: whisper のモデル（small／kotoba／turbo）の既定を決める
 - DeX のキー表（`docs/DEX-KEYS.md`）は未記入。設定画面の「キー記録」の中身をもらえれば埋める
 - Gemini アプリでカーソルが出ない件（本人の指示で後回し。キー記録に入力欄の情報が残る）
+- 音声: 本命の作り替えは、途中表示を Nemotron-3.5 streaming（本物のストリーミング）にし、確定で書き換える2段構え（`docs/RESEARCH-voice.md` の案B）。安い改善は今の途中表示に LocalAgreement
 - 後回し: Zenzai の制約付き再探索（並べ替えで外れる文の多くは正解が辞書の2〜4位にあり、効き目は小さい見込み）、kotoba-whisper の句読点、段階5（ホームラボの GPU）

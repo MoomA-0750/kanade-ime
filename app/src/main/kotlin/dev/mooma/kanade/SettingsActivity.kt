@@ -363,11 +363,7 @@ class SettingsActivity : Activity() {
             addView(Button(this@SettingsActivity).apply {
                 text = "ReazonSpeech をダウンロード"
                 setOnClickListener {
-                    val d = StreamingRecognizer.dir(this@SettingsActivity)
-                    download(
-                        StreamingRecognizer.FILES.map { (name, size) -> ModelDownloader.Item(StreamingRecognizer.FILE_URL + name, File(d, name), size) },
-                        "ReazonSpeech",
-                    )
+                    download(SherpaRecognizer.reazon.downloadItems(this@SettingsActivity), "ReazonSpeech")
                 }
             })
             addView(Button(this@SettingsActivity).apply {
@@ -382,49 +378,103 @@ class SettingsActivity : Activity() {
                 }
             })
         })
+        root.addView(note("parakeet-ja（約 656MB）: NVIDIA の日本語専用の認識。精度が高く（公開の評価で whisper small の半分以下の誤り）、句読点も付く。確定の文に使える"))
+        root.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(Button(this@SettingsActivity).apply {
+                text = "parakeet-ja をダウンロード"
+                setOnClickListener { download(SherpaRecognizer.parakeet.downloadItems(this@SettingsActivity), "parakeet-ja") }
+            })
+        })
+        root.addView(note("SenseVoice-Small（約 239MB）: 中・英・日・韓の認識。速く、句読点も付く。確定の文に使える"))
+        root.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(Button(this@SettingsActivity).apply {
+                text = "SenseVoice をダウンロード"
+                setOnClickListener { download(SherpaRecognizer.senseVoice.downloadItems(this@SettingsActivity), "SenseVoice") }
+            })
+            addView(Button(this@SettingsActivity).apply {
+                text = "ファイルから取り込む（2つ）"
+                setOnClickListener {
+                    @Suppress("DEPRECATION")
+                    startActivityForResult(
+                        Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
+                            .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true),
+                        REQUEST_SENSEVOICE,
+                    )
+                }
+            })
+        })
+        root.addView(note("確定の文（入力欄に入る文字）を作る認識。話している途中の文字は、いつも ReazonSpeech で出す"))
+        root.addView(android.widget.RadioGroup(this).apply {
+            for ((value, label) in listOf(
+                "WHISPER" to "whisper（上で選んだモデル。句読点が付く）",
+                "REAZON" to "ReazonSpeech（日本語向け・速い。句読点は付かないので、話して入れる）",
+                "SENSEVOICE" to "SenseVoice（速い。句読点が付く）",
+                "PARAKEET" to "parakeet-ja（日本語向け・高精度。句読点が付く）",
+            )) {
+                addView(android.widget.RadioButton(this@SettingsActivity).apply {
+                    id = View.generateViewId()
+                    text = label
+                    isChecked = settings.voiceFinal == value
+                    setOnCheckedChangeListener { _, checked ->
+                        if (checked) {
+                            settings.voiceFinal = value
+                            refreshVoice()
+                        }
+                    }
+                })
+            }
+        })
         val result = TextView(this).apply {
             textSize = 13f
             setTextIsSelectable(true)
         }
         root.addView(Button(this).apply {
-            text = "見本の音声で測る（8.8秒の日本語）"
+            text = "見本の音声で測る（8.8秒の日本語、取得済みのモデルをすべて）"
             setOnClickListener {
-                val whisperReady = settings.voiceModel.isReady(this@SettingsActivity)
-                val reazonReady = StreamingRecognizer.isReady(this@SettingsActivity)
-                if (!whisperReady && !reazonReady) {
-                    result.text = "モデルがまだない"
-                    return@setOnClickListener
-                }
-                result.text = "認識中…（初回はモデルの読み込みも含む）"
                 val pcm = readSampleWav()
-                // ReazonSpeech（あれば）→ whisper（あれば）の順に測る。2回目は読み込み済みの速さ
-                fun runWhisper() {
-                    if (!whisperReady) return
-                    val started = System.nanoTime()
-                    VoiceInput.transcribe(this@SettingsActivity, pcm, settings.voiceModel, settings.voiceThreads) { text, ms ->
-                        val total = (System.nanoTime() - started) / 1_000_000
-                        runOnUiThread {
-                            result.append("whisper ${settings.voiceModel.name}・${settings.voiceThreads}スレッド: 認識 ${ms}ms（読み込み込みで ${total}ms）\n${text ?: "（認識できなかった）"}\n")
-                        }
-                    }
-                }
-                result.text = ""
-                if (reazonReady) {
-                    val started = System.nanoTime()
-                    StreamingRecognizer.recognize(this@SettingsActivity, pcm, settings.voiceThreads) { first ->
-                        val firstMs = (System.nanoTime() - started) / 1_000_000
-                        val again = System.nanoTime()
-                        StreamingRecognizer.recognize(this@SettingsActivity, pcm, settings.voiceThreads) { _ ->
-                            val ms = (System.nanoTime() - again) / 1_000_000
-                            runOnUiThread {
-                                result.append("ReazonSpeech: 認識 ${ms}ms（初回は読み込み込みで ${firstMs}ms）\n${first ?: "（認識できなかった）"}\n")
-                                runWhisper()
+                // 取得済みのものを順に測る。sherpa のモデルは2回かけて、2回目（読み込み済み）の速さを出す
+                val steps = ArrayList<(() -> Unit) -> Unit>()
+                for (r in listOf(SherpaRecognizer.reazon, SherpaRecognizer.senseVoice, SherpaRecognizer.parakeet)) {
+                    if (!r.isReady(this@SettingsActivity)) continue
+                    steps += { next ->
+                        val started = System.nanoTime()
+                        r.recognize(this@SettingsActivity, pcm, settings.voiceThreads) { first ->
+                            val firstMs = (System.nanoTime() - started) / 1_000_000
+                            val again = System.nanoTime()
+                            r.recognize(this@SettingsActivity, pcm, settings.voiceThreads) { _ ->
+                                val ms = (System.nanoTime() - again) / 1_000_000
+                                runOnUiThread {
+                                    result.append("${r.label}: 認識 ${ms}ms（初回は読み込み込みで ${firstMs}ms）\n${first ?: "（認識できなかった）"}\n")
+                                    next()
+                                }
                             }
                         }
                     }
-                } else {
-                    runWhisper()
                 }
+                for (m in VoiceModel.entries) {
+                    if (!m.isReady(this@SettingsActivity)) continue
+                    steps += { next ->
+                        val started = System.nanoTime()
+                        VoiceInput.transcribe(this@SettingsActivity, pcm, m, settings.voiceThreads) { text, ms ->
+                            val total = (System.nanoTime() - started) / 1_000_000
+                            runOnUiThread {
+                                result.append("whisper ${m.name}: 認識 ${ms}ms（読み込み込みで ${total}ms）\n${text ?: "（認識できなかった）"}\n")
+                                next()
+                            }
+                        }
+                    }
+                }
+                if (steps.isEmpty()) {
+                    result.text = "モデルがまだない"
+                    return@setOnClickListener
+                }
+                result.text = "${settings.voiceThreads}スレッド\n"
+                fun run(i: Int) {
+                    if (i < steps.size) steps[i] { run(i + 1) } else result.append("終わり")
+                }
+                run(0)
             }
         })
         root.addView(result)
@@ -436,11 +486,23 @@ class SettingsActivity : Activity() {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
         val uri = data?.data
+        if (requestCode == REQUEST_SENSEVOICE && resultCode == RESULT_OK && data != null) {
+            val uris = data.clipData?.let { c -> (0 until c.itemCount).map { c.getItemAt(it).uri } } ?: listOfNotNull(data.data)
+            voiceStatus.text = "写している…"
+            Thread {
+                val n = runCatching { SherpaRecognizer.senseVoice.importFrom(this, uris) }.getOrDefault(0)
+                runOnUiThread {
+                    refreshVoice()
+                    voiceStatus.append("\nSenseVoice: ${n} 個を取り込んだ（名前と大きさが合うものだけ）")
+                }
+            }.start()
+            return
+        }
         if (requestCode == REQUEST_REAZON && resultCode == RESULT_OK && data != null) {
             val uris = data.clipData?.let { c -> (0 until c.itemCount).map { c.getItemAt(it).uri } } ?: listOfNotNull(data.data)
             voiceStatus.text = "写している…"
             Thread {
-                val n = runCatching { StreamingRecognizer.importFrom(this, uris) }.getOrDefault(0)
+                val n = runCatching { SherpaRecognizer.reazon.importFrom(this, uris) }.getOrDefault(0)
                 runOnUiThread {
                     refreshVoice()
                     voiceStatus.append("\nReazonSpeech: ${n} 個を取り込んだ（名前と大きさが合うものだけ）")
@@ -480,7 +542,10 @@ class SettingsActivity : Activity() {
         voiceKeyButton?.text = "録音キー: ${keyName(settings.voiceKey)}（変える）"
         voiceStatus.text = "マイク: ${if (VoiceInput.hasPermission(this)) "許可済み" else "未許可"}　" +
             "モデル: ${m.name}（$state）　録音キー: ${keyName(settings.voiceKey)}　" +
-            "スレッド: ${settings.voiceThreads}　ReazonSpeech: ${StreamingRecognizer.readyCount(this)}/${StreamingRecognizer.FILES.size}"
+            "スレッド: ${settings.voiceThreads}　ReazonSpeech: ${SherpaRecognizer.reazon.readyCount(this)}/${SherpaRecognizer.reazon.files.size}　" +
+            "SenseVoice: ${SherpaRecognizer.senseVoice.readyCount(this)}/${SherpaRecognizer.senseVoice.files.size}　" +
+            "parakeet: ${SherpaRecognizer.parakeet.readyCount(this)}/${SherpaRecognizer.parakeet.files.size}　" +
+            "確定: ${when (settings.voiceFinal) { "REAZON" -> "ReazonSpeech"; "SENSEVOICE" -> "SenseVoice"; "PARAKEET" -> "parakeet-ja"; else -> "whisper" }}"
     }
 
     /**
@@ -601,5 +666,6 @@ class SettingsActivity : Activity() {
     private companion object {
         const val REQUEST_MODEL = 10
         const val REQUEST_REAZON = 11
+        const val REQUEST_SENSEVOICE = 13
     }
 }
