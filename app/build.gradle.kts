@@ -91,7 +91,9 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // 設定画面の Compose を入れてコードが大きくなったので、R8 で要るものだけにする（APK が軽く、起動も速い）
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // 当面ローカルでしか配らないので、debug 鍵で署名して入れられるようにする
             signingConfig = signingConfigs.getByName("debug")
         }
