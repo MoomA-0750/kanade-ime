@@ -88,6 +88,18 @@ class SoftKeyboardView(
     private val pill = HashMap<Key, Float>()
     private val pillAnimators = HashMap<Key, android.animation.ValueAnimator>()
 
+    /**
+     * 修飾キー（真ん中か払った先の修飾）が効いている間（1打だけ・固定・押したまま）は、離してもピル型のままにする。
+     * 修飾の状態が変わるたびに呼ぶ
+     */
+    private fun syncLatchedPills() {
+        for (key in rows.flatten()) {
+            val keyMods = (listOfNotNull(key.center) + key.corners.values).mapNotNull { (it as? Action.Modifier)?.mod }
+            if (keyMods.isEmpty() || touches.values.any { it.key === key }) continue
+            animatePill(key, pressed = keyMods.any { mods.containsKey(it) || held.containsKey(it) })
+        }
+    }
+
     /** 押したら素早くピル型に、離したらゆっくり元の形へ戻す（Material 3 Expressive の形の変化） */
     private fun animatePill(key: Key, pressed: Boolean) {
         pillAnimators.remove(key)?.cancel()
@@ -396,6 +408,7 @@ class SoftKeyboardView(
                 } else {
                     actionOf(t)?.let { fire(it) }
                 }
+                syncLatchedPills()
                 invalidate()
             }
             MotionEvent.ACTION_CANCEL -> {
@@ -404,6 +417,7 @@ class SoftKeyboardView(
                 if (touches.values.any { it.key.center == Action.Voice }) onVoice(false)
                 touches.clear()
                 held.clear()
+                syncLatchedPills()
                 invalidate()
             }
         }
