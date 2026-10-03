@@ -28,13 +28,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -60,20 +53,24 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import dev.mooma.kanade.R
 import androidx.compose.ui.unit.dp
 
-/** 設定のまとまり。左の一覧に並べ、選ぶと中身を出す */
-enum class Category(val title: String, val summary: String, val icon: ImageVector) {
-    INPUT("入力と変換", "日本語オン/オフのキー・句読点・ライブ変換・学習", Icons.Filled.Edit),
-    KEYBOARD("画面キーボード", "出すとき・高さ・操作", KanadeIcons.Keyboard),
-    VOICE("音声入力", "モデル・確定の認識・録音キー", KanadeIcons.Mic),
-    DICTIONARY("ユーザー辞書", "読みと語を登録して変換で優先する", Icons.AutoMirrored.Filled.List),
-    SNIPPETS("スニペット", "打った瞬間に置き換える文字列", KanadeIcons.Bolt),
-    TOOLS("試験と記録", "試し打ち・変換の試験・キー記録", Icons.Filled.Build),
-    USAGE("使い方", "Kanade の使い方の説明", Icons.Filled.Info),
+/** 左の一覧の区画 */
+enum class CategoryGroup(val title: String) { INPUT("入力"), WORDS("辞書"), OTHER("その他") }
+
+/** 設定のまとまり。左の一覧に区画ごとに並べ、選ぶと中身を出す。アイコンは Material Symbols */
+enum class Category(val title: String, val summary: String, val icon: Int, val group: CategoryGroup) {
+    INPUT("入力と変換", "日本語オン/オフのキー・句読点・ライブ変換・学習", R.drawable.sym_translate, CategoryGroup.INPUT),
+    KEYBOARD("画面キーボード", "出すとき・高さ・操作", R.drawable.sym_keyboard, CategoryGroup.INPUT),
+    VOICE("音声入力", "モデル・録音キー・話し方", R.drawable.sym_mic, CategoryGroup.INPUT),
+    DICTIONARY("ユーザー辞書", "読みと語を登録して、変換で優先します", R.drawable.sym_dictionary, CategoryGroup.WORDS),
+    SNIPPETS("スニペット", "打った瞬間に置き換える文字列", R.drawable.sym_bolt, CategoryGroup.WORDS),
+    TOOLS("試験と記録", "試し打ち・変換の試験・キー記録", R.drawable.sym_science, CategoryGroup.OTHER),
+    USAGE("使い方", "Kanade の使い方", R.drawable.sym_help, CategoryGroup.OTHER),
 }
 
 /** 幅がこれ以上なら2カラム（左に一覧、右に中身）。Fold の内側の画面や DeX の広い窓 */
@@ -136,10 +133,22 @@ private fun ListPane(resumeTick: Int, selected: Category?, onSelect: (Category) 
     }
 }
 
-/** まとまりの一覧（Expressive のつながったリスト。先頭と末尾だけ大きく丸める） */
+/** まとまりの一覧。区画ごとに見出しを付け、区画の中は Expressive のつながったリスト（先頭と末尾だけ大きく丸める） */
 @Composable
 private fun CategoryList(selected: Category?, onSelect: (Category) -> Unit) {
-    val items = Category.entries
+    for (group in CategoryGroup.entries) {
+        Text(
+            group.title,
+            Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        CategoryGroupList(Category.entries.filter { it.group == group }, selected, onSelect)
+    }
+}
+
+@Composable
+private fun CategoryGroupList(items: List<Category>, selected: Category?, onSelect: (Category) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         items.forEachIndexed { i, c ->
             val big = 24.dp
@@ -162,7 +171,7 @@ private fun CategoryList(selected: Category?, onSelect: (Category) -> Unit) {
                             Modifier.size(40.dp),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Icon(c.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Icon(painterResource(c.icon), contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         }
                     },
                     colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
@@ -188,28 +197,28 @@ private fun SetupCards(resumeTick: Int) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (!state.imeEnabled) {
             SetupCard(
-                "Kanade を入力方法として有効にする",
-                "Android の「入力方法」で Kanade を入れると、キーボードで日本語が打てるようになる",
+                "Kanade を入力方法として有効にしてください",
+                "Android の「入力方法」で Kanade をオンにすると、キーボードで日本語が打てるようになります。",
                 "入力方法の設定を開く",
             ) { context.startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) }
         } else if (!state.imeSelected) {
             SetupCard(
-                "Kanade に切り替える",
-                "有効にはなっているが、今使っている入力方法が Kanade ではない",
+                "Kanade に切り替えてください",
+                "Kanade は有効になっていますが、今使っている入力方法が Kanade ではありません。",
                 "入力方法を選ぶ",
             ) { context.getSystemService(InputMethodManager::class.java).showInputMethodPicker() }
         }
         if (!state.overlay) {
             SetupCard(
-                "他のアプリの上に重ねて表示を許可する",
-                "変換候補と「あ」「A」の表示をカーソルの近くに出すのに使う。許可しないと、Galaxy で物理キーボードを使っているときに候補が出ないことがある",
+                "「他のアプリの上に重ねて表示」を許可してください",
+                "変換候補と「あ」「A」の表示を、カーソルの近くに出すのに使います。許可しないと、Galaxy で物理キーボードを使っているときに候補が出ないことがあります。",
                 "許可する",
             ) { context.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))) }
         }
         if (!micGranted) {
             SetupCard(
-                "マイクを許可する",
-                "音声入力に使う。声は端末の中で文字にし、外へは送らない",
+                "マイクを許可してください",
+                "音声入力に使います。声は端末の中で文字にし、外へは送りません。",
                 if (micAsked) "アプリの設定で許可する" else "許可する",
             ) {
                 if (micAsked) {
@@ -234,7 +243,7 @@ private fun SetupCard(title: String, why: String, action: String, onClick: () ->
     ) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.Warning, contentDescription = null, modifier = Modifier.size(20.dp))
+                Icon(painterResource(R.drawable.sym_warning), contentDescription = null, modifier = Modifier.size(20.dp))
                 Text(title, Modifier.padding(start = 8.dp), style = MaterialTheme.typography.titleMedium)
             }
             Text(why, style = MaterialTheme.typography.bodyMedium)
@@ -270,7 +279,7 @@ private fun DetailPane(category: Category, onBack: (() -> Unit)?, modifier: Modi
                 title = { Text(category.title) },
                 navigationIcon = {
                     if (onBack != null) {
-                        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る") }
+                        IconButton(onClick = onBack) { Icon(painterResource(R.drawable.sym_arrow_back), contentDescription = "戻る") }
                     }
                 },
             )

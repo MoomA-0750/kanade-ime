@@ -36,8 +36,8 @@ object ModelDownloader {
                     fetch(item) { got -> progress(i, got, item.bytes) }
                     if (cancelled) break
                 }
-                if (cancelled) "やめた（途中まで落とした分は残り、次は続きから）" else null
-            }.getOrElse { "落とせなかった: ${it.message ?: it.javaClass.simpleName}（次は続きから）" }
+                if (cancelled) "やめました（途中までの分は残り、次は続きからダウンロードします）" else null
+            }.getOrElse { "ダウンロードできませんでした: ${it.message ?: it.javaClass.simpleName}（次は続きからダウンロードします）" }
             running = false
             done(error)
         }, "kanade-download").start()
@@ -82,9 +82,9 @@ object ModelDownloader {
         if (cancelled) return
         if (part.length() != item.bytes) {
             part.delete()
-            error("大きさが合わない（${part.length()} / ${item.bytes}）")
+            error("ファイルの大きさが合いません（${part.length()} / ${item.bytes}）")
         }
-        if (!part.renameTo(item.dest)) error("名前を変えられない")
+        if (!part.renameTo(item.dest)) error("ファイルの名前を変えられません")
         progress(item.bytes)
     }
 }

@@ -561,7 +561,7 @@ class KanadeInputMethodService : InputMethodService() {
                     }
                 }
                 if (!endpointer.inSpeech && now - lastSpeechAt > CONTINUOUS_IDLE_MS) {
-                    stopContinuous("🎤 終わり（1分話さなかった）")
+                    stopContinuous("🎤 終わりました（1分話さなかったため）")
                     return
                 }
             }
@@ -574,7 +574,7 @@ class KanadeInputMethodService : InputMethodService() {
         val now = android.os.SystemClock.uptimeMillis()
         if (down) {
             if (continuous) {
-                stopContinuous("🎤 終わり")
+                stopContinuous("🎤 終わりました")
                 voiceKeyStopped = true
                 return
             }
@@ -601,7 +601,7 @@ class KanadeInputMethodService : InputMethodService() {
         partialText = null
         voiceSegments.clear()
         keyboardView?.voiceActive = true
-        showIndicatorText("🎤 聞いています（もう一度押すと終わり）", 1500)
+        showIndicatorText("🎤 聞いています（もう一度押すと終わります）", 1500)
         main.postDelayed(continuousTick, VAD_INTERVAL_MS)
     }
 
@@ -629,9 +629,9 @@ class KanadeInputMethodService : InputMethodService() {
         if (VoiceInput.isRecording) return
         val streamingReady = settings.voiceStreaming && SherpaRecognizer.reazon.isReady(this)
         val message = when {
-            !VoiceInput.hasPermission(this) -> "マイクの権限がない（設定画面で許可）"
-            VoiceCatalog.finalModel(this, settings) == null -> "音声認識のモデルがありません（設定画面で落とします）"
-            !VoiceInput.start(this) -> "録音を始められない"
+            !VoiceInput.hasPermission(this) -> "マイクが許可されていません（設定画面で許可してください）"
+            VoiceCatalog.finalModel(this, settings) == null -> "音声認識のモデルがありません（設定画面でダウンロードしてください）"
+            !VoiceInput.start(this) -> "録音を始められませんでした"
             else -> null
         }
         if (message != null) {

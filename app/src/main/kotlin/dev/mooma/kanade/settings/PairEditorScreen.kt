@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
@@ -28,6 +26,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import dev.mooma.kanade.R
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -45,15 +45,15 @@ enum class PairKind(
 ) {
     DICTIONARY(
         "よみ（ひらがな）", "語",
-        "読みと語を登録する。登録した語は変換で優先され、候補の先頭に「ユーザー辞書」と付いて出る（macOS のユーザ辞書と同じ）。文の途中でも、その読みの部分に使われやすくなる",
-        "1行に「よみ 語」（最初の空白で区切る）。# で始まる行は無視される",
+        "読みと語を登録します。登録した語は変換で優先され、候補の先頭に「ユーザー辞書」と付いて出ます（macOS のユーザ辞書と同じです）。文の途中でも、その読みの部分に使われやすくなります。",
+        "1行に「よみ 語」と書きます（最初の空白で区切ります）。# で始まる行は無視します",
         "user_dictionary_text_mode", { TextStore.userDictionary(it) },
     ),
     SNIPPETS(
         "キー（打つ文字）", "出力",
-        "キーを打ち終わった瞬間に出力へ置き換わる（例: @@ → メールアドレス、-> → →）。日本語入力中も直接入力中も効く。" +
-            "キーは打つ文字そのもの（かなや全角になる前の文字で見る）。英字だけのキーはローマ字にも反応するので、記号を含むキーがおすすめ。長いキーが優先される",
-        "1行に「キー 出力」（最初の空白で区切る）。出力の中の \\n は改行。# で始まる行は無視される",
+        "キーを打ち終わった瞬間に、出力へ置き換えます（例: @@ → メールアドレス、-> → →）。日本語入力中も直接入力中も使えます。" +
+            "キーは打つ文字そのものです（かなや全角になる前の文字で見ます）。英字だけのキーはローマ字にも反応するので、記号を含むキーがおすすめです。長いキーが優先されます。",
+        "1行に「キー 出力」と書きます（最初の空白で区切ります）。出力の中の \\n は改行です。# で始まる行は無視します",
         "snippets_text_mode", { TextStore.snippets(it) },
     ),
 }
@@ -122,12 +122,12 @@ fun ColumnScope.PairEditorScreen(kind: PairKind) {
                 HorizontalDivider()
             }
             Button(onClick = { adding = true }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
+                Icon(painterResource(R.drawable.sym_add), contentDescription = null)
                 Text("追加", Modifier.padding(start = 8.dp))
             }
         }
     } else {
-        Section("テキストで編集", kind.textHelp + "。エディターでまとめて書いたり、ここをコピーして書き出したりできる") {
+        Section("テキストで編集", kind.textHelp + "。エディターでまとめて書いたり、ここをコピーして書き出したりできます。") {
             var draft by remember(text) { mutableStateOf(text) }
             OutlinedTextField(
                 draft, { draft = it },

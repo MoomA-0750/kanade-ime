@@ -35,7 +35,7 @@ fun ColumnScope.InputScreen() {
     val context = LocalContext.current
     val settings = rememberSettings()
 
-    Section("日本語オン/オフのキー", "US 配列で使うキー。JIS 配列の変換（オン）・無変換（オフ）・かな（オン）・半角/全角（切り替え）は常に効く") {
+    Section("日本語オン/オフのキー", "US 配列で使うキーを選びます。JIS 配列の変換（オン）・無変換（オフ）・かな（オン）・半角/全角（切り替え）は、いつでも使えます。") {
         var triggers by rememberPref({ settings.toggleTriggers }, { settings.toggleTriggers = it })
         for (t in ToggleTrigger.entries) {
             SwitchRow(t.label, t in triggers, { on -> triggers = if (on) triggers + t else triggers - t })
@@ -47,7 +47,7 @@ fun ColumnScope.InputScreen() {
 
     Section("文字") {
         var fullWidth by rememberPref({ settings.fullWidthSymbols }, { settings.fullWidthSymbols = it })
-        SwitchRow("数字・記号を全角で入力する", fullWidth, { fullWidth = it }, "切ると半角（変換の候補には両方出る）")
+        SwitchRow("数字・記号を全角で入力する", fullWidth, { fullWidth = it }, "オフにすると半角で入力します（変換の候補には両方出ます）。")
         Text("句読点（, と . で入るもの）")
         var punctuation by rememberPref({ settings.punctuation }, { settings.punctuation = it })
         ConnectedChoices(listOf("、。", "，．", "、．", "，。").map { it to it }, punctuation, { punctuation = it })
@@ -55,16 +55,16 @@ fun ColumnScope.InputScreen() {
 
     Section("変換") {
         var live by rememberPref({ settings.liveConversion }, { settings.liveConversion = it })
-        SwitchRow("ライブ変換", live, { live = it }, "打つたびに変換結果を出す")
+        SwitchRow("ライブ変換", live, { live = it }, "打つたびに変換した結果を出します。")
         var learning by rememberPref({ settings.learningEnabled }, { settings.learningEnabled = it })
-        SwitchRow("学習する", learning, { learning = it }, "前に選んだ候補を次から上に出す")
+        SwitchRow("学習する", learning, { learning = it }, "前に選んだ候補を、次から上に出します。")
         var confirm by remember { mutableStateOf(false) }
         OutlinedButton(onClick = { confirm = true }) { Text("学習を消す") }
         if (confirm) {
             AlertDialog(
                 onDismissRequest = { confirm = false },
                 title = { Text("学習を消す") },
-                text = { Text("覚えた候補をすべて消す（ユーザー辞書は消えない）") },
+                text = { Text("覚えた候補をすべて消します（ユーザー辞書は消えません）。") },
                 confirmButton = {
                     TextButton(onClick = {
                         File(context.filesDir, "learning.tsv").delete()
@@ -77,7 +77,7 @@ fun ColumnScope.InputScreen() {
         }
     }
 
-    Section("入力中の文字を帯に出すアプリ", "未確定文字列をうまく出せないアプリ（Termux などの端末アプリ）。パッケージ名をカンマ区切りで") {
+    Section("入力中の文字を帯に出すアプリ", "入力中の文字をうまく出せないアプリ（Termux などの端末アプリ）では、入力中の文字を帯に出します。パッケージ名をカンマで区切って入れます。") {
         var saved by remember { mutableStateOf(settings.previewInBarPackages.sorted().joinToString(", ")) }
         var text by remember { mutableStateOf(saved) }
         OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth(), singleLine = true)
@@ -98,14 +98,14 @@ fun ColumnScope.InputScreen() {
 fun ColumnScope.KeyboardScreen() {
     val settings = rememberSettings()
 
-    Section("出すとき", "物理キーボードがつながっていないときに出す画面キーボード（Unexpected Keyboard と同じ考え方）") {
+    Section("出すとき", "物理キーボードがつながっていないときに使う画面キーボードです（Unexpected Keyboard と同じ考え方です）。") {
         var mode by rememberPref({ settings.softKeyboard }, { settings.softKeyboard = it })
         ConnectedChoices(listOf("AUTO" to "自動", "ALWAYS" to "いつも", "NEVER" to "出さない"), mode, { mode = it })
         Note(
             when (mode) {
-                "AUTO" -> "物理キーボードがないときだけ出す"
-                "ALWAYS" -> "物理キーボードがあっても出す"
-                else -> "出さない（物理キーボード専用）"
+                "AUTO" -> "物理キーボードがないときだけ出します。"
+                "ALWAYS" -> "物理キーボードがあっても出します。"
+                else -> "出しません（物理キーボード専用）。"
             },
         )
     }
@@ -115,17 +115,17 @@ fun ColumnScope.KeyboardScreen() {
         SliderRow("高さ", height, 60..150, 5, { height = it }) { "$it%" }
         var bottom by rememberPref({ settings.softKeyboardBottom }, { settings.softKeyboardBottom = it })
         SliderRow("下の余白", bottom, 0..64, 4, { bottom = it }) { "${it}dp" }
-        Note("ナビゲーションバーに重なるときは、下の余白を増やす。次にキーボードを出したときから効く")
+        Note("ナビゲーションバーに重なるときは、下の余白を増やしてください。次にキーボードを出したときから変わります。")
     }
 
     Section("操作") {
         for (line in listOf(
-            "キーを隅や上下左右へ払うと、小さく書いてある文字（数字・記号）が出る",
-            "Shift・Ctrl・Alt・Fn は次の1打だけ効き、2回続けて押すと固定。押したまま別のキーを押す同時押しもできる",
-            "修飾キーの押す・離すも送るので、Shift＋矢印の選択やアプリのショートカットが物理キーボードと同じに効く",
-            "Alt を上に払うと Meta（◆）。Fn＋数字で F1〜F10、Fn＋- = で F11・F12",
-            "Space を左右に払うと矢印。⇥ のキーは上下左右が矢印、四隅が Home・End・PgUp・PgDn。⌫ を右に払うと Delete",
-            "🎤 は押している間だけ録音、短く押すと聞き続ける",
+            "キーを隅や上下左右へ払うと、小さく書いてある文字（数字・記号）が出ます。",
+            "Shift・Ctrl・Alt・Fn は次の1打だけ効き、2回続けて押すと固定します。押したまま別のキーを押す同時押しもできます。",
+            "修飾キーの押す・離すも送るので、Shift＋矢印の選択やアプリのショートカットが物理キーボードと同じように使えます。",
+            "Alt を上に払うと Meta（⌘）です。Fn＋数字で F1〜F10、Fn＋- = で F11・F12 を入力します。",
+            "Space を左右に払うと矢印です。Tab のキーは上下左右に払うと矢印、四隅に払うと Home・End・PgUp・PgDn です。Backspace を右に払うと Delete です。",
+            "マイクのキーは、押している間だけ録音します。短く押すと聞き続けます。",
         )) Note("・$line")
     }
 }

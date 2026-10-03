@@ -47,7 +47,7 @@ fun ColumnScope.ToolsScreen() {
         OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth(), placeholder = { Text("ここで入力を試す") })
     }
 
-    Section("変換の試験", "ひらがなの読みを入れて、辞書と zenz の結果と時間を見る。評価セット（202 文）で正解率も測れる") {
+    Section("変換の試験", "ひらがなの読みを入れて、辞書と zenz の結果と時間を見ます。評価セット（202 文）で正解率も測れます。") {
         var reading by remember { mutableStateOf("") }
         var result by remember { mutableStateOf("") }
         var running by remember { mutableStateOf(false) }
@@ -71,7 +71,7 @@ fun ColumnScope.ToolsScreen() {
         if (result.isNotEmpty()) SelectionContainer { Text(result, style = MaterialTheme.typography.bodyMedium) }
     }
 
-    Section("キー記録", "IME に届いたキーを記録する。DeX が先に取るキーはここに出ない") {
+    Section("キー記録", "IME に届いたキーを記録します。DeX が先に受け取るキーは、ここには出ません。") {
         val keyLog = remember { KeyLog(context) }
         var enabled by rememberPref({ settings.keyLogEnabled }, { settings.keyLogEnabled = it })
         SwitchRow("記録する", enabled, { enabled = it })
@@ -91,7 +91,7 @@ fun ColumnScope.ToolsScreen() {
                     .verticalScroll(rememberScrollState())
                     .horizontalScroll(rememberScrollState()),
             ) {
-                Text(log.ifEmpty { "（まだない）" }, fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 15.sp)
+                Text(log.ifEmpty { "（まだありません）" }, fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 15.sp)
             }
         }
     }
@@ -101,7 +101,7 @@ fun ColumnScope.ToolsScreen() {
 @Composable
 fun ColumnScope.UsageScreen() {
     val context = LocalContext.current
-    val blocks = remember { parseUsage(runCatching { context.assets.open("usage.md").bufferedReader().readText() }.getOrDefault("（使い方が見つからない）")) }
+    val blocks = remember { parseUsage(runCatching { context.assets.open("usage.md").bufferedReader().readText() }.getOrDefault("（使い方が見つかりません）")) }
     for ((title, lines) in blocks) {
         Section(title) {
             SelectionContainer {

@@ -129,7 +129,6 @@ dependencies {
     // 1.5.0-alpha19 以降は compileSdk 37・AGP 9.1 が要るので、それより前で止める
     implementation(platform("androidx.compose:compose-bom:2026.06.01"))
     implementation("androidx.compose.material3:material3:1.5.0-alpha18")
-    implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.activity:activity-compose:1.13.0")
 }
