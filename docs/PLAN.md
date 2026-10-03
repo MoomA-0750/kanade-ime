@@ -279,7 +279,7 @@ Samsung DeX で使う、物理キーボード最適化に全振りした Android
 
 - **whisper.cpp v1.9.4**（submodule）を `native/whisper/` の `libkanade_whisper.so` にした。llama.cpp（zenz）とは ggml の CMake のターゲット名がぶつかるので、Android ライブラリのモジュール `native-whisper` で別にビルドする。どちらの .so も静的に取り込んだ ggml の記号を外に出さない（`-Wl,--exclude-libs,ALL`）。Kotlin 側は JVM モジュール `whisper`（`WhisperModel`）で、手元では `scripts/build-host-whisper.sh` と `dictool whisper` で試せる
 - **モデル**（APK に入れない。設定画面で選ぶ）: whisper small q5_1（190MB、既定）、kotoba-whisper v2.0 q5_0（538MB、日本語向けに large-v3 を蒸留、デコーダ2層）、large-v3-turbo q5_0（574MB）。手元で、to-fu の Windows の音声合成（Haruka）で作った 8.8 秒の日本語（`eval/voice-sample-ja.wav`）を、small も kotoba も正しく書き起こした（句読点付き）
-- **取得の仕方**: 「ブラウザで取得」で落とし、「取得したファイルを選ぶ」（SAF）でアプリ内へ写す（大きさを確かめる）。初めは Android のダウンロード機能（DownloadManager）を使ったが、頼むアプリにもネットの権限が要った（`SecurityException`）。IME にネットの権限を持たせないため、この形にした（仮決定。本人が直接の取得を望めば INTERNET を足す）
+- **取得の仕方**: 設定画面の「ダウンロード」で直接落とす（`ModelDownloader`。`.part` に書き、止まったら Range で続きから、大きさが合ったら本来の名前に）。初めはネットの権限なしでブラウザ＋SAF の取り込みにしていたが、2026-10-03 に本人の判断で Kanade に INTERNET を付けた（ネットにつなぐのはモデルの取得だけ）。手元のファイルを SAF で取り込む道も残す
 - **操作**: 録音キー（既定 F12、設定画面で押して割り当て）を押している間だけ録音し（16kHz・モノラル、`VOICE_RECOGNITION`、最長 60 秒）、離すと認識して確定する。入力中の文字があれば先に確定する。カーソルの近くに録音中「🎤」、認識中「…」を出す。マイクの権限は設定画面で求める
 - **幻聴の対策**: whisper は無音から「ご視聴ありがとうございました」を作りやすい（エミュレータの無音で実際に出た）。ほぼ無音なら認識しない、whisper が話していないと見た区間（no_speech_prob > 0.6）は捨てる、よく出る決まり文句だけなら捨てる
 - **速さ**: エミュレータ（最適化なしの x86_64）で small が 8.8 秒の音声に 28.6 秒。Fold 7 は設定画面の「見本の音声で測る」で測ってもらう（zenz ではエミュレータの約8倍速かった）
@@ -294,7 +294,7 @@ Samsung DeX で使う、物理キーボード最適化に全振りした Android
   - 日本語の本来の逐次（streaming）モデルは多言語の zipformer しか見つからなかった
 - **決定（仮）**: 「疑似の逐次」。録音中 0.6 秒ごとに、ここまでの音声全体を ReazonSpeech で認識し、未確定文字列（Termux などでは帯）に出す。離したら whisper（取り込んであれば）で句読点の付いた文を作って確定する。whisper がなければ ReazonSpeech の結果、確定の文が作れなければ途中の文を使う
 - **sherpa-onnx**: onnxruntime を静的に含む Android 用 AAR（v1.13.8、ハッシュ固定）を `.cache/` に取得して app の依存にする（`prepareKanadeAssets` が取得）。arm64 の .so が 24MB あるので、ネイティブを APK の中で圧縮するようにした（`useLegacyPackaging`、APK は 54MB）
-- **ReazonSpeech のモデル**: HuggingFace の `csukuangfj/reazonspeech-k2-v2-ja-en` の int8 の4ファイル。whisper と同じく、ブラウザで取得し、設定画面で4つまとめて選んで取り込む（名前と大きさで見分ける）
+- **ReazonSpeech のモデル**: HuggingFace の `csukuangfj/reazonspeech-k2-v2-ja-en` の int8 の4ファイル。whisper と同じく設定画面のボタンで4つまとめて落とす（ファイルから取り込むときは名前と大きさで見分ける）
 - エミュレータ: 見本の音声（8.8 秒）で ReazonSpeech 0.58 秒（初回は読み込みで 4.5 秒）、whisper small 33 秒。どちらも正しい。マイクがないので、話しながらの表示は Fold 7 で確かめる
 
 ### 段階5（任意）

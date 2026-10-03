@@ -12,8 +12,8 @@ import dev.mooma.kanade.whisper.WhisperModel
 import java.io.File
 
 /**
- * 音声認識のモデル。APK には入れない。ブラウザで取得したファイルを設定画面で選んでアプリ内へ写す
- * （Kanade にネットの権限を持たせないため。Android のダウンロード機能も、頼むアプリにネットの権限を求める）
+ * 音声認識のモデル。APK には入れない。設定画面の「ダウンロード」で落とす（[ModelDownloader]）か、
+ * 手元のファイルを選んでアプリ内へ写す
  */
 enum class VoiceModel(val label: String, val file: String, val url: String, val bytes: Long) {
     SMALL(
@@ -35,7 +35,7 @@ enum class VoiceModel(val label: String, val file: String, val url: String, val 
     fun isReady(context: Context): Boolean = path(context).let { it.exists() && it.length() == bytes }
 
     /**
-     * 選んだファイル（ブラウザで取得したもの）をアプリ内へ写す。大きさが合わなければ写さずに false。
+     * 選んだファイル（手元に落としてあるもの）をアプリ内へ写す。大きさが合わなければ写さずに false。
      * 時間がかかるので UI スレッドから呼ばないこと
      */
     fun importFrom(context: Context, uri: Uri, progress: (Long) -> Unit): Boolean {

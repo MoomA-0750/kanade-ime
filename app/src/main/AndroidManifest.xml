@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- 音声入力（押している間だけ録音し、端末内の whisper で文字にする。音声は外へ送らない） -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- モデルの取得だけに使う（ModelDownloader）。打った文字や音声は送らない -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:label="@string/app_name"

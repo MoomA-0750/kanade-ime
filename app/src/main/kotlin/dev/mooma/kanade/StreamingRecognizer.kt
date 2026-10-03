@@ -18,8 +18,8 @@ import java.util.concurrent.Executors
  * 句読点は付かないので、確定の文は whisper があれば whisper で作る。
  */
 object StreamingRecognizer {
-    /** モデル（csukuangfj/reazonspeech-k2-v2-ja-en の int8）。4 つのファイルをブラウザで取得して設定画面で取り込む */
-    const val PAGE_URL = "https://huggingface.co/csukuangfj/reazonspeech-k2-v2-ja-en/tree/main"
+    /** モデル（csukuangfj/reazonspeech-k2-v2-ja-en の int8）。設定画面で 4 つのファイルを落とす（ファイルからの取り込みもできる） */
+    const val FILE_URL = "https://huggingface.co/csukuangfj/reazonspeech-k2-v2-ja-en/resolve/main/"
     val FILES = mapOf(
         "encoder-epoch-35-avg-1.int8.onnx" to 70_876_409L,
         "decoder-epoch-35-avg-1.int8.onnx" to 1_308_690L,

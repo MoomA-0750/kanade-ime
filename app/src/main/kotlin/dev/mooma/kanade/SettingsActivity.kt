@@ -14,6 +14,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import java.io.File
 
 /**
  * 設定とキー記録の確認画面。段階1では見た目を作り込まず、動作確認に要るものだけを置く。
@@ -274,8 +275,8 @@ class SettingsActivity : Activity() {
         root.addView(heading("音声入力"))
         root.addView(note(
             "録音キーを押している間だけ録音し、離すと端末内の whisper で文字にして入れる（音声は外へ送らない）。" +
-                "モデルは大きいので APK に入れていない。「ブラウザで取得」で落としてから「取得したファイルを選ぶ」で選ぶと、アプリ内へ写す" +
-                "（Kanade 自身はネットにつながない）。速さは「見本の音声で測る」で確かめられる"
+                "モデルは大きいので APK に入れていない。「ダウンロード」で落とす（Wi-Fi で。落としている間は設定画面を開いたままにする。途中で止まっても次は続きから）。手元のファイルは「ファイルから取り込む」で写せる" +
+                "（ネットにつなぐのはモデルを落とすときだけ）。速さは「見本の音声で測る」で確かめられる"
         ))
         voiceStatus = TextView(this).apply { textSize = 13f }
         root.addView(voiceStatus)
@@ -301,13 +302,14 @@ class SettingsActivity : Activity() {
         root.addView(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             addView(Button(this@SettingsActivity).apply {
-                text = "ブラウザで取得"
+                text = "ダウンロード"
                 setOnClickListener {
-                    startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(settings.voiceModel.url)))
+                    val m = settings.voiceModel
+                    download(listOf(ModelDownloader.Item(m.url, m.path(this@SettingsActivity), m.bytes)), m.name)
                 }
             })
             addView(Button(this@SettingsActivity).apply {
-                text = "取得したファイルを選ぶ"
+                text = "ファイルから取り込む"
                 setOnClickListener {
                     @Suppress("DEPRECATION")
                     startActivityForResult(
@@ -353,16 +355,17 @@ class SettingsActivity : Activity() {
         root.addView(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             addView(Button(this@SettingsActivity).apply {
-                text = "ReazonSpeech をブラウザで取得"
+                text = "ReazonSpeech をダウンロード"
                 setOnClickListener {
-                    startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(StreamingRecognizer.PAGE_URL)))
-                    android.app.AlertDialog.Builder(this@SettingsActivity)
-                        .setMessage("開いたページから次の 4 つを落とす:\n" + StreamingRecognizer.FILES.keys.joinToString("\n"))
-                        .setPositiveButton("閉じる", null).show()
+                    val d = StreamingRecognizer.dir(this@SettingsActivity)
+                    download(
+                        StreamingRecognizer.FILES.map { (name, size) -> ModelDownloader.Item(StreamingRecognizer.FILE_URL + name, File(d, name), size) },
+                        "ReazonSpeech",
+                    )
                 }
             })
             addView(Button(this@SettingsActivity).apply {
-                text = "取得した4つを選ぶ"
+                text = "ファイルから取り込む（4つ）"
                 setOnClickListener {
                     @Suppress("DEPRECATION")
                     startActivityForResult(
@@ -472,6 +475,34 @@ class SettingsActivity : Activity() {
         voiceStatus.text = "マイク: ${if (VoiceInput.hasPermission(this)) "許可済み" else "未許可"}　" +
             "モデル: ${m.name}（$state）　録音キー: ${keyName(settings.voiceKey)}　" +
             "スレッド: ${settings.voiceThreads}　ReazonSpeech: ${StreamingRecognizer.readyCount(this)}/${StreamingRecognizer.FILES.size}"
+    }
+
+    /**
+     * モデルを落とす。進み具合は音声入力の状態の欄に出す。落としている間にもう一度押すとやめる
+     */
+    private fun download(items: List<ModelDownloader.Item>, name: String) {
+        if (ModelDownloader.running) {
+            ModelDownloader.cancel()
+            return
+        }
+        val total = items.sumOf { it.bytes }
+        voiceStatus.text = "$name を落としている…（もう一度押すとやめる）"
+        ModelDownloader.start(
+            items,
+            progress = { i, got, _ ->
+                // 前のファイルは落とし終えている
+                val sum = items.take(i).sumOf { it.bytes } + got
+                runOnUiThread {
+                    voiceStatus.text = "$name を落としている… ${sum / 1_000_000}MB / ${total / 1_000_000}MB（もう一度押すとやめる）"
+                }
+            },
+            done = { error ->
+                runOnUiThread {
+                    refreshVoice()
+                    voiceStatus.append("\n$name: ${error ?: "落とし終えた"}")
+                }
+            },
+        )
     }
 
     private fun keyName(keyCode: Int) = KeyEvent.keyCodeToString(keyCode).removePrefix("KEYCODE_")
