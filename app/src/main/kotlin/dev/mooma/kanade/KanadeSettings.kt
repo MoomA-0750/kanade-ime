@@ -73,6 +73,11 @@ class KanadeSettings(context: Context) {
         get() = prefs.getBoolean(KEY_ZENZ_SMALL, false)
         set(value) = prefs.edit().putBoolean(KEY_ZENZ_SMALL, value).apply()
 
+    /** 画面キーボード: AUTO（物理キーボードがないときだけ）・ALWAYS・NEVER */
+    var softKeyboard: String
+        get() = prefs.getString(KEY_SOFT_KEYBOARD, "AUTO") ?: "AUTO"
+        set(value) = prefs.edit().putString(KEY_SOFT_KEYBOARD, value).apply()
+
     var lastJapanese: Boolean
         get() = prefs.getBoolean(KEY_LAST_MODE, false)
         set(value) = prefs.edit().putBoolean(KEY_LAST_MODE, value).apply()
@@ -90,6 +95,7 @@ class KanadeSettings(context: Context) {
         const val KEY_KEYLOG = "key_log"
         const val KEY_LAST_MODE = "last_japanese"
         const val KEY_LIVE = "live_conversion"
+        const val KEY_SOFT_KEYBOARD = "soft_keyboard"
         const val KEY_PUNCTUATION = "punctuation"
         const val KEY_VOICE_MODEL = "voice_model"
         const val KEY_LEARNING = "learning"

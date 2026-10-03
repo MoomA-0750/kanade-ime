@@ -98,13 +98,59 @@ class KanadeInputMethodService : InputMethodService() {
         super.onDestroy()
     }
 
-    override fun onEvaluateInputViewShown(): Boolean = false
+    /**
+     * 画面キーボードを出すか。既定では物理キーボードがつながっていないときだけ出す
+     * （つながっていれば、物理キーボード専用の IME として何も出さない）
+     */
+    override fun onEvaluateInputViewShown(): Boolean = if (!::settings.isInitialized) false else when (settings.softKeyboard) {
+        "ALWAYS" -> true
+        "NEVER" -> false
+        else -> !hasHardwareKeyboard()
+    }
+
+    private fun hasHardwareKeyboard(): Boolean {
+        val c = resources.configuration
+        return c.keyboard != android.content.res.Configuration.KEYBOARD_NOKEYS &&
+            c.hardKeyboardHidden != android.content.res.Configuration.HARDKEYBOARDHIDDEN_YES
+    }
+
+    /** 画面キーボード */
+    private var keyboardView: SoftKeyboardView? = null
+
+    override fun onCreateInputView(): View =
+        SoftKeyboardView(this, ::softKey) { handle(KeyInput.ToggleJapanese) }.also {
+            it.japanese = engine.japanese
+            keyboardView = it
+        }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // 物理キーボードをつないだ・外したら、画面キーボードを出し直す
+        updateInputViewShown()
+        if (!onEvaluateInputViewShown() && !barShown) requestHideSelf(0)
+    }
+
+    /**
+     * 画面キーボードのキー。物理キーボードと同じ流れで処理し、IME で使わなかったキーはそのままアプリへ送る
+     * （Ctrl+C などのアプリのショートカットや、端末アプリのキー操作が効くように）
+     */
+    private fun softKey(keyCode: Int, meta: Int) {
+        val now = android.os.SystemClock.uptimeMillis()
+        val down = KeyEvent(
+            now, now, KeyEvent.ACTION_DOWN, keyCode, 0, meta, android.view.KeyCharacterMap.VIRTUAL_KEYBOARD, 0,
+            KeyEvent.FLAG_SOFT_KEYBOARD or KeyEvent.FLAG_KEEP_TOUCH_MODE, android.view.InputDevice.SOURCE_KEYBOARD,
+        )
+        val up = KeyEvent.changeAction(down, KeyEvent.ACTION_UP)
+        val ic = currentInputConnection
+        if (!handleKeyDown(down)) ic?.sendKeyEvent(down)
+        if (!handleKeyUp(up)) ic?.sendKeyEvent(up)
+    }
 
     /**
      * Android 11 以降、IME の窓を見せるかはシステムが決め、IME が自分で showWindow しても出ない。
      * 帯を出したいときだけ requestShowSelf し、その要求をここで通す（画面キーボードは出さないので、帯だけが出る）
      */
-    override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean = barShown
+    override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean = onEvaluateInputViewShown() || barShown
 
     override fun onEvaluateFullscreenMode(): Boolean = false
 
@@ -201,8 +247,16 @@ class KanadeInputMethodService : InputMethodService() {
         }
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (secureField) return super.onKeyDown(keyCode, event)
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean =
+        handleKeyDown(event) || super.onKeyDown(keyCode, event)
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean =
+        handleKeyUp(event) || super.onKeyUp(keyCode, event)
+
+    /** キーを IME で使ったら true（物理キーボードと画面キーボードで共通） */
+    private fun handleKeyDown(event: KeyEvent): Boolean {
+        val keyCode = event.keyCode
+        if (secureField) return false
         if (keyCode == settings.voiceKey) {
             // 押している間だけ録音する（押しっぱなしの繰り返しは無視）
             if (event.repeatCount == 0) startVoice()
@@ -217,7 +271,7 @@ class KanadeInputMethodService : InputMethodService() {
                 consumedDown += keyCode
                 return true
             }
-            return super.onKeyDown(keyCode, event)
+            return false
         }
         val consumed = handle(input)
         log(event, "$input consumed=$consumed")
@@ -225,11 +279,12 @@ class KanadeInputMethodService : InputMethodService() {
             consumedDown += keyCode
             return true
         }
-        return super.onKeyDown(keyCode, event)
+        return false
     }
 
-    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
-        if (secureField) return super.onKeyUp(keyCode, event)
+    private fun handleKeyUp(event: KeyEvent): Boolean {
+        val keyCode = event.keyCode
+        if (secureField) return false
         if (keyCode == settings.voiceKey) {
             stopVoice()
             log(event, "voice")
@@ -239,7 +294,7 @@ class KanadeInputMethodService : InputMethodService() {
         if (input != null) handle(input)
         val consumed = consumedDown.remove(keyCode)
         log(event, if (input != null) "$input" else if (consumed) "consumed" else "pass")
-        return consumed || super.onKeyUp(keyCode, event)
+        return consumed
     }
 
     private fun handle(input: KeyInput): Boolean {
@@ -522,6 +577,7 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     private fun updateStatusIcon() {
+        keyboardView?.japanese = engine.japanese
         if (engine.japanese) showStatusIcon(R.drawable.ic_mode_ja) else hideStatusIcon()
     }
 

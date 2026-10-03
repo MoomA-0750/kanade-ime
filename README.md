@@ -16,6 +16,7 @@ Samsung DeX で使うための、物理キーボード専用の Android 日本�
 - F6〜F10・Ctrl+U/I/O/P/T、未確定文字列の中のカーソル移動
 - 音声入力: 録音キーを押している間だけ録音。話しながら ReazonSpeech で文字を出し、離したら whisper で句読点付きの文にする（どちらも端末内）
 - Termux のように未確定文字列を出せないアプリでは、入力中の文字を候補の窓に出す
+- 物理キーボードがないときだけ出る画面キーボード（Unexpected Keyboard と同じ考え方。払って数字・記号、Ctrl/Alt/Fn/Esc/矢印もあり、ショートカットがそのまま使える）
 
 主な利用端末は Galaxy Z Fold 7（Snapdragon 8 Elite、One UI 8.5 / Android 16）を DeX で使う形。
 

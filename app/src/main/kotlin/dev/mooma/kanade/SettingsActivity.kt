@@ -62,6 +62,23 @@ class SettingsActivity : Activity() {
             }
         })
 
+        root.addView(heading("画面キーボード"))
+        root.addView(note(
+            "物理キーボードがないときに出す画面キーボード（Unexpected Keyboard と同じ考え方）。キーを払うと隅の文字（数字・記号）が出る。" +
+                "Shift・Ctrl・Alt・Fn は次の1打だけ効き、2回続けて押すと固定。Fn＋数字で F1〜F10、Fn＋- = で F11・F12。" +
+                "Space を左右に払うと矢印、⇥ のキーは上下左右が矢印・四隅が Home/End/PgUp/PgDn、⌫ を右に払うと Delete"
+        ))
+        root.addView(android.widget.RadioGroup(this).apply {
+            for ((value, label) in listOf("AUTO" to "物理キーボードがないときだけ出す", "ALWAYS" to "いつも出す", "NEVER" to "出さない")) {
+                addView(android.widget.RadioButton(this@SettingsActivity).apply {
+                    id = View.generateViewId()
+                    text = label
+                    isChecked = settings.softKeyboard == value
+                    setOnCheckedChangeListener { _, checked -> if (checked) settings.softKeyboard = value }
+                })
+            }
+        })
+
         root.addView(heading("日本語オン/オフのキー（US 配列用）"))
         root.addView(note("JIS 配列の変換（オン）・無変換（オフ）・かな（オン）・半角/全角（切り替え）は常に有効"))
         for (trigger in ToggleTrigger.entries) {
