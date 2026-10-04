@@ -108,12 +108,18 @@ void TextService::SetComposingText(TfEditCookie ec, ITfContext* context, const s
         return;
     }
     LONG length = static_cast<LONG>(text.size());
+    anchorOffset_ = 0;
+    anchorLength_ = length;
     if (segments.empty()) {
         SetAttribute(ec, ctx, range.Get(), atomInput_);
     } else {
         LONG offset = 0;
         for (size_t i = 0; i < segments.size() && offset < length; i++) {
             LONG segLength = std::min<LONG>(segments[i], length - offset);
+            if (static_cast<int>(i) == focused) {
+                anchorOffset_ = offset;
+                anchorLength_ = segLength;
+            }
             if (auto sub = SubRange(ec, range.Get(), offset, segLength)) {
                 SetAttribute(ec, ctx, sub.Get(), static_cast<int>(i) == focused ? atomFocused_ : atomConverted_);
             }
@@ -187,13 +193,30 @@ void TextService::EndComposition(TfEditCookie ec) {
 
 void TextService::SendCaret(TfEditCookie ec, ITfContext* context) {
     if (!engine_ || !composition_ || !context) return;
-    ComPtr<ITfContextView> view;
     ComPtr<ITfRange> range;
-    if (FAILED(context->GetActiveView(&view)) || FAILED(composition_->GetRange(&range))) return;
+    if (FAILED(composition_->GetRange(&range))) return;
+    // 選んでいる文節の下に候補の窓を出す
+    auto anchor = SubRange(ec, range.Get(), anchorOffset_, std::max<LONG>(anchorLength_, 1));
+    SendRect(ec, context, anchor ? anchor.Get() : range.Get());
+}
+
+void TextService::SendRect(TfEditCookie ec, ITfContext* context, ITfRange* range) {
+    if (!engine_) return;
+    ComPtr<ITfContextView> view;
+    if (FAILED(context->GetActiveView(&view))) return;
     RECT rect = {};
     BOOL clipped = FALSE;
     // 描画がまだのアプリ（ブラウザなど）では E_PENDING が返る。そのときは送らない（前の位置のまま）
-    if (view->GetTextExt(ec, range.Get(), &rect, &clipped) != S_OK) return;
+    if (view->GetTextExt(ec, range, &rect, &clipped) != S_OK) return;
+    // 拡大率に対応していないアプリでは、引き伸ばす前の座標が返る。エンジン（拡大率に対応）に合わせて実際の画面の座標に直す
+    HWND hwnd = nullptr;
+    if (SUCCEEDED(view->GetWnd(&hwnd)) && hwnd) {
+        POINT topLeft = {rect.left, rect.top};
+        POINT bottomRight = {rect.right, rect.bottom};
+        if (LogicalToPhysicalPointForPerMonitorDPI(hwnd, &topLeft) && LogicalToPhysicalPointForPerMonitorDPI(hwnd, &bottomRight)) {
+            rect = {topLeft.x, topLeft.y, bottomRight.x, bottomRight.y};
+        }
+    }
     engine_->Send({"caret", std::to_string(rect.left), std::to_string(rect.top), std::to_string(rect.right), std::to_string(rect.bottom)});
 }
 

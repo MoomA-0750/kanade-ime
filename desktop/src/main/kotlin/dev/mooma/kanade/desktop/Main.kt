@@ -40,11 +40,11 @@ fun main(args: Array<String>) {
 
 private fun log(s: String) = System.err.println("[kanade] ${java.time.LocalTime.now().withNano(0)} $s")
 
-private fun newHost(data: File): EngineHost {
+private fun newHost(data: File, view: CandidateView = object : CandidateView {}): EngineHost {
     val started = System.nanoTime()
     val source = DesktopResources(data).candidateSource()
     log("辞書を読んだ ${(System.nanoTime() - started) / 1_000_000}ms")
-    return EngineHost(InputEngine(candidateSource = source))
+    return EngineHost(InputEngine(candidateSource = source), view)
 }
 
 private fun serve(data: File, socket: Path) {
@@ -59,7 +59,8 @@ private fun serve(data: File, socket: Path) {
         log("別のエンジンが動いている: $socket")
         exitProcess(1)
     }
-    val host = newHost(data)
+    val view = if (java.awt.GraphicsEnvironment.isHeadless()) object : CandidateView {} else SwingCandidateView()
+    val host = newHost(data, view)
     val started = runCatching { SocketServer(socket, host, ::log).start() }.getOrElse {
         log("待ち受けられない: $it")
         false

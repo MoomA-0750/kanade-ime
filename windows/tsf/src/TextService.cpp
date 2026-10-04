@@ -280,7 +280,11 @@ bool TextService::KeyRequest(const char* type, ITfContext* context, WPARAM wPara
     if (!engine_->Request(type, fields, kTimeoutMs, &reply)) return false;
     Log("%s %s vk=%s char=%s -> %zu commands, eaten=%d", type, down ? "down" : "up", fields[1].c_str(), fields[2].c_str(),
         reply.commands.size(), reply.consumed);
+    bool modeChanged = false;
+    for (const auto& c : reply.commands) modeChanged = modeChanged || c[0] == "mode";
     if (!reply.commands.empty()) ApplyCommands(context, std::move(reply.commands), true);
+    // 「あ」「A」をカーソルの近くに出すため、切り替えたらカーソルの位置を送る
+    if (modeChanged && context && !composition_) SendSelectionCaret(context);
     *eaten = reply.consumed;
     return true;
 }
@@ -312,6 +316,18 @@ void TextService::SendContext(ITfContext* context) {
         return S_OK;
     });
     engine_->Send({"ctx", ToUtf8(left), ToUtf8(right)});
+}
+
+void TextService::SendSelectionCaret(ITfContext* context) {
+    EditSync(context, TF_ES_READ, [&](TfEditCookie ec) {
+        TF_SELECTION sel;
+        ULONG fetched = 0;
+        if (FAILED(context->GetSelection(ec, TF_DEFAULT_SELECTION, 1, &sel, &fetched)) || fetched == 0) return S_OK;
+        ComPtr<ITfRange> range;
+        range.Attach(sel.range);
+        SendRect(ec, context, range.Get());
+        return S_OK;
+    });
 }
 
 HRESULT TextService::EditSync(ITfContext* context, DWORD flags, std::function<HRESULT(TfEditCookie)> fn) {

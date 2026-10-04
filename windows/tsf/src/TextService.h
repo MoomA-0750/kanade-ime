@@ -76,6 +76,8 @@ private:
     std::vector<std::string> KeyFields(WPARAM wParam, LPARAM lParam, bool down);
     bool KeyRequest(const char* type, ITfContext* context, WPARAM wParam, LPARAM lParam, bool down, BOOL* eaten);
     void SendContext(ITfContext* context);
+    void SendSelectionCaret(ITfContext* context);
+    void SendRect(TfEditCookie ec, ITfContext* context, ITfRange* range);
     HRESULT EditSync(ITfContext* context, DWORD flags, std::function<HRESULT(TfEditCookie)> fn);
     void ApplyCommands(ITfContext* context, std::vector<Command> commands, bool sync);
     void InitDisplayAttributes();
@@ -109,6 +111,9 @@ private:
     HWND window_ = nullptr;
     bool japanese_ = false;
     bool settingCompartment_ = false;
+    // 候補の窓を出す位置（選んでいる文節。変換中でなければ入力中の文字の先頭）
+    LONG anchorOffset_ = 0;
+    LONG anchorLength_ = 0;
     TfGuidAtom atomInput_ = TF_INVALID_GUIDATOM;
     TfGuidAtom atomFocused_ = TF_INVALID_GUIDATOM;
     TfGuidAtom atomConverted_ = TF_INVALID_GUIDATOM;
