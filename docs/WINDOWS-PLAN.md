@@ -75,6 +75,11 @@ windows/installer/   DLL の登録（regsvr32）、エンジンをログオン�
   - 本人が試したら、どのアプリでも日本語に切り替えられなかった（2026-10-04）。原因はエンジンが止まっていたこと（隠したコンソールが Ctrl+C を受けて終わった）。エンジンを javaw（コンソールなし）で動かし、記録は自分で `%LOCALAPPDATA%\Kanade\engine.log` に書く。DLL はつながらないとき、`HKCU\Software\Kanade\EngineCommand` の命令でエンジンを起動する（Mozc と同じ。普通の権限のプロセスからだけ、15秒に1回まで、アプリのジョブから外して）
   - 本人の2回目: Zen とメモ帳はライブ変換つきで打てた。Windows Terminal は英字だけ（10月1日から動くプロセスが最初の版の DLL を持ったまま。開き直しが要る）。スタートメニューの検索はライブ変換なし（隔離されたアプリが DLL を読めず、代わりの入力になっていた見込み）→ DLL のフォルダとソケットに ALL APPLICATION PACKAGES の権限と低い整合性を付けた。ソケットの場所は KF_FLAG_NO_APPCONTAINER_REDIRECTION で取る
   - DLL の記録は WriteFile で共有して書く（同じプロセスに別の版の DLL があると、前の書き方では空のファイルになった見込み）
+  - 本人の3回目（サインインし直して）: Zen・メモ帳は動く、Windows Terminal とスタートメニューは英字だけ。DLL の記録では Windows Terminal・1Password（どちらもパッケージ化されたアプリ）で接続が WSAEINVAL（10022）
+    - 再現: 試験の窓を Windows Terminal のパッケージの中（Invoke-CommandInDesktopPackage、ログオン中のセッション）で動かすと同じ 10022。パッケージ化されたアプリでは AppData が仮想化され、そこに置いた AF_UNIX のソケットにつながらない
+    - 直した: ソケットを `%USERPROFILE%\.kanade\engine.sock` に移した。パッケージの中でもつながった
+    - スタートメニュー（AppContainer）: `kanade_appcontainer.exe`（命令を AppContainer の中で動かす道具）で試すと、AppContainer の中ではプロファイルのフォルダの場所が取れていなかった。USERPROFILE で取り直し、つながった
+    - 移行のあいだだけ、エンジンは前の場所（%LOCALAPPDATA%\Kanade\engine.sock）でも待つ（前の版の DLL を読み込んだままのアプリのため）。フェーズ7で外す
   - 残り: ブラウザ・ターミナル・エディタでの確認（本人の作業中の画面で全体にキーを送るのは避け、本人に試してもらう）。言語バー/タスクバーの「あ」「A」の表示（GUID_LBI_INPUTMODE のボタン）、アイコン
 
 ## 本人に確かめること（始める前に。答えは上）

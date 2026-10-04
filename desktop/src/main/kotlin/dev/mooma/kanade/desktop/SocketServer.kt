@@ -49,11 +49,13 @@ class SocketServer(private val path: Path, private val host: EngineHost, private
      */
     private fun allowAppContainers() {
         val result = runCatching {
-            val p = ProcessBuilder(
-                "icacls", path.absolutePathString(), "/grant", "*S-1-15-2-1:(M)", "*S-1-15-2-2:(M)", "/setintegritylevel", "L",
-            ).redirectErrorStream(true).start()
-            val out = p.inputStream.readAllBytes()
-            if (p.waitFor() != 0) String(out) else null
+            fun icacls(vararg args: String): String? {
+                val p = ProcessBuilder(listOf("icacls") + args).redirectErrorStream(true).start()
+                val out = p.inputStream.readAllBytes()
+                return if (p.waitFor() != 0) String(out) else null
+            }
+            icacls(path.parent.absolutePathString(), "/grant", "*S-1-15-2-1:(RX)", "*S-1-15-2-2:(RX)")
+                ?: icacls(path.absolutePathString(), "/grant", "*S-1-15-2-1:(M)", "*S-1-15-2-2:(M)", "/setintegritylevel", "L")
         }.getOrElse { it.toString() }
         if (result != null) log("ソケットの権限を変えられない: $result")
     }
@@ -100,10 +102,13 @@ class SocketServer(private val path: Path, private val host: EngineHost, private
             SocketChannel.open(UnixDomainSocketAddress.of(path)).use { true }
         }.getOrDefault(false)
 
-        /** Windows は %LOCALAPPDATA%\Kanade\engine.sock、ほかは $XDG_RUNTIME_DIR/kanade-engine.sock */
+        /**
+         * Windows は %USERPROFILE%\.kanade\engine.sock、ほかは $XDG_RUNTIME_DIR/kanade-engine.sock。
+         * AppData に置かないのは、パッケージ化されたアプリ（Windows Terminal など）では AppData が仮想化され、
+         * そこに置いたソケットへの接続が WSAEINVAL（10022）になるため
+         */
         fun defaultPath(): Path {
-            val local = System.getenv("LOCALAPPDATA")
-            if (local != null) return Path.of(local, "Kanade", "engine.sock")
+            if (System.getenv("LOCALAPPDATA") != null) return Path.of(System.getProperty("user.home"), ".kanade", "engine.sock")
             val runtime = System.getenv("XDG_RUNTIME_DIR") ?: System.getProperty("java.io.tmpdir")
             return Path.of(runtime, "kanade-engine.sock")
         }

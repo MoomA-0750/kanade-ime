@@ -68,6 +68,12 @@ private fun serve(data: File, socket: Path) {
         log("別のエンジンが動いている: $socket")
         exitProcess(1)
     }
+    // 移行のあいだだけ: 前の版の DLL（ソケットを %LOCALAPPDATA%\Kanade に置いていた）を読み込んだままのアプリのために、前の場所でも待つ。
+    // インストーラーを作るとき（フェーズ7）に外す
+    System.getenv("LOCALAPPDATA")?.let { local ->
+        val legacy = Path.of(local, "Kanade", "engine.sock")
+        if (legacy != socket) runCatching { SocketServer(legacy, host, ::log).start() }.onFailure { log("前の場所で待てない: $it") }
+    }
 }
 
 private fun typeLocal(data: File, scripts: List<String>) {

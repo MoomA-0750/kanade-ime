@@ -20,7 +20,7 @@ int main(int argc, char** argv) {
     SetConsoleOutputCP(CP_UTF8);
     EngineClient client([] {});
     if (client.EnsureConnected() == EngineClient::State::Failed) {
-        printf("エンジンにつながらない\n");
+        printf("エンジンにつながらない (WSA %d)\n", client.lastError());
         return 1;
     }
     for (int a = 1; a < argc; a++) {

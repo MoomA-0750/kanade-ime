@@ -32,6 +32,7 @@ public:
     // つながっていなければつなぐ（失敗したら1秒は試さない）。つないだ直後は hello を送る
     State EnsureConnected();
     bool connected() const { return connected_; }
+    int lastError() const { return lastError_; }
 
     // 要求を送って返事を待つ。返事が来ない・切れたら false（呼んだ側は素通しにする）
     bool Request(const std::string& type, std::vector<std::string> fields, DWORD timeoutMs, Reply* reply);

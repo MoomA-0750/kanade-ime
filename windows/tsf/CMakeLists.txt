@@ -31,3 +31,11 @@ target_link_libraries(kanade_probe PRIVATE ws2_32 shell32 ole32 user32)
 add_executable(kanade_typetest WIN32 src/Protocol.cpp src/TypeTest.cpp)
 set_target_properties(kanade_typetest PROPERTIES WIN32_EXECUTABLE OFF)
 target_link_libraries(kanade_typetest PRIVATE ole32 user32 gdi32 uuid)
+
+# Windows Terminal と同じく、プロセスの文字コードを UTF-8 にした試験の道具（違いを調べる用）
+add_executable(kanade_probe_utf8 ${COMMON_SOURCES} src/Probe.cpp utf8.manifest)
+target_link_libraries(kanade_probe_utf8 PRIVATE ws2_32 shell32 ole32 user32)
+
+# 命令を AppContainer の中で動かす（スタートメニューの検索と同じ隔離でつながるかを試す）
+add_executable(kanade_appcontainer src/AppContainerRun.cpp)
+target_link_libraries(kanade_appcontainer PRIVATE userenv)

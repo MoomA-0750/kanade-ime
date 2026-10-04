@@ -10,9 +10,19 @@ namespace kanade {
 namespace {
 std::string SocketPath() {
     PWSTR local = nullptr;
-    if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_NO_APPCONTAINER_REDIRECTION, nullptr, &local))) return {};
-    std::wstring path = std::wstring(local) + L"\\Kanade\\engine.sock";
-    CoTaskMemFree(local);
+    // AppData には置かない（パッケージ化されたアプリでは AppData が仮想化され、接続が WSAEINVAL になる）
+    std::wstring profile;
+    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Profile, 0, nullptr, &local))) {
+        profile = local;
+        CoTaskMemFree(local);
+    } else {
+        // AppContainer の中では取れないことがある
+        wchar_t buf[MAX_PATH];
+        DWORD n = GetEnvironmentVariableW(L"USERPROFILE", buf, MAX_PATH);
+        if (n == 0 || n >= MAX_PATH) return {};
+        profile.assign(buf, n);
+    }
+    std::wstring path = profile + L"\\.kanade\\engine.sock";
     // Java（エンジン）もソケットの場所を ANSI のコードページで渡すので、それに合わせる
     int n = WideCharToMultiByte(CP_ACP, 0, path.c_str(), -1, nullptr, 0, nullptr, nullptr);
     std::string out(n > 0 ? n - 1 : 0, '\0');
@@ -33,16 +43,28 @@ EngineClient::~EngineClient() {
 
 EngineClient::State EngineClient::EnsureConnected() {
     if (connected_) return State::Connected;
-    if (!wsa_) return State::Failed;
+    if (!wsa_) {
+        lastError_ = -2;
+        return State::Failed;
+    }
     ULONGLONG now = GetTickCount64();
     if (lastAttempt_ != 0 && now - lastAttempt_ < 1000) return State::Failed;
     lastAttempt_ = now;
     Close();
 
     std::string path = SocketPath();
-    if (path.empty() || path.size() >= UNIX_PATH_MAX) return State::Failed;
+    if (path.empty() || path.size() >= UNIX_PATH_MAX) {
+        if (lastError_ != -1) Log("no socket path");
+        lastError_ = -1;
+        return State::Failed;
+    }
     SOCKET s = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (s == INVALID_SOCKET) return State::Failed;
+    if (s == INVALID_SOCKET) {
+        int error = WSAGetLastError();
+        if (error != lastError_) Log("socket failed %d", error);
+        lastError_ = error;
+        return State::Failed;
+    }
     SOCKADDR_UN addr = {};
     addr.sun_family = AF_UNIX;
     memcpy(addr.sun_path, path.c_str(), path.size());

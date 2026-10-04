@@ -5,7 +5,7 @@ Kotlin 側は `desktop/src/main/kotlin/dev/mooma/kanade/desktop/`（`Protocol.kt
 
 ## つなぎ方
 
-- AF_UNIX のソケット。場所は `%LOCALAPPDATA%\Kanade\engine.sock`（Linux では `$XDG_RUNTIME_DIR/kanade-engine.sock`）
+- AF_UNIX のソケット。場所は `%USERPROFILE%\.kanade\engine.sock`（AppData に置くと、パッケージ化されたアプリから WSAEINVAL でつながらない）（Linux では `$XDG_RUNTIME_DIR/kanade-engine.sock`）
   - 名前付きパイプにしなかった理由: Java だけではパイプのサーバーを作れない（JNA が要る）。同期の読み書きは1本のパイプで直列になり、エンジンから自分から送る（並べ替えの結果）のに重なった読み書きが要る。ソケットなら Java も Winsock もそのまま両方向に使え、Linux でも同じ形で試せる
   - 気をつけること: AppContainer のアプリ（スタートメニューの検索など）からはソケットのファイルに触れない見込み。主に使うアプリ（ブラウザ・ターミナル・エディタ）は AppContainer ではない。要るときは名前付きパイプ（ACL に ALL APPLICATION PACKAGES）を足す
 - 1行1メッセージ。UTF-8、`\n` で区切る。欄はタブ区切り。欄の中の `\`・タブ・改行・CR は `\\`・`\t`・`\n`・`\r`
