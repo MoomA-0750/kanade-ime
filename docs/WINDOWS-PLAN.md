@@ -51,7 +51,23 @@ windows/installer/   DLL の登録（regsvr32）、エンジンをログオン�
 6. **音声入力**: 録音キーを押している間だけ録音、ReazonSpeech（話しながら）と、確定の文を作るモデル（ReazonSpeech・SenseVoice・parakeet・whisper）。モデルは Android 版と同じく、設定の画面からダウンロード
 7. **設定・インストール**: 設定の画面（ユーザー辞書・スニペット・音声のモデル）、Android 版の設定の書き出しファイル（`SettingsBackup.kt` の JSON）を読めるようにする、インストーラー
 
-## 本人に確かめること（始める前に）
+## 本人の答え（2026-10-04）
+
+- DLL の登録: **to-fu で登録して試してよい**（普段のユーザーで。落ちたら登録の解除で戻す）
+- 主に使うアプリ: **ブラウザ・ターミナル・エディタ**（Office は後回し）。この3つを優先して確かめる
+- キーボード配列: **US と JIS の両方**（Android 版と同じく、右 Alt の単押し・Ctrl+Space・変換/無変換・半角/全角）
+- MS-IME: **最終的には Kanade だけにしたい**。試験中は逃げ道として MS-IME を残し、外すのは安定してから本人が行う
+
+## 進み具合と仮決定（2026-10-04〜）
+
+- フェーズ1 済: to-fu の JDK は **Android Studio 同梱の JBR 21** を使う（入れる手間がなく、Temurin 21 と同じ版）。配るときは jlink で同梱する（フェーズ7）。エンジン（Kotlin）は手元でビルドして送り、DLL は to-fu の MSVC でビルドする。道具は `scripts/win.sh`（engine・data・tsf・eng・ps）
+- フェーズ2 済: `desktop/`（Gradle の `:desktop`、1つのモジュール）にエンジンを置いた。計画の `desktop/engine`・`desktop/protocol` に分けなかったのは、命令の形を使う Kotlin がエンジンだけで、C++ 側とは文書（`docs/WINDOWS-PROTOCOL.md`）で合わせれば足りるため
+  - つなぎ方は名前付きパイプではなく **AF_UNIX のソケット**にした（理由は `docs/WINDOWS-PROTOCOL.md`）。Linux でも同じ形で動き、to-fu でも動いた
+  - エンジンは1つの `InputEngine` を全アプリで共有（日本語のオン/オフも共通。Android 版と同じ）。入力中の文字はフォーカスのある DLL だけが持つ
+  - キーの割り当ては全部エンジン側（`WinKeyMapper.kt`）。DLL は仮想キー・ToUnicodeEx の文字・修飾キーを送るだけ
+  - 試験: `kanade-engine type '<キー列>'`（同じプロセス）と `send`（ソケット越し）、単体テスト（偽の DLL `FakeDll.kt`）。to-fu で辞書の読み込み約0.1〜0.3秒、1文の打鍵で約70ms
+
+## 本人に確かめること（始める前に。答えは上）
 
 - to-fu で、作った IME の DLL を登録してよいか（`regsvr32` は管理者権限が要る。登録すると全アプリに読み込まれる。登録の解除で戻せる）
 - 試すのは to-fu でよいか（普段使いの PC なら、落ちたときに他のアプリを巻き込む。DLL を小さく保つ・試すときは Windows Sandbox や別ユーザーも候補）
