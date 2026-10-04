@@ -69,6 +69,7 @@ enum class Category(val title: String, val summary: String, val icon: Int, val g
     VOICE("音声入力", "モデル・録音キー・話し方", R.drawable.sym_mic, CategoryGroup.INPUT),
     DICTIONARY("ユーザー辞書", "読みと語を登録して、変換で優先します", R.drawable.sym_dictionary, CategoryGroup.WORDS),
     SNIPPETS("スニペット", "打った瞬間に置き換える文字列", R.drawable.sym_bolt, CategoryGroup.WORDS),
+    BACKUP("書き出しと読み込み", "設定・辞書・スニペットをファイルに保存して、別の端末に移します", R.drawable.sym_upload_file, CategoryGroup.OTHER),
     TOOLS("試験と記録", "試し打ち・変換の試験・キー記録", R.drawable.sym_science, CategoryGroup.OTHER),
     USAGE("使い方", "Kanade の使い方", R.drawable.sym_help, CategoryGroup.OTHER),
 }
@@ -303,6 +304,7 @@ private fun DetailPane(category: Category, onBack: (() -> Unit)?, modifier: Modi
                     Category.VOICE -> VoiceScreen()
                     Category.DICTIONARY -> PairEditorScreen(PairKind.DICTIONARY)
                     Category.SNIPPETS -> PairEditorScreen(PairKind.SNIPPETS)
+                    Category.BACKUP -> BackupScreen()
                     Category.TOOLS -> ToolsScreen()
                     Category.USAGE -> UsageScreen()
                 }
