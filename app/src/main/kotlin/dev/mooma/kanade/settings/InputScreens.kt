@@ -137,6 +137,13 @@ fun ColumnScope.KeyboardScreen() {
                 else -> "12 のキーをフリック（トグル入力も選べます）で打ちます。"
             },
         )
+        if ("GLIDE" in enabled) {
+            var glideZenz by rememberPref({ settings.glideZenz }, { settings.glideZenz = it })
+            SwitchRow(
+                "グライドの候補を zenz で並べ直す", glideZenz, { glideZenz = it },
+                "日本語のグライドで、前の文とのつながりを zenz（変換の並べ替えに使う言語モデル）に見てもらいます。辞書の1位を先に入れ、zenz が別の語を選んだら少し遅れて入れ替えます。",
+            )
+        }
         if (layout == "FLICK") {
             var toggle by rememberPref({ settings.flickToggle }, { settings.flickToggle = it })
             SwitchRow("トグル入力", toggle, { toggle = it }, "同じキーを続けて押すと、次の文字になります（あ→い→う）。オフにするとフリックだけで入力します。")

@@ -18,6 +18,12 @@ interface LanguageModel {
 
     /** 実行中の [score]・[generate] を止める（別スレッドから呼ぶ） */
     fun cancel()
+
+    /**
+     * [leftContext] に続けて、読み（ひらがな）とその変換の組 [items] が出てくる対数確率（読みの部分も含む）。
+     * 読みが違う候補どうし（グライドの候補）を比べるのに使う。対応しなければ null
+     */
+    fun scoreReadings(leftContext: String, items: List<Pair<String, String>>): FloatArray? = null
 }
 
 /**

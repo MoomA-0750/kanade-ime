@@ -66,6 +66,7 @@ fun main(args: Array<String>) {
         "whisper" -> whisperTry(File(args[1]), File(args[2]), args.drop(3).map(::File))
         "eval-glide" -> evaluateGlide(File(args[1]), args.getOrNull(2)?.toFloat() ?: 0.25f)
         "tune-glide" -> tuneGlide(File(args[1]), args.getOrNull(2)?.toFloat() ?: 0.25f)
+        "eval-glide-zenz" -> evaluateGlideZenz(File(args[1]), File(args[2]), File(args[3]), File(args[4]), args.getOrNull(5)?.toFloat() ?: 0.25f)
         "eval-zenz" -> evaluateZenz(File(args[1]), File(args[2]), File(args[3]), File(args[4]), args.getOrNull(5)?.toInt() ?: 10, args.getOrNull(6)?.toFloat() ?: 1.0f)
         else -> {
             System.err.println(
@@ -79,6 +80,7 @@ fun main(args: Array<String>) {
                   convert <outDir> <かな...>     変換を試す
                   eval-glide <assetsDir> [ずれ]  グライドの読み取りを、人の指に近い軌跡で測る（ずれは狙いのずれ。キーの幅に対する割合）
                   tune-glide <assetsDir> [ずれ]  グライドの重みを探す
+                  eval-glide-zenz <assetsDir> <builtDir> <gguf> <libkanade_zenz.so> [ずれ]  日本語のグライドを zenz で並べ直したときを測る
                   zenz <outDir> <gguf> <libkanade_zenz.so> <かな...>        zenz の並べ替えと生成を試す
                   eval-zenz <outDir> <tsv> <gguf> <libkanade_zenz.so> [topK] zenz ありで評価する
                   eval-context <outDir> <tsv> <gguf> <libkanade_zenz.so>   左の文脈ありとなしで並べ替えを比べる
@@ -701,6 +703,73 @@ fun tuneGlide(assets: File, aim: Float) {
             }
             println("${set.name}: $best → ${"%.1f".format(bestScore)}")
             System.out.flush()
+        }
+    }
+}
+
+/**
+ * 日本語のグライドの上位を zenz で並べ直したときの正確さを、重みを変えて測る。
+ * 読みごとに Mozc のいちばん良い変換を付け、「読み＋変換」の対数確率を zenz に聞く。文脈つきの見本（手で作った）も見る
+ */
+fun evaluateGlideZenz(assets: File, built: File, gguf: File, lib: File, aim: Float) {
+    val zenz = openZenz(gguf, lib)
+    val converter = loadConverter(built)
+    val set = glideEvalSets(assets, (System.getenv("GLIDE_N") ?: "300").toInt()).first { it.name == "日本語" }
+    val decoder = dev.mooma.kanade.core.glide.GlideDecoder(set.lexicon, dev.mooma.kanade.core.glide.GlideParams.JAPANESE)
+    fun conversion(reading: String) = converter.convert(reading, n = 1).firstOrNull()?.words?.joinToString("") { it.surface } ?: reading
+    // 文脈つきの見本: （入力中の読み, なぞる語の綴り, 正しい読み）
+    val contextCases = listOf(
+        Triple("がっこうに", "ikeru", "いける"), Triple("ほんが", "aru", "ある"), Triple("ともだちに", "au", "あう"),
+        Triple("きょうは", "tenki", "てんき"), Triple("あしたは", "yasumi", "やすみ"), Triple("でんしゃに", "noru", "のる"),
+        Triple("ごはんを", "taberu", "たべる"), Triple("えいがを", "miru", "みる"), Triple("みずを", "nomu", "のむ"),
+        Triple("てがみを", "kaku", "かく"), Triple("おんがくを", "kiku", "きく"), Triple("かいぎに", "deru", "でる"),
+        Triple("しごとが", "owaru", "おわる"), Triple("あめが", "furu", "ふる"), Triple("いえに", "kaeru", "かえる"),
+        Triple("でんわを", "kakeru", "かける"), Triple("しゃしんを", "toru", "とる"), Triple("みちを", "aruku", "あるく"),
+        Triple("ねつが", "aru", "ある"), Triple("かおを", "arau", "あらう"),
+    )
+    for (h in listOf(140f)) {
+        val keys = glideKeys(h)
+        val r = java.util.Random(5)
+        class Case(val expected: String, val cands: List<dev.mooma.kanade.core.glide.GlideCandidate>, val lp: FloatArray?)
+        val cases = ArrayList<Case>()
+        val times = ArrayList<Double>()
+        fun run(context: String, spelling: String, expected: String) {
+            val (xs, ys) = humanGesture(spelling, keys, r, aim, h)
+            var cands = decoder.decode(xs, ys, keys, 100f, limit = 9, keyHeight = h)
+            if (context.isNotEmpty()) {
+                val costs = HashMap<String, Int?>()
+                fun cost(x: String) = costs.getOrPut(x) { converter.convert(x, n = 1).firstOrNull()?.cost }
+                cands = decoder.rerank(cands) { w -> dev.mooma.kanade.core.glide.GlideLexicon.japanesePrior(context, w, ::cost) }
+            }
+            val t = System.nanoTime()
+            val lp = zenz.scoreReadings("", cands.map { (context + it.output) to conversion(context + it.output) })
+            times += (System.nanoTime() - t) / 1e6
+            cases += Case(expected, cands, lp)
+        }
+        for ((spelling, expected) in set.cases) run("", spelling, expected)
+        val plain = cases.size
+        for ((context, spelling, expected) in contextCases) run(context, spelling, expected)
+        if (h == 140f) for (c in cases.drop(plain)) {
+            val base = c.cands.take(3).map { it.output }
+            val z = c.lp?.let { decoder.rerankWithModel(c.cands, it, 0.4f, 0.5f) }?.take(3)?.map { it.output }
+            val lps = c.cands.take(4).mapIndexed { i, x -> "${x.output}:${"%.1f".format(c.lp?.get(i) ?: 0f)}" }
+            println("  ${c.expected}: 辞書 $base／zenz $z（$lps）")
+        }
+        times.sort()
+        println("キーの高さ $h: zenz の時間 中央値 ${"%.0f".format(times[times.size / 2])}ms・95% ${"%.0f".format(times[times.size * 95 / 100])}ms")
+        for (keep in listOf(1f, 0.5f, 0f)) for (w in listOf(0f, 0.2f, 0.4f, 0.7f, 1f, 1.5f)) {
+            var t1 = 0
+            var t3 = 0
+            var c1 = 0
+            for ((i, c) in cases.withIndex()) {
+                val ranked = c.lp?.let { decoder.rerankWithModel(c.cands, it, w, keep) } ?: c.cands
+                val out = ranked.map { it.output }
+                if (i < plain) {
+                    if (out.firstOrNull() == c.expected) t1++
+                    if (c.expected in out.take(3)) t3++
+                } else if (out.firstOrNull() == c.expected) c1++
+            }
+            println("  辞書の頻度を残す ${keep}・zenz の重み $w: 1位 ${100 * t1 / plain}%・3位以内 ${100 * t3 / plain}%、文脈つき ${c1}/${contextCases.size}")
         }
     }
 }

@@ -116,6 +116,11 @@ class KanadeSettings(context: Context) {
         }
         set(value) = prefs.edit().putString(KEY_SOFT_KEYBOARD_LAYOUT, value).apply()
 
+    /** 日本語のグライドの候補を zenz で並べ直す（辞書の1位を先に入れ、zenz が別の語を選べば入れ替える） */
+    var glideZenz: Boolean
+        get() = prefs.getBoolean(KEY_GLIDE_ZENZ, true)
+        set(value) = prefs.edit().putBoolean(KEY_GLIDE_ZENZ, value).apply()
+
     /** 使う配列（左下のキーの上払いで、この中を順に替える）。既定はグライドとテンキー。空にはしない */
     var enabledLayouts: Set<String>
         get() = prefs.getStringSet(KEY_ENABLED_LAYOUTS, null)?.filter { it in LAYOUTS }?.toSet()?.ifEmpty { null } ?: setOf("GLIDE", "FLICK")
@@ -170,6 +175,7 @@ class KanadeSettings(context: Context) {
         const val KEY_SOFT_KEYBOARD_LAYOUT = "soft_keyboard_layout"
         const val KEY_FLICK_TOGGLE = "flick_toggle"
         const val KEY_ENABLED_LAYOUTS = "enabled_layouts"
+        const val KEY_GLIDE_ZENZ = "glide_zenz"
         const val KEY_FLOAT = "soft_keyboard_floating"
         const val KEY_FLOAT_X = "float_x"
         const val KEY_FLOAT_Y = "float_y"

@@ -322,7 +322,7 @@ class KanadeInputMethodService : InputMethodService() {
      * 直前にグライドで入れたもの。候補の帯で別の語を選ぶと、これを置き換える。
      * [text] は入れた文字（英語は前に足した空白も含む）、[japanese] は入力中の読みに入れたか
      */
-    private class GlideResult(val candidates: List<String>, var text: String, val japanese: Boolean, val prefix: String)
+    private class GlideResult(var candidates: List<String>, var text: String, val japanese: Boolean, val prefix: String)
     private var lastGlide: GlideResult? = null
     /** グライドの語を置き換えている途中（そのあいだの入力では、グライドの候補を消さない） */
     private var replacingGlide = false
@@ -337,6 +337,9 @@ class KanadeInputMethodService : InputMethodService() {
         }
         // 日本語は、入力中の読みのあとにつなげたときの自然さで並べ直す（読みの終わりの方だけを使う）
         val context = if (japanese && engine.isComposing && !engine.isConverting) engine.composingReading.takeLast(GLIDE_CONTEXT) else ""
+        // zenz に渡す左の文脈（確定済みの文）
+        val committed = if (!japanese) "" else if (engine.isComposing) engine.leftContext
+        else currentInputConnection?.getTextBeforeCursor(ZenzModel.MAX_LEFT_CONTEXT, 0)?.toString().orEmpty()
         val learning = glideLearning
         glideThread.execute {
             val result = runCatching {
@@ -355,7 +358,56 @@ class KanadeInputMethodService : InputMethodService() {
                 val words = result.map { c ->
                     if (!japanese && input.shift) c.output.replaceFirstChar { it.uppercaseChar() } else c.output
                 }.distinct()
-                if (words.isNotEmpty()) insertGlide(words, japanese)
+                if (words.isEmpty()) return@post
+                insertGlide(words, japanese)
+                if (japanese && settings.glideZenz && result.size > 1) lastGlide?.let { zenzGlide(it, result, decoder, context, committed) }
+            }
+        }
+    }
+
+    /**
+     * 日本語のグライドの候補を zenz で並べ直す（読みごとに Mozc のいちばん良い変換を付け、文脈に続く「読み＋変換」の自然さを聞く）。
+     * 先に辞書の1位を入れておき、zenz が終わったときにまだ次の入力がなく、1位が変わっていれば入れ替える
+     */
+    private fun zenzGlide(
+        g: GlideResult,
+        candidates: List<dev.mooma.kanade.core.glide.GlideCandidate>,
+        decoder: dev.mooma.kanade.core.glide.GlideDecoder,
+        context: String,
+        committed: String,
+    ) {
+        zenzThread.execute {
+            val model = zenz ?: return@execute
+            if (lastGlide !== g) return@execute
+            val ranked = runCatching {
+                val converter = ConversionResources.converter(this)
+                val items = candidates.map { c ->
+                    val reading = context + c.output
+                    reading to (converter.convert(reading, n = 1).firstOrNull()?.words?.joinToString("") { it.surface } ?: reading)
+                }
+                val lp = model.scoreReadings(committed, items) ?: return@execute
+                decoder.rerankWithModel(candidates, lp)
+            }.getOrNull() ?: return@execute
+            main.post {
+                if (lastGlide !== g) return@post
+                val words = ranked.map { it.output }.distinct()
+                if (words == g.candidates) return@post
+                val top = words.first()
+                if (top != g.text) {
+                    if (!engine.isComposing || !engine.composingReading.endsWith(g.text)) return@post
+                    replacingGlide = true
+                    try {
+                        handle(KeyInput.ReplaceLast(top, g.text.length))
+                    } finally {
+                        replacingGlide = false
+                    }
+                    glideLearning.forget(g.text)
+                    glideLearning.record(top)
+                    saveGlideLearning()
+                    g.text = top
+                }
+                g.candidates = words
+                showBar { it.showCandidates(words, 0) }
             }
         }
     }

@@ -322,9 +322,29 @@ class GlideDecoder(private val lexicon: GlideLexicon, val params: GlideParams = 
             c.copy(score = c.score + params.priorWeight * (p - c.prior), prior = p)
         }.sortedByDescending { it.score }
 
+    /**
+     * 言語モデル（zenz）の対数確率 [logProbs]（[candidates] と同じ順）で並べ直す。辞書のよく使う度合いは [keepPrior] の割合だけ残し、
+     * 言語モデルの点を [weight] 倍して足す（いちばん良い候補との差だけを見る）。重みは dictool の eval-glide で選ぶ
+     */
+    fun rerankWithModel(candidates: List<GlideCandidate>, logProbs: FloatArray, weight: Float = MODEL_WEIGHT, keepPrior: Float = MODEL_KEEP_PRIOR): List<GlideCandidate> {
+        if (logProbs.size != candidates.size) return candidates
+        val best = logProbs.filter { it.isFinite() }.maxOrNull() ?: return candidates
+        return candidates.mapIndexed { i, c ->
+            val lp = logProbs[i].takeIf { it.isFinite() } ?: return@mapIndexed c
+            c.copy(score = c.score - params.priorWeight * c.prior * (1 - keepPrior) + weight * (lp - best))
+        }.sortedByDescending { it.score }
+    }
+
     companion object {
         /** 比べる点の数 */
         const val POINTS = 40
+        /**
+         * 言語モデルの点の重みと、辞書のよく使う度合いを残す割合（dictool の eval-glide-zenz で選んだ。2026-10-04）。
+         * 文脈なしの語では辞書だけと同じくらい、入力中の読みのあとに続く語（でんしゃに＋のる など）では良くなる重み
+         */
+        const val MODEL_WEIGHT = 0.25f
+        const val MODEL_KEEP_PRIOR = 0.5f
+
         /** DTW で合わせるときに、ずらしてよい点の数 */
         const val DTW_BAND = 8
         /** 語のキーの数の上限 */

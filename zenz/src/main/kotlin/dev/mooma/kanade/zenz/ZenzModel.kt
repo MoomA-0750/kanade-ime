@@ -27,6 +27,17 @@ class ZenzModel private constructor(private var handle: Long) : LanguageModel, C
         return bytes.decodeToString().takeIf { it.isNotEmpty() && '�' !in it }
     }
 
+    override fun scoreReadings(leftContext: String, items: List<Pair<String, String>>): FloatArray? = synchronized(lock) {
+        if (handle == 0L) return null
+        // プロンプトは左文脈と読みの始まりの印まで。読み・変換の始まりの印・変換を候補として続ける
+        val left = normalize(leftContext).takeLast(MAX_LEFT_CONTEXT)
+        val prompt = ((if (left.isEmpty()) "" else "\uEE02$left") + "\uEE00").encodeToByteArray()
+        return ZenzNative.score(
+            handle, prompt,
+            items.map { (reading, output) -> (CharWidth.toKatakana(normalize(reading)) + "\uEE01" + normalize(output)).encodeToByteArray() }.toTypedArray(),
+        )
+    }
+
     override fun cancel() {
         if (handle != 0L) ZenzNative.cancel(handle)
     }
