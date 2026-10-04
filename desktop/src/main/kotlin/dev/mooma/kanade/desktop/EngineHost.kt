@@ -25,6 +25,9 @@ interface CandidateView {
 /** 言語モデルでの並べ替え（zenz）。重いので裏のスレッドから呼ぶ。できなければ null */
 fun interface RerankService {
     fun rerank(request: ImeCommand.RequestRerank): List<String>?
+
+    /** 計算中のものを止める（新しい依頼が来たとき。別のスレッドから呼ぶ） */
+    fun cancel() {}
 }
 
 /**
@@ -160,6 +163,7 @@ class EngineHost(
     private fun requestRerank(request: ImeCommand.RequestRerank) {
         val service = reranker ?: return
         val ticket = latestRerank.incrementAndGet()
+        service.cancel()
         rerankExecutor.execute {
             if (ticket != latestRerank.get()) return@execute
             val ranked = runCatching { service.rerank(request) }.getOrNull() ?: return@execute

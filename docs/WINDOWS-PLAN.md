@@ -88,6 +88,11 @@ windows/installer/   DLL の登録（regsvr32）、エンジンをログオン�
   - モードを切り替えたら DLL がカーソルの位置を送り、そこに「あ」「A」を 0.9 秒出す
   - クリックで候補を選ぶのは外した: Java だけでは WS_EX_NOACTIVATE の窓にできず、クリックで入力欄のフォーカスが外れて入力中の文字が消えた。フェーズ5でネイティブの部品を作るときに入れる
 
+- フェーズ5 済（2026-10-05 夜）: zenz の並べ替え。`native/` を MSVC でもビルドできるようにし（`native/build-windows.cmd`、`scripts/win.sh zenz`）、`kanade_zenz.dll` をエンジンが最初の依頼で読む（`ZenzReranker.kt`）。読み込み約25ms、1回の並べ替え 10〜70ms（Ryzen 7 3700X）
+  - 落ちた原因: JBR が古い msvcp140.dll を同梱していて、MSVC 14.44 でビルドしたものが std::mutex で落ちた → VC++ のランタイムを静的に組み込む（/MT）
+  - JNI のヘッダーは JBR にないので、手元の JDK の jni.h と Windows 用の jni_md.h を送る
+  - 残り: GGML_NATIVE で to-fu の CPU（AVX2）向けにビルドしている。配るときは CPU の機能で切り替える形にする（フェーズ7）。クリックで候補を選ぶ（WS_EX_NOACTIVATE のためのネイティブの部品）も残り
+
 ## 本人に確かめること（始める前に。答えは上）
 
 - to-fu で、作った IME の DLL を登録してよいか（`regsvr32` は管理者権限が要る。登録すると全アプリに読み込まれる。登録の解除で戻せる）

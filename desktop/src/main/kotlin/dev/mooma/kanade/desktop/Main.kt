@@ -24,12 +24,14 @@ fun main(args: Array<String>) {
         "serve" -> serve(data, socket)
         "type" -> typeLocal(data, opts.drop(1))
         "send" -> sendOverSocket(socket, opts.drop(1))
+        "zenz" -> zenzCheck(data, opts.drop(1))
         else -> {
             println(
                 """
                 kanade-engine serve [--data DIR] [--socket PATH]   DLL を待つ（常駐するエンジン）
                 kanade-engine type [--data DIR] <キー列>...         エンジンを同じプロセスで動かし、キー列を流して結果を出す
                 kanade-engine send [--socket PATH] <キー列>...      動いているエンジンへソケット越しにキー列を流す
+                kanade-engine zenz [--data DIR] <読み>...           zenz を読み、辞書の候補を並べ替えた結果を出す（ネイティブの確認）
                 キー列: 文字はそのまま、特別なキーは {Space} {Enter} {BS} {Esc} {F7} {Ctrl+Space} {RAlt} {Henkan} など
                 """.trimIndent(),
             )
@@ -42,9 +44,16 @@ private fun log(s: String) = System.err.println("[kanade] ${java.time.LocalTime.
 
 private fun newHost(data: File, view: CandidateView = object : CandidateView {}): EngineHost {
     val started = System.nanoTime()
-    val source = DesktopResources(data).candidateSource()
+    val resources = DesktopResources(data)
+    val source = resources.candidateSource()
     log("辞書を読んだ ${(System.nanoTime() - started) / 1_000_000}ms")
-    return EngineHost(InputEngine(candidateSource = source), view)
+    val library = ZenzReranker.libraryFile()
+    val model = resources.zenzModel
+    val reranker = if (library.exists() && model != null) ZenzReranker(library, model, ::log) else {
+        log("zenz なし（${library.path}、モデル ${model?.path}）")
+        null
+    }
+    return EngineHost(InputEngine(candidateSource = source), view, reranker)
 }
 
 private fun serve(data: File, socket: Path) {
@@ -108,4 +117,19 @@ private fun sendOverSocket(socket: Path, scripts: List<String>) {
     }
     out.write("bye\n".toByteArray())
     ch.close()
+}
+
+private fun zenzCheck(data: File, readings: List<String>) {
+    val resources = DesktopResources(data)
+    val source = resources.candidateSource()
+    val library = ZenzReranker.libraryFile()
+    val model = resources.zenzModel ?: error("zenz.gguf がない")
+    log("ネイティブ ${library.path}")
+    val reranker = ZenzReranker(library, model, ::log)
+    for (reading in readings) {
+        val candidates = source.convert(reading, 5).map { it.text }
+        val started = System.nanoTime()
+        val ranked = reranker.rerank(dev.mooma.kanade.core.ImeCommand.RequestRerank(1, "", reading, candidates))
+        println("$reading: 辞書 $candidates -> zenz $ranked (${(System.nanoTime() - started) / 1_000_000}ms)")
+    }
 }

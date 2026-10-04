@@ -26,6 +26,11 @@ if (ANDROID)
     endif()
 endif()
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+if (MSVC)
+    # VC++ のランタイムを静的に組み込む。JDK（JBR）が古い msvcp140.dll を同梱していて、新しい MSVC でビルドしたものが
+    # それを使うと std::mutex で落ちる（MSVC 17.10 以降の変更）
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded" CACHE STRING "" FORCE)
+endif()
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../third_party/llama.cpp llama.cpp EXCLUDE_FROM_ALL)
 
@@ -36,9 +41,17 @@ if (ANDROID)
     target_link_libraries(kanade_zenz PRIVATE log)
     # 16KB ページの端末（Android 15 以降）でも読めるようにする
     target_link_options(kanade_zenz PRIVATE "-Wl,-z,max-page-size=16384")
+elseif (KANADE_JNI_INCLUDE)
+    # Windows（to-fu）: JDK に JNI のヘッダーがないので、手元から送ったものを使う（scripts/win.sh zenz）
+    target_include_directories(kanade_zenz PRIVATE ${KANADE_JNI_INCLUDE} ${KANADE_JNI_INCLUDE}/win32)
 elseif (JNI_FOUND)
     target_include_directories(kanade_zenz PRIVATE ${JNI_INCLUDE_DIRS})
 endif()
-target_compile_options(kanade_zenz PRIVATE -O3)
-# whisper の .so も ggml を持つので、静的に取り込んだ記号は外へ出さない
-target_link_options(kanade_zenz PRIVATE "-Wl,--exclude-libs,ALL")
+if (MSVC)
+    # Windows 版（desktop のエンジン）。DLL は書き出した関数しか外へ出さないので、記号を隠す指定は要らない
+    target_compile_options(kanade_zenz PRIVATE /O2 /utf-8)
+else()
+    target_compile_options(kanade_zenz PRIVATE -O3)
+    # whisper の .so も ggml を持つので、静的に取り込んだ記号は外へ出さない
+    target_link_options(kanade_zenz PRIVATE "-Wl,--exclude-libs,ALL")
+endif()
