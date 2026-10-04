@@ -229,24 +229,27 @@ std::vector<std::string> TextService::KeyFields(WPARAM wParam, LPARAM lParam, bo
     return {down ? "d" : "u", std::to_string(vk), std::to_string(ch), std::to_string(mods), repeat ? "1" : "0"};
 }
 
-STDMETHODIMP TextService::OnTestKeyDown(ITfContext*, WPARAM wParam, LPARAM lParam, BOOL* eaten) {
+// キーの扱い: OnTestKeyDown（アプリが「このキーを使うか」を聞く）の時点でエンジンに実際に処理させ、結果を取っておく。
+// 使わないキーには、その場で正確に「使わない」と答える。IMM のアプリ（EDIT など）では、OnTestKeyDown で「使う」と答えたキーを
+// OnKeyDown で「やっぱり使わない」と返すと、キーがアプリに届かずに消えるため。続く OnKeyDown では取っておいた結果を書く。
+// OnTestKeyDown を呼ばずに OnKeyDown だけ呼ぶアプリ（RichEdit など）では、OnKeyDown で処理する
+
+STDMETHODIMP TextService::OnTestKeyDown(ITfContext* context, WPARAM wParam, LPARAM lParam, BOOL* eaten) {
     *eaten = FALSE;
     try {
-        Reply reply;
-        if (Connect() && engine_->Request("test", KeyFields(wParam, lParam, true), kTimeoutMs, &reply)) *eaten = reply.consumed;
-        Log("OnTestKeyDown vk=%d lp=%08llx eaten=%d", static_cast<int>(wParam), static_cast<unsigned long long>(lParam), *eaten);
+        *eaten = TestKey(context, wParam, lParam, true);
     } catch (...) {
+        Log("exception in OnTestKeyDown");
     }
     return S_OK;
 }
 
-STDMETHODIMP TextService::OnTestKeyUp(ITfContext*, WPARAM wParam, LPARAM lParam, BOOL* eaten) {
+STDMETHODIMP TextService::OnTestKeyUp(ITfContext* context, WPARAM wParam, LPARAM lParam, BOOL* eaten) {
     *eaten = FALSE;
     try {
-        Reply reply;
-        if (Connect() && engine_->Request("test", KeyFields(wParam, lParam, false), kTimeoutMs, &reply)) *eaten = reply.consumed;
-        Log("OnTestKeyUp vk=%d lp=%08llx eaten=%d", static_cast<int>(wParam), static_cast<unsigned long long>(lParam), *eaten);
+        *eaten = TestKey(context, wParam, lParam, false);
     } catch (...) {
+        Log("exception in OnTestKeyUp");
     }
     return S_OK;
 }
@@ -254,7 +257,7 @@ STDMETHODIMP TextService::OnTestKeyUp(ITfContext*, WPARAM wParam, LPARAM lParam,
 STDMETHODIMP TextService::OnKeyDown(ITfContext* context, WPARAM wParam, LPARAM lParam, BOOL* eaten) {
     *eaten = FALSE;
     try {
-        KeyRequest("key", context, wParam, lParam, true, eaten);
+        HandleKey(context, wParam, lParam, true, eaten);
     } catch (...) {
         Log("exception in OnKeyDown");
     }
@@ -264,29 +267,53 @@ STDMETHODIMP TextService::OnKeyDown(ITfContext* context, WPARAM wParam, LPARAM l
 STDMETHODIMP TextService::OnKeyUp(ITfContext* context, WPARAM wParam, LPARAM lParam, BOOL* eaten) {
     *eaten = FALSE;
     try {
-        KeyRequest("key", context, wParam, lParam, false, eaten);
+        HandleKey(context, wParam, lParam, false, eaten);
     } catch (...) {
         Log("exception in OnKeyUp");
     }
     return S_OK;
 }
 
-bool TextService::KeyRequest(const char* type, ITfContext* context, WPARAM wParam, LPARAM lParam, bool down, BOOL* eaten) {
+bool TextService::ProcessKey(ITfContext* context, const std::vector<std::string>& fields, bool down, Reply* reply) {
     if (!Connect()) return false;
-    std::vector<std::string> fields = KeyFields(wParam, lParam, down);
     // 入力を始める打鍵なら、先にカーソルの前後の文を送る（zenz の文脈）
     if (down && japanese_ && !composition_ && fields[2] != "0" && context) SendContext(context);
+    if (!engine_->Request("key", fields, kTimeoutMs, reply)) return false;
+    Log("key %s vk=%s char=%s -> %zu commands, eaten=%d", down ? "down" : "up", fields[1].c_str(), fields[2].c_str(), reply->commands.size(),
+        reply->consumed);
+    return true;
+}
+
+BOOL TextService::TestKey(ITfContext* context, WPARAM wParam, LPARAM lParam, bool down) {
+    std::vector<std::string> fields = KeyFields(wParam, lParam, down);
+    // 同じキーをもう一度聞かれた（OnKeyDown の前に2回）ときは、取っておいた答えを返す
+    if (pending_.valid && pending_.fields == fields) return TRUE;
+    pending_ = {};
     Reply reply;
-    if (!engine_->Request(type, fields, kTimeoutMs, &reply)) return false;
-    Log("%s %s vk=%s char=%s -> %zu commands, eaten=%d", type, down ? "down" : "up", fields[1].c_str(), fields[2].c_str(),
-        reply.commands.size(), reply.consumed);
+    if (!ProcessKey(context, fields, down, &reply)) return FALSE;
+    // 使わず、書くものもないキーは、そのままアプリへ
+    if (!reply.consumed && reply.commands.empty()) return FALSE;
+    // 書くものがあるとき（使わないキーでも、入力中の文字を先に確定するなど）は OnKeyDown で書く
+    pending_ = {true, std::move(fields), std::move(reply)};
+    return TRUE;
+}
+
+void TextService::HandleKey(ITfContext* context, WPARAM wParam, LPARAM lParam, bool down, BOOL* eaten) {
+    std::vector<std::string> fields = KeyFields(wParam, lParam, down);
+    Reply reply;
+    if (pending_.valid && pending_.fields == fields) {
+        reply = std::move(pending_.reply);
+        pending_ = {};
+    } else {
+        pending_ = {};
+        if (!ProcessKey(context, fields, down, &reply)) return;
+    }
     bool modeChanged = false;
     for (const auto& c : reply.commands) modeChanged = modeChanged || c[0] == "mode";
     if (!reply.commands.empty()) ApplyCommands(context, std::move(reply.commands), true);
     // 「あ」「A」をカーソルの近くに出すため、切り替えたらカーソルの位置を送る
     if (modeChanged && context && !composition_) SendSelectionCaret(context);
     *eaten = reply.consumed;
-    return true;
 }
 
 void TextService::SendContext(ITfContext* context) {

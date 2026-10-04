@@ -16,7 +16,7 @@ Kotlin 側は `desktop/src/main/kotlin/dev/mooma/kanade/desktop/`（`Protocol.kt
 | 行 | 意味 |
 |---|---|
 | `hello	<版>	<pid>	<exe>` | つないだ直後。エンジンは `mode` を返す（id 0） |
-| `test	<id>	<d\|u>	<vk>	<char>	<mods>	<repeat>` | OnTestKeyDown/Up。返事 `done	<id>	<1\|0>`（1 なら OnKeyDown/Up に回してほしい）。状態はほぼ変えない |
+| `test	<id>	<d\|u>	<vk>	<char>	<mods>	<repeat>` | （前の版の DLL だけが使う）OnTestKeyDown/Up。返事 `done	<id>	<1\|0>`（1 なら OnKeyDown/Up に回してほしい）。今の DLL は OnTestKeyDown の時点で `key` を送る（下） |
 | `key	<id>	<d\|u>	<vk>	<char>	<mods>	<repeat>` | OnKeyDown/Up。返事は命令の行と `done	<id>	<consumed>`。consumed が 0 なら DLL はキーを食べずにアプリへ渡す（OnKeyDown で `*pfEaten = FALSE`） |
 | `commitall	<id>` | 入力中の文字を確定してほしい（マウスで入力欄を触ったなど） |
 | `ctx	<左の文>	<右の文>` | 入力を始める前の、カーソルの前後の文（zenz の文脈）。入力中でなければ受け取る |
@@ -28,6 +28,7 @@ Kotlin 側は `desktop/src/main/kotlin/dev/mooma/kanade/desktop/`（`Protocol.kt
 
 - `vk` は仮想キー。右 Alt は DLL が VK_RMENU（0xA5）に直す。`char` は ToUnicodeEx の結果（なければ 0）。`mods` は Shift=1・Ctrl=2・Alt=4・Win=8
 - キーの割り当て（どのキーで何をするか）は全部エンジン（`WinKeyMapper.kt`）が決める。DLL は決めない
+- DLL は OnTestKeyDown の時点で `key` を送ってエンジンに処理させ、返事を取っておく。使わず書くものもないキーには「使わない」と答え（アプリへ届く）、それ以外は OnKeyDown で取っておいた命令を書く。IMM のアプリ（EDIT など）では、OnTestKeyDown で「使う」と答えたキーを OnKeyDown で「使わない」と返すと、キーが消えるため。OnTestKeyDown を呼ばないアプリ（RichEdit など）では OnKeyDown で送る
 
 ## エンジン → DLL
 

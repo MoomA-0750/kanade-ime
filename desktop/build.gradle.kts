@@ -22,6 +22,8 @@ dependencies {
     implementation(project(":core"))
     implementation(project(":zenz"))
     implementation(project(":whisper"))
+    // Android 版の設定の書き出し（JSON）を読む。Android と同じ API で、パブリックドメイン
+    implementation("org.json:json:20250517")
     testImplementation(kotlin("test"))
 }
 

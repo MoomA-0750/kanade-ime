@@ -101,6 +101,13 @@ windows/installer/   DLL の登録（regsvr32）、エンジンをログオン�
     - 読み込み約2秒（録音を始めたときに裏で）、1回の認識 0.1〜0.2 秒
   - 残り: モデルの選択（kotoba・turbo・SenseVoice・parakeet）とダウンロード（設定の画面、フェーズ7）、録音キーの変更
 
+- フェーズ7 第1弾（2026-10-05 夜）: 設定・ユーザー辞書・スニペット・学習を `%APPDATA%\Kanade` に保存する（`DesktopStore.kt`・`DesktopApp.kt`）。どれもメモ帳で編集できるテキストで、エンジンが2秒ごとに変更を見て読み直す。学習と前回の日本語のオン/オフは30秒ごと（変わったときだけ）と終了時に保存
+  - 設定の項目名は Android 版と同じ（full_width_symbols・live_conversion・punctuation・toggle_triggers・spoken_punctuation・learning）。Android 版の「設定の書き出し」の JSON をそのまま読み込める（タスクトレイの「Android 版の設定を読み込む…」。今の辞書・スニペットは .bak に残す）。JSON は org.json（Android と同じ API、パブリックドメイン）で読む
+  - タスクトレイの「あ」のアイコン: ユーザー辞書・スニペット・設定をメモ帳で開く、Android 版の設定を読み込む、記録を開く、終了
+  - キーの扱いを変えた: IMM のアプリ（EDIT など）では、OnTestKeyDown で「使う」と答えたキーを OnKeyDown で「使わない」と返すとキーが消えた（日本語オンで何も打っていないときの Enter、スニペットがあるときの日本語オフの文字）。OnTestKeyDown の時点でエンジンに処理させて答えを正確にした
+  - 分かったこと: IMM のアプリでは DLL がカーソルの前の文字を読めず、日本語オフのスニペットは効かない（打った文字はそのまま入る）
+  - 残り: 設定の画面、インストーラー（jlink の JRE、DLL の登録、ログオン時の起動、モデルのダウンロード）、32bit の DLL、CPU の機能での ggml の切り替え
+
 ## 本人に確かめること（始める前に。答えは上）
 
 - to-fu で、作った IME の DLL を登録してよいか（`regsvr32` は管理者権限が要る。登録すると全アプリに読み込まれる。登録の解除で戻せる）

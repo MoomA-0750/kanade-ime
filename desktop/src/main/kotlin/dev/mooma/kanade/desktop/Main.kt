@@ -44,7 +44,11 @@ fun main(args: Array<String>) {
 
 private fun log(s: String) = System.err.println("[kanade] ${java.time.LocalTime.now().withNano(0)} $s")
 
-private fun newHost(data: File, view: CandidateView = object : CandidateView {}): EngineHost {
+private class Built(val host: EngineHost, val source: dev.mooma.kanade.core.convert.DictionaryCandidateSource, val voice: DesktopVoice?)
+
+private fun newHost(data: File, view: CandidateView = object : CandidateView {}): EngineHost = build(data, view).host
+
+private fun build(data: File, view: CandidateView): Built {
     val started = System.nanoTime()
     val resources = DesktopResources(data)
     val source = resources.candidateSource()
@@ -63,7 +67,7 @@ private fun newHost(data: File, view: CandidateView = object : CandidateView {})
         log("音声入力なし（${whisperLibrary.path}、モデル ${whisperModel.path}）")
         null
     }
-    return EngineHost(InputEngine(candidateSource = source), view, reranker, voice)
+    return Built(EngineHost(InputEngine(candidateSource = source), view, reranker, voice), source, voice)
 }
 
 /** 音声入力のモデル（Android 版の既定と同じ whisper small）。設定の画面で選べるようにするのはフェーズ7 */
@@ -82,7 +86,10 @@ private fun serve(data: File, socket: Path) {
         exitProcess(1)
     }
     val view = if (java.awt.GraphicsEnvironment.isHeadless()) object : CandidateView {} else SwingCandidateView()
-    val host = newHost(data, view)
+    val built = build(data, view)
+    val host = built.host
+    val app = DesktopApp(DesktopStore(), host, built.source, built.voice, ::log)
+    app.start()
     val started = runCatching { SocketServer(socket, host, ::log).start() }.getOrElse {
         log("待ち受けられない: $it")
         false
@@ -91,6 +98,7 @@ private fun serve(data: File, socket: Path) {
         log("別のエンジンが動いている: $socket")
         exitProcess(1)
     }
+    if (!java.awt.GraphicsEnvironment.isHeadless()) runCatching { app.installTray() }.onFailure { log("タスクトレイに出せない: $it") }
     // 移行のあいだだけ: 前の版の DLL（ソケットを %LOCALAPPDATA%\Kanade に置いていた）を読み込んだままのアプリのために、前の場所でも待つ。
     // インストーラーを作るとき（フェーズ7）に外す
     System.getenv("LOCALAPPDATA")?.let { local ->

@@ -29,6 +29,11 @@ class DesktopVoice(
     private val partial: ReazonPartial? = null,
 ) : VoiceService {
     @Volatile private var lastPartial: String? = null
+
+    /** 話した句読点（「まる」→「。」）を直す */
+    @Volatile var spokenPunctuation = true
+
+    private fun spoken(text: String) = if (spokenPunctuation) SpokenPunctuation.apply(text) else text
     private val worker = Executors.newSingleThreadScheduledExecutor { Thread(it, "whisper").apply { isDaemon = true } }
     private var unload: java.util.concurrent.ScheduledFuture<*>? = null
     private var whisper: WhisperModel? = null
@@ -67,7 +72,7 @@ class DesktopVoice(
                     val text = runCatching { partial.recognize(pcm) }.getOrNull() ?: continue
                     if (line !== l) break
                     lastPartial = text
-                    onPartial(SpokenPunctuation.apply(text))
+                    onPartial(spoken(text))
                 }
             }, "partial").apply { isDaemon = true; start() }
         }
@@ -91,7 +96,7 @@ class DesktopVoice(
             val text = runCatching { model()?.transcribe(pcm) }.onFailure { log("whisper: $it") }.getOrNull()
             log("whisper ${pcm.size / WhisperModel.SAMPLE_RATE.toFloat()}秒 -> ${(System.nanoTime() - started) / 1_000_000}ms ${text ?: "（なし）"}")
             // 確定の文が作れなければ、話している途中に出していた文を使う（Android 版と同じ）
-            onText((text ?: lastPartial)?.let { SpokenPunctuation.apply(it) })
+            onText((text ?: lastPartial)?.let { spoken(it) })
             scheduleUnload()
         }
     }

@@ -49,6 +49,14 @@ class EngineHost(
 ) {
     private val lock = Any()
     private val mapper = WinKeyMapper()
+
+    /** エンジンのロックの中で動かす（設定の読み直しなど、キーの処理と重ならないように） */
+    fun <T> locked(block: () -> T): T = synchronized(lock, block)
+
+    /** 日本語のオン/オフに使うキー */
+    var toggles: Set<WinToggle>
+        get() = mapper.triggers
+        set(value) = synchronized(lock) { mapper.triggers = value }
     private var active: Client? = null
     private val rerankExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "rerank").apply { isDaemon = true } }
     private val latestRerank = AtomicInteger()

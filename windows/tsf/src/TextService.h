@@ -74,7 +74,9 @@ public:
 private:
     bool Connect();
     std::vector<std::string> KeyFields(WPARAM wParam, LPARAM lParam, bool down);
-    bool KeyRequest(const char* type, ITfContext* context, WPARAM wParam, LPARAM lParam, bool down, BOOL* eaten);
+    bool ProcessKey(ITfContext* context, const std::vector<std::string>& fields, bool down, Reply* reply);
+    BOOL TestKey(ITfContext* context, WPARAM wParam, LPARAM lParam, bool down);
+    void HandleKey(ITfContext* context, WPARAM wParam, LPARAM lParam, bool down, BOOL* eaten);
     void SendContext(ITfContext* context);
     void SendSelectionCaret(ITfContext* context);
     void SendRect(TfEditCookie ec, ITfContext* context, ITfRange* range);
@@ -98,6 +100,14 @@ private:
     void EndComposition(TfEditCookie ec);
     void SendCaret(TfEditCookie ec, ITfContext* context);
     static void SetSelectionAt(TfEditCookie ec, ITfContext* context, ITfRange* range, TfAnchor anchor);
+
+    // OnTestKeyDown で処理して、OnKeyDown で書くのを待っているキー
+    struct PendingKey {
+        bool valid = false;
+        std::vector<std::string> fields;
+        Reply reply;
+    };
+    PendingKey pending_;
 
     LONG refs_ = 1;
     ComPtr<ITfThreadMgr> threadMgr_;

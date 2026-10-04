@@ -30,12 +30,13 @@ class FakeDll(private val out: (String) -> Unit) {
 
     fun type(script: String) = press(KeyScript.parse(script))
 
-    /** OnTestKeyDown/Up → OnKeyDown/Up。エンジンが使わなかったキーはアプリへ届いたことにする */
+    /**
+     * 本物の DLL と同じく、OnTestKeyDown の時点でエンジンに処理させる（`key`）。使わず書くものもないキーはアプリへ。
+     * 書くものがあれば書き、使わなかったキーはそのあとアプリへ届いたことにする（TSF に対応したアプリと同じ）
+     */
     fun key(key: WinKey) {
         val upDown = if (key.down) "d" else "u"
-        val fields = arrayOf<Any>(upDown, key.vk, key.char, key.mods, if (key.repeat) 1 else 0)
-        val relevant = request("test", *fields)
-        val consumed = relevant && request("key", *fields)
+        val consumed = request("key", upDown, key.vk, key.char, key.mods, if (key.repeat) 1 else 0)
         if (!consumed && key.down) appReceives(key)
     }
 
