@@ -56,6 +56,11 @@ class FloatingFrame(
     /** 浮いているキーボードの、窓の中の位置（IME の当たり判定に使う） */
     val touchableRect = Rect()
 
+    /** 投げて動いている間のキーボードの左上（窓の中の px。壁の外へはみ出すこともある）。止まっていれば null */
+    private var flingX: Float? = null
+    private var flingY: Float? = null
+    private var flingAnimator: android.animation.TimeAnimator? = null
+
     /** 画面の上下で避ける高さ（ステータスバー・ナビゲーションバー） */
     private var safeTop = 0
     private var safeBottom = 0
@@ -82,6 +87,14 @@ class FloatingFrame(
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         requestApplyInsets()
+    }
+
+    override fun onDetachedFromWindow() {
+        flingAnimator?.cancel()
+        flingAnimator = null
+        flingX = null
+        flingY = null
+        super.onDetachedFromWindow()
     }
 
     private fun cardWidth(total: Int): Int {
@@ -112,8 +125,8 @@ class FloatingFrame(
             val cw = card.measuredWidth
             val ch = card.measuredHeight
             val freeH = maxOf(0, h - safeTop - safeBottom - ch)
-            val x = ((w - cw) * posX.coerceIn(0f, 1f)).toInt()
-            val y = safeTop + (freeH * posY.coerceIn(0f, 1f)).toInt()
+            val x = flingX?.toInt() ?: ((w - cw) * posX.coerceIn(0f, 1f)).toInt()
+            val y = flingY?.toInt() ?: (safeTop + (freeH * posY.coerceIn(0f, 1f)).toInt())
             card.layout(x, y, x + cw, y + ch)
         }
         val loc = IntArray(2)
@@ -129,6 +142,93 @@ class FloatingFrame(
         return loc[1]
     }
 
+    /** 投げるのをやめる（つかみ直したとき）。今の位置をそのまま位置にする */
+    private fun stopFling() {
+        val a = flingAnimator ?: return
+        a.cancel()
+        flingAnimator = null
+        settleFromCard()
+    }
+
+    /** 今のキーボードの位置を、割合の位置にして覚える */
+    private fun settleFromCard() {
+        val freeW = width - card.width
+        val freeH = height - safeTop - safeBottom - card.height
+        if (freeW > 0) posX = (card.left.toFloat() / freeW).coerceIn(0f, 1f)
+        if (freeH > 0) posY = ((card.top - safeTop).toFloat() / freeH).coerceIn(0f, 1f)
+        flingX = null
+        flingY = null
+        requestLayout()
+    }
+
+    /**
+     * 速さ [vx]・[vy]（px/秒）で投げる。摩擦で減速しながら滑り、壁に当たったら残りの勢いで少し外へはみ出して、
+     * ばねで端に戻る（Android のピクチャー・イン・ピクチャーの窓と同じ感じ）
+     */
+    private fun fling(vx: Float, vy: Float) {
+        val ax = Axis(card.left.toFloat(), vx, 0f, maxOf(0, width - card.width).toFloat())
+        val top = safeTop.toFloat()
+        val ay = Axis(card.top.toFloat(), vy, top, maxOf(top, (height - safeBottom - card.height).toFloat()))
+        flingX = ax.x
+        flingY = ay.x
+        val a = android.animation.TimeAnimator()
+        a.setTimeListener { anim, _, delta ->
+            // 1フレームを細かく分けて計算する（ばねが速いので）
+            var left = delta.coerceAtMost(64L) / 1000f
+            while (left > 0f) {
+                val dt = minOf(left, 0.004f)
+                ax.step(dt)
+                ay.step(dt)
+                left -= dt
+            }
+            flingX = ax.x
+            flingY = ay.x
+            requestLayout()
+            if (ax.done && ay.done) {
+                anim.cancel()
+                flingAnimator = null
+                settleFromCard()
+                onMoved(posX, posY, widthFraction)
+            }
+        }
+        flingAnimator = a
+        a.start()
+    }
+
+    /** 投げたときの1つの向き（横か縦）の動き */
+    private inner class Axis(var x: Float, var v: Float, val min: Float, val max: Float) {
+        /** 壁に当たって、ばねで端へ戻っているところ */
+        private var spring = false
+        private var target = 0f
+        var done = false
+            private set
+
+        fun step(dt: Float) {
+            if (done) return
+            if (!spring) {
+                v *= kotlin.math.exp(-FRICTION * dt)
+                x += v * dt
+                if (x < min || x > max) {
+                    spring = true
+                    target = if (x < min) min else max
+                    // はみ出しすぎないよう、壁に当たったときの勢いを抑える
+                    val cap = BOUNCE_DP * density * SPRING_OMEGA
+                    v = v.coerceIn(-cap, cap)
+                } else if (kotlin.math.abs(v) < 20f) {
+                    done = true
+                }
+            } else {
+                val a = -SPRING_OMEGA * SPRING_OMEGA * (x - target) - 2 * SPRING_DAMPING * SPRING_OMEGA * v
+                v += a * dt
+                x += v * dt
+                if (kotlin.math.abs(x - target) < 0.5f && kotlin.math.abs(v) < 10f) {
+                    x = target
+                    done = true
+                }
+            }
+        }
+    }
+
     /** キーボードの下のつまみ。左: 固定に戻す、真ん中: 動かす、右: 幅を変える */
     private inner class Handle : View(context) {
         private val palette = KeyboardPalette.of(context)
@@ -140,6 +240,15 @@ class FloatingFrame(
         private var mode = 0 // 0: なし 1: 移動 2: 幅 3: 固定に戻す
         private var lastX = 0f
         private var lastY = 0f
+        private var velocity: android.view.VelocityTracker? = null
+
+        /** 指の速さを画面の座標で測る（つまみ自身が指と一緒に動くので、自分の座標では測れない） */
+        private fun track(e: MotionEvent) {
+            val copy = MotionEvent.obtain(e)
+            copy.setLocation(e.rawX, e.rawY)
+            velocity?.addMovement(copy)
+            copy.recycle()
+        }
 
         init {
             setBackgroundColor(palette.background)
@@ -169,8 +278,15 @@ class FloatingFrame(
                     }
                     lastX = e.rawX
                     lastY = e.rawY
+                    if (mode == 1) {
+                        stopFling()
+                        velocity?.recycle()
+                        velocity = android.view.VelocityTracker.obtain()
+                        track(e)
+                    }
                 }
                 MotionEvent.ACTION_MOVE -> {
+                    if (mode == 1) track(e)
                     val dx = e.rawX - lastX
                     val dy = e.rawY - lastY
                     lastX = e.rawX
@@ -196,13 +312,27 @@ class FloatingFrame(
                 }
                 MotionEvent.ACTION_UP -> {
                     when (mode) {
-                        1, 2 -> onMoved(posX, posY, widthFraction)
+                        1 -> {
+                            track(e)
+                            val vt = velocity
+                            vt?.computeCurrentVelocity(1000)
+                            val vx = vt?.xVelocity ?: 0f
+                            val vy = vt?.yVelocity ?: 0f
+                            // 勢いよく離したら投げる。そっと離したらその場に置く
+                            if (kotlin.math.hypot(vx, vy) > FLING_MIN_DP * density) fling(vx, vy)
+                            else onMoved(posX, posY, widthFraction)
+                        }
+                        2 -> onMoved(posX, posY, widthFraction)
                         3 -> if (e.x < iconZone) onDock()
                     }
+                    velocity?.recycle()
+                    velocity = null
                     mode = 0
                 }
                 MotionEvent.ACTION_CANCEL -> {
                     if (mode == 1 || mode == 2) onMoved(posX, posY, widthFraction)
+                    velocity?.recycle()
+                    velocity = null
                     mode = 0
                 }
             }
@@ -213,5 +343,18 @@ class FloatingFrame(
     private companion object {
         const val HANDLE_DP = 28
         const val MIN_WIDTH_DP = 260
+
+        /** 投げたときの減速（1/秒。大きいほど早く止まる。滑る距離はおよそ 速さ/この値） */
+        const val FRICTION = 5f
+
+        /** これより遅く離したら投げない（dp/秒） */
+        const val FLING_MIN_DP = 400f
+
+        /** 壁でばねが戻す速さ（rad/秒）と減衰（1 未満で少しはみ出して戻る） */
+        const val SPRING_OMEGA = 18f
+        const val SPRING_DAMPING = 0.55f
+
+        /** 壁の外へはみ出すのは、おおよそこのくらいまで（dp） */
+        const val BOUNCE_DP = 40f
     }
 }

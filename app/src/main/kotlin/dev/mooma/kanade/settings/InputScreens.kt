@@ -135,7 +135,7 @@ fun ColumnScope.KeyboardScreen() {
     Section("フロート", "キーボードを画面の下から離して、好きな位置・幅に浮かせます。浮かせている間はアプリの画面が縮まず、キーボードの外を触ると下のアプリを操作できます。") {
         var floating by rememberPref({ settings.softKeyboardFloating }, { settings.softKeyboardFloating = it })
         SwitchRow("キーボードを浮かせる", floating, { floating = it })
-        Note("キーボードの下のつまみの真ん中をドラッグすると動かせます。右端をドラッグすると幅が変わり、左端を押すと画面の下に戻ります。")
+        Note("キーボードの下のつまみの真ん中をドラッグすると動かせます。勢いよく払うと滑っていき、画面の端で跳ね返って端に収まります。右端をドラッグすると幅が変わり、左端を押すと画面の下に戻ります。")
         Note("Ctrl を下に払う（フリックでは「あa1」を下に払う）と、キーボードからも浮かせる・戻すを切り替えられます。")
     }
 
