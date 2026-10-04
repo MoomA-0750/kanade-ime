@@ -96,7 +96,10 @@ windows/installer/   DLL の登録（regsvr32）、エンジンをログオン�
 - フェーズ6 第1弾（2026-10-05 夜）: 録音キー（F12、Android 版の既定と同じ）を押している間だけ録音し、離したら whisper small で句読点付きの文にして確定する（`DesktopVoice.kt`）。録音は javax.sound（16kHz モノラル）。whisper.cpp は zenz と同じく MSVC でビルド（`scripts/win.sh whisper`）。話した句読点（「まる」→「。」）も Android 版と同じく直す
   - 測った: 8.8 秒の見本の音声を約 1.0 秒（Ryzen 7 3700X、8スレッド）。モデルの読み込み約 0.2 秒（録音を始めたときに裏で読む）。5分使わなければ放す
   - 試験: `-Dkanade.voiceWav=<wav>` で録った音の代わりに wav を使える（声を出さずに、F12 → 認識 → アプリへの確定まで通しで確かめた）。`kanade-engine voice <wav> | --mic 秒`
-  - 残り: 話しながら途中の文字を出す（sherpa-onnx の ReazonSpeech。Java 版の sherpa-onnx を Windows で使う）、モデルの選択（kotoba・turbo・SenseVoice・parakeet）とダウンロード（設定の画面、フェーズ7）、録音キーの変更
+  - 第2弾: 話しながらの途中の文字（ReazonSpeech、sherpa-onnx の Java 版 1.13.8 と Windows のネイティブの jar。版とハッシュを固定して `.cache/sherpa-jvm` に取る）。Android 版と同じく 0.6 秒ごとに、録っている途中の音声（後ろの30秒まで）を文字にし、カーソルの近くの「🎤」の表示に出す（アプリの入力欄には入れない。打っている文字とぶつからないように）。確定の文が作れなければ途中の文を使う
+    - 分かったこと: この ReazonSpeech のモデルは、音声がいきなり始まると前の部分を丸ごと落とすことがある（見本の 8.8 秒の音声で最後の文だけ。Linux でも同じなので Windows の問題ではない）。前後に 0.5 秒の無音を足すと、見本の4つのうち3つで全文が出た（足すと逆に落とす音声もある）。Android 版の途中表示も同じモデルなので、同じ直しが効く見込み
+    - 読み込み約2秒（録音を始めたときに裏で）、1回の認識 0.1〜0.2 秒
+  - 残り: モデルの選択（kotoba・turbo・SenseVoice・parakeet）とダウンロード（設定の画面、フェーズ7）、録音キーの変更
 
 ## 本人に確かめること（始める前に。答えは上）
 

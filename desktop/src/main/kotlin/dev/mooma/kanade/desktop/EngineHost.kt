@@ -161,8 +161,8 @@ class EngineHost(
             if (key.repeat || recording) return reply(id, emptyList(), true)
             activate(client)
             val commands = run(engine.commitAll())
-            recording = v.start()
-            view.voice(if (recording) "録音中" else "マイクを使えません")
+            recording = v.start { partial -> synchronized(lock) { if (recording) view.voice("🎤 $partial") } }
+            view.voice(if (recording) "🎤" else "マイクを使えません")
             return reply(id, commands, true)
         }
         if (!recording) {

@@ -57,7 +57,9 @@ private fun newHost(data: File, view: CandidateView = object : CandidateView {})
     }
     val whisperLibrary = DesktopVoice.libraryFile()
     val whisperModel = File(data, WHISPER_MODEL)
-    val voice = if (whisperLibrary.exists() && whisperModel.exists()) DesktopVoice(whisperLibrary, whisperModel, ::log) else {
+    val reazon = ReazonPartial(File(data, "reazonspeech"), ::log).takeIf { it.isReady }
+    if (reazon == null) log("話しながらの途中の文字なし（${File(data, "reazonspeech").path}）")
+    val voice = if (whisperLibrary.exists() && whisperModel.exists()) DesktopVoice(whisperLibrary, whisperModel, ::log, reazon) else {
         log("音声入力なし（${whisperLibrary.path}、モデル ${whisperModel.path}）")
         null
     }
@@ -147,6 +149,16 @@ private fun zenzCheck(data: File, readings: List<String>) {
 
 private fun voiceCheck(data: File, args: List<String>) {
     val voice = DesktopVoice(DesktopVoice.libraryFile(), File(data, WHISPER_MODEL), ::log)
+    if (args.firstOrNull() == "--reazon") {
+        val reazon = ReazonPartial(File(data, "reazonspeech"), ::log)
+        for (wav in args.drop(1)) {
+            val bytes = File(wav).readBytes().let { it.copyOfRange(44, it.size) }
+            val pcm = FloatArray(bytes.size / 2) { i -> ((bytes[2 * i].toInt() and 0xFF) or (bytes[2 * i + 1].toInt() shl 8)).toShort() / 32768f }
+            val started = System.nanoTime()
+            println("$wav: ${reazon.recognize(pcm)} (${(System.nanoTime() - started) / 1_000_000}ms)")
+        }
+        return
+    }
     if (args.firstOrNull() == "--mic") {
         val seconds = args.getOrNull(1)?.toLongOrNull() ?: 3
         if (!voice.start()) return

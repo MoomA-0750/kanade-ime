@@ -10,8 +10,8 @@ import javax.sound.sampled.TargetDataLine
 
 /** 音声入力（録音キーを押している間だけ録音し、離したら文字にする） */
 interface VoiceService {
-    /** 録音を始める。マイクが使えなければ false */
-    fun start(): Boolean
+    /** 録音を始める。マイクが使えなければ false。話しながらの途中の文字は [onPartial] で返す（裏のスレッドから） */
+    fun start(onPartial: (String) -> Unit = {}): Boolean
 
     /** 録音を止めて文字にする。結果（文字にできなければ null）は裏のスレッドから [onText] で返す */
     fun stop(onText: (String?) -> Unit)
@@ -21,7 +21,14 @@ interface VoiceService {
  * マイク（javax.sound）と whisper.cpp（kanade_whisper.dll）での音声入力。Android 版の「確定の文」を whisper で作るのと同じ。
  * モデルは最初に使うときに読み、5分使わなければ放す（Android 版と同じ）。話した句読点（「まる」→「。」）も同じく直す
  */
-class DesktopVoice(private val library: File, private val model: File, private val log: (String) -> Unit) : VoiceService {
+class DesktopVoice(
+    private val library: File,
+    private val model: File,
+    private val log: (String) -> Unit,
+    /** 話しながらの途中の文字（なければ出さない） */
+    private val partial: ReazonPartial? = null,
+) : VoiceService {
+    @Volatile private var lastPartial: String? = null
     private val worker = Executors.newSingleThreadScheduledExecutor { Thread(it, "whisper").apply { isDaemon = true } }
     private var unload: java.util.concurrent.ScheduledFuture<*>? = null
     private var whisper: WhisperModel? = null
@@ -30,7 +37,7 @@ class DesktopVoice(private val library: File, private val model: File, private v
     private var recordThread: Thread? = null
     private val samples = java.io.ByteArrayOutputStream()
 
-    override fun start(): Boolean {
+    override fun start(onPartial: (String) -> Unit): Boolean {
         if (line != null) return true
         val format = AudioFormat(WhisperModel.SAMPLE_RATE.toFloat(), 16, 1, true, false)
         val l = runCatching { AudioSystem.getTargetDataLine(format).apply { open(format) } }.getOrElse {
@@ -49,6 +56,21 @@ class DesktopVoice(private val library: File, private val model: File, private v
         }, "record").apply { isDaemon = true; start() }
         // 録っているあいだにモデルを読んでおく（離してから待たせない）
         worker.execute { model() }
+        lastPartial = null
+        val partial = partial
+        if (partial != null && partial.isReady) {
+            Thread({
+                while (line === l) {
+                    Thread.sleep(PARTIAL_INTERVAL_MS)
+                    if (line !== l) break
+                    val pcm = snapshot(samples = PARTIAL_MAX_SECONDS * WhisperModel.SAMPLE_RATE)
+                    val text = runCatching { partial.recognize(pcm) }.getOrNull() ?: continue
+                    if (line !== l) break
+                    lastPartial = text
+                    onPartial(SpokenPunctuation.apply(text))
+                }
+            }, "partial").apply { isDaemon = true; start() }
+        }
         return true
     }
 
@@ -68,8 +90,19 @@ class DesktopVoice(private val library: File, private val model: File, private v
             val started = System.nanoTime()
             val text = runCatching { model()?.transcribe(pcm) }.onFailure { log("whisper: $it") }.getOrNull()
             log("whisper ${pcm.size / WhisperModel.SAMPLE_RATE.toFloat()}秒 -> ${(System.nanoTime() - started) / 1_000_000}ms ${text ?: "（なし）"}")
-            onText(text?.let { SpokenPunctuation.apply(it) })
+            // 確定の文が作れなければ、話している途中に出していた文を使う（Android 版と同じ）
+            onText((text ?: lastPartial)?.let { SpokenPunctuation.apply(it) })
             scheduleUnload()
+        }
+    }
+
+    /** 録っている途中の音声（後ろの [samples] サンプルまで） */
+    private fun snapshot(samples: Int): FloatArray {
+        val bytes = synchronized(this.samples) { this.samples.toByteArray() }
+        val from = maxOf(0, bytes.size / 2 - samples)
+        return FloatArray(bytes.size / 2 - from) { i ->
+            val j = from + i
+            ((bytes[2 * j].toInt() and 0xFF) or (bytes[2 * j + 1].toInt() shl 8)).toShort() / 32768f
         }
     }
 
@@ -103,6 +136,11 @@ class DesktopVoice(private val library: File, private val model: File, private v
     }
 
     companion object {
+        /** 途中の文字を作る間隔（Android 版と同じ） */
+        private const val PARTIAL_INTERVAL_MS = 600L
+        /** 途中の文字は後ろの何秒だけで作るか（長く話しても重くならないように） */
+        private const val PARTIAL_MAX_SECONDS = 30
+
         /** 録れる長さの上限（2分） */
         private const val MAX_BYTES = WhisperModel.SAMPLE_RATE * 2 * 120
 
