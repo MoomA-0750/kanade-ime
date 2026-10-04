@@ -22,16 +22,20 @@ enum class WinToggle { RIGHT_ALT_TAP, CTRL_SPACE, F13 }
  * US 配列でも JIS 配列でも、右 Alt の単押し・Ctrl+Space・変換/無変換・半角/全角でオン/オフする。
  */
 class WinKeyMapper(var triggers: Set<WinToggle> = WinToggle.entries.toSet()) {
-    private var rightAltAlone = false
+    /**
+     * 右 Alt を押してから、Alt と一緒にほかのキーを押したか。右 Alt を離したとき、これが false なら単押し。
+     * 「押した」を見て決めないのは、TSF に直接対応したアプリ（RichEdit など）では Alt を押したことが DLL に届かず、離したことだけが届くため
+     */
+    private var altCombo = false
 
     /** null なら IME は関与しない（修飾キー単体など） */
     fun onKeyDown(key: WinKey): KeyInput? {
         val vk = key.vk
         if (vk == VK.RMENU) {
-            if (!key.repeat) rightAltAlone = true
+            if (!key.repeat) altCombo = false
             return null
         }
-        rightAltAlone = false
+        if (key.alt && vk !in MODIFIERS) altCombo = true
 
         when (vk) {
             VK.CONVERT, VK.KANA, VK.OEM_COPY, VK.IME_ON -> return KeyInput.SetJapanese(true)
@@ -71,15 +75,14 @@ class WinKeyMapper(var triggers: Set<WinToggle> = WinToggle.entries.toSet()) {
     }
 
     /** OnTestKeyUp 用: [onKeyUp] で切り替えになるか（状態は変えない） */
-    fun onKeyUpWouldToggle(key: WinKey) = key.vk == VK.RMENU && rightAltAlone && WinToggle.RIGHT_ALT_TAP in triggers
+    fun onKeyUpWouldToggle(key: WinKey) = key.vk == VK.RMENU && !altCombo && WinToggle.RIGHT_ALT_TAP in triggers
 
     /** 右 Alt の単押しが成立したら切り替えを返す */
     fun onKeyUp(key: WinKey): KeyInput? {
-        if (key.vk == VK.RMENU && rightAltAlone && WinToggle.RIGHT_ALT_TAP in triggers) {
-            rightAltAlone = false
-            return KeyInput.ToggleJapanese
-        }
-        return null
+        if (key.vk != VK.RMENU) return null
+        val toggle = onKeyUpWouldToggle(key)
+        altCombo = false
+        return if (toggle) KeyInput.ToggleJapanese else null
     }
 
     private companion object {

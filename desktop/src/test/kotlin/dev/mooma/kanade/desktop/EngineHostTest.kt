@@ -64,6 +64,15 @@ class EngineHostTest {
     }
 
     @Test
+    fun rightAltUpAloneTogglesEvenIfDownWasNotSeen() {
+        // RichEdit などでは Alt を押したことが届かない
+        val d = dll()
+        d.type("ab")
+        d.key(WinKey(false, VK.RMENU, 0, 0))
+        assertTrue(d.japanese)
+    }
+
+    @Test
     fun shortcutCommitsThenPasses() {
         val d = dll()
         d.type("{Henkan}ka{Ctrl+s}")

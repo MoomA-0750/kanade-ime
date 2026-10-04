@@ -122,7 +122,7 @@ class EngineHost(
      */
     private fun test(client: Client, key: WinKey): Boolean {
         if (!key.down) return mapper.onKeyUpWouldToggle(key)
-        // 状態（右 Alt の単押しの見張り）は OnKeyDown で同じキーをもう一度通しても同じになるので、ここで進めてよい
+        // 状態（右 Alt と一緒に押したか）は OnKeyDown で同じキーをもう一度通しても同じになるので、ここで進めてよい
         val input = mapper.onKeyDown(key) ?: return false
         return when (input) {
             is KeyInput.SetJapanese, KeyInput.ToggleJapanese -> true
