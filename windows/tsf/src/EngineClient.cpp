@@ -76,6 +76,9 @@ EngineClient::State EngineClient::EnsureConnected() {
         return State::Failed;
     }
     lastError_ = 0;
+    // 送るときにも時間の上限を付ける（エンジンが固まって受け取らなくなっても、アプリの UI のスレッドを止めない）
+    DWORD sendTimeout = 100;
+    setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&sendTimeout), sizeof(sendTimeout));
     socket_ = s;
     connected_ = true;
     reader_ = std::thread([this, s] { ReadLoop(s); });
@@ -104,7 +107,11 @@ bool EngineClient::Request(const std::string& type, std::vector<std::string> fie
     bool ok = cv_.wait_for(lock, std::chrono::milliseconds(timeoutMs), [&] { return gotReply_ || !connected_; }) && gotReply_;
     waitingId_ = 0;
     if (!ok) {
-        Log("no reply for %s %d", type.c_str(), id);
+        // 返事が間に合わなかったキーは素通しになるが、エンジンは処理しているかもしれない。食い違いを残さないよう、接続を切る
+        // （エンジンは切れた相手の入力を捨てる。次のキーでつなぎ直す）
+        Log("no reply for %s %d, disconnect", type.c_str(), id);
+        lock.unlock();
+        Close();
         return false;
     }
     *reply = std::move(reply_);
@@ -146,6 +153,8 @@ void EngineClient::ReadLoop(SOCKET s) {
         int n = recv(s, chunk, sizeof(chunk), 0);
         if (n <= 0) break;
         buffer.append(chunk, n);
+        // 改行の来ない行が溜まり続けたら、壊れた相手として切る
+        if (buffer.size() > (1 << 20)) break;
         size_t start = 0;
         for (size_t nl; (nl = buffer.find('\n', start)) != std::string::npos; start = nl + 1) {
             if (nl > start) OnLine(buffer.substr(start, nl - start));

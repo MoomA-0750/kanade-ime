@@ -8,6 +8,9 @@
 #   scripts/win.sh zenz             zenz（llama.cpp）の kanade_zenz.dll を to-fu でビルドし、%USERPROFILE%\kanade\native に置く（エンジンには -Dkanade.native で渡す）
 #   scripts/win.sh reg | unreg      ビルドした DLL を登録して日本語のキーボードの一覧に足す/外す（管理者。ssh は管理者で入る）
 #                                   使用中の DLL は上書きできないので、毎回別の名前（tsf-bin\kanade_tsf-<時刻>.dll）に写して登録し直す
+#   scripts/win.sh package          配布物（C:\Users\MoomA\kanade\dist\Kanade と Kanade-windows-x64.zip）を to-fu で作る
+#                                   jlink の実行環境（Temurin 21、kanade\jdk）・エンジン・ネイティブ・DLL（Release）・辞書・モデル・インストーラー
+#   scripts/win.sh install          作った配布物を to-fu に入れる（install.ps1。管理者。ssh は管理者で入る）
 #   scripts/win.sh start | stop     to-fu のログオン中のセッションでエンジンを常駐させる/止める（タスク KanadeEngine）
 #   scripts/win.sh type [--rich] '<キー列>'  試験の窓（kanade_typetest）をログオン中のセッションで開いて打ち、入力欄の中身を出す
 #   scripts/win.sh log              エンジンの記録を出す
@@ -81,6 +84,20 @@ JNI
     ps "\$bin = '$REMOTE\\tsf-bin'; New-Item -ItemType Directory -Force \$bin | Out-Null; \$dll = Join-Path \$bin ('kanade_tsf-' + (Get-Date -Format 'MMddHHmmss') + '.dll'); Copy-Item $REMOTE\\tsf-build\\kanade_tsf.dll \$dll; icacls \$bin /grant '*S-1-15-2-1:(OI)(CI)(RX)' '*S-1-15-2-2:(OI)(CI)(RX)' /T /Q | Out-Null; \$p = Start-Process regsvr32 -ArgumentList '/s',\$dll -Wait -PassThru; 'regsvr32 ' + \$p.ExitCode + ' ' + \$dll; \$tip = '0411:{92CD23E6-D514-4099-84D0-81969040EE41}{92A70E2C-B06A-4AD4-B6CB-7B6DF9CED95E}'; \$l = Get-WinUserLanguageList; \$ja = \$l | Where-Object LanguageTag -eq 'ja'; if (\$ja.InputMethodTips -notcontains \$tip) { \$ja.InputMethodTips.Add(\$tip); Set-WinUserLanguageList \$l -Force }; (Get-WinUserLanguageList | Where-Object LanguageTag -eq 'ja').InputMethodTips; Get-ChildItem \$bin -Filter *.dll | Sort-Object LastWriteTime -Descending | Select-Object -Skip 5 | Remove-Item -ErrorAction SilentlyContinue" ;;
   unreg)
     ps "\$tip = '0411:{92CD23E6-D514-4099-84D0-81969040EE41}{92A70E2C-B06A-4AD4-B6CB-7B6DF9CED95E}'; \$l = Get-WinUserLanguageList; \$ja = \$l | Where-Object LanguageTag -eq 'ja'; [void]\$ja.InputMethodTips.Remove(\$tip); Set-WinUserLanguageList \$l -Force; \$dll = (Get-ItemProperty 'HKLM:\\Software\\Classes\\CLSID\\{92CD23E6-D514-4099-84D0-81969040EE41}\\InprocServer32' -ErrorAction SilentlyContinue).'(default)'; if (\$dll) { \$p = Start-Process regsvr32 -ArgumentList '/s','/u',\$dll -Wait -PassThru; 'unregistered ' + \$p.ExitCode + ' ' + \$dll }" ;;
+  package)
+    "$0" tsf Release | tail -2
+    ./gradlew -q :desktop:installDist
+    A=app/build/generated/kanadeAssets
+    mkdir -p "$TMP/Kanade/data"
+    cp -r desktop/build/install/kanade-engine/lib "$TMP/Kanade/lib"
+    cp $A/system.kdic.kgz $A/connection.kcon.kgz $A/pos.kpos $A/symbol.ksym $A/emoji.ksym $A/zenz.gguf "$TMP/Kanade/data/"
+    cp windows/installer/install.ps1 windows/installer/uninstall.ps1 docs/THIRD-PARTY.md "$TMP/Kanade/"
+    tar -C "$TMP" -czf "$TMP/dist.tgz" Kanade
+    scp -q -o BatchMode=yes "$TMP/dist.tgz" windows/installer/package.ps1 "tofu:kanade/"
+    ps "Set-Location $REMOTE; if (Test-Path dist) { Remove-Item -Recurse -Force dist }; New-Item -ItemType Directory dist | Out-Null; tar -xzf dist.tgz -C dist; Remove-Item dist.tgz; powershell -NoProfile -ExecutionPolicy Bypass -File package.ps1" ;;
+  install)
+    "$0" stop >/dev/null
+    ps "powershell -NoProfile -ExecutionPolicy Bypass -File $REMOTE\\dist\\Kanade\\install.ps1" ;;
   start)
     # エンジンの起動の命令を HKCU\Software\Kanade\EngineCommand に書き（DLL がつながらないときに使う）、タスクで起動する
     ps "\$java = '$JBR\\bin\\javaw.exe'; \$jargs = '-Xmx512m -Dfile.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dsun.java2d.uiScale=1 -Dkanade.native=$REMOTE\\native -cp \"$REMOTE\\engine\\lib\\*\" dev.mooma.kanade.desktop.MainKt serve'; New-Item -Force HKCU:\\Software\\Kanade | Out-Null; Set-ItemProperty HKCU:\\Software\\Kanade EngineCommand ('\"' + \$java + '\" ' + \$jargs); \$a = New-ScheduledTaskAction -Execute \$java -Argument \$jargs; \$p = New-ScheduledTaskPrincipal -UserId \$env:USERNAME -LogonType Interactive -RunLevel Limited; Register-ScheduledTask -TaskName KanadeEngine -Action \$a -Principal \$p -Force | Out-Null; Start-ScheduledTask KanadeEngine; Start-Sleep 3; Get-Content -Encoding UTF8 \$env:LOCALAPPDATA\\Kanade\\engine.log -Tail 3" ;;

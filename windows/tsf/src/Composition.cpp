@@ -58,8 +58,15 @@ void TextService::ApplyInSession(TfEditCookie ec, ITfContext* context, const std
     for (const auto& c : commands) {
         const std::string& type = c[0];
         if (type == "compose" && c.size() >= 2) {
-            SetComposingText(ec, context, FromUtf8(c[1]), c.size() > 2 ? ToInt(c[2], -1) : -1, c.size() > 3 ? ToInt(c[3], -1) : -1,
-                             c.size() > 4 ? ParseSegments(c[4]) : std::vector<int>{});
+            // エンジンから自分から届いた入力中の文字には、届いた時点の印（@番号）が付く。そのあとキーを処理していたら古いので捨てる
+            size_t at = 1;
+            if (c[1].size() > 1 && c[1][0] == '@') {
+                if (std::stoull(c[1].substr(1)) != keySeq_) continue;
+                at = 2;
+            }
+            if (c.size() <= at) continue;
+            SetComposingText(ec, context, FromUtf8(c[at]), c.size() > at + 1 ? ToInt(c[at + 1], -1) : -1,
+                             c.size() > at + 2 ? ToInt(c[at + 2], -1) : -1, c.size() > at + 3 ? ParseSegments(c[at + 3]) : std::vector<int>{});
         } else if (type == "commit" && c.size() >= 2) {
             Commit(ec, context, FromUtf8(c[1]));
         } else if (type == "replace" && c.size() >= 4) {

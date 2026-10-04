@@ -10,7 +10,12 @@ namespace kanade {
 namespace {
 
 constexpr UINT WM_KANADE_PUSH = WM_APP + 1;
-constexpr wchar_t kWindowClass[] = L"KanadeTsfMessageWindow";
+// 窓のクラス名は DLL ごとに分ける（開発中に別の版の DLL が同じプロセスに読み込まれたとき、外れた DLL の窓の手続きを呼ばないように）
+const wchar_t* WindowClassName() {
+    static wchar_t name[64] = {};
+    if (!name[0]) swprintf_s(name, L"KanadeTsfMessageWindow_%p", static_cast<void*>(g_module));
+    return name;
+}
 // エンジンの返事を待つ長さ。これを過ぎたらキーを素通しにする（アプリを固めない）
 constexpr DWORD kTimeoutMs = 300;
 
@@ -104,9 +109,9 @@ STDMETHODIMP TextService::ActivateEx(ITfThreadMgr* threadMgr, TfClientId clientI
     WNDCLASSEXW wc = {sizeof(wc)};
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = g_module;
-    wc.lpszClassName = kWindowClass;
+    wc.lpszClassName = WindowClassName();
     RegisterClassExW(&wc);  // 2回目以降は失敗するが、登録済みなのでよい
-    window_ = CreateWindowExW(0, kWindowClass, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, g_module, nullptr);
+    window_ = CreateWindowExW(0, WindowClassName(), L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, g_module, nullptr);
     if (window_) SetWindowLongPtrW(window_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 
     ComPtr<ITfSource> source;
@@ -137,6 +142,15 @@ STDMETHODIMP TextService::ActivateEx(ITfThreadMgr* threadMgr, TfClientId clientI
 
 STDMETHODIMP TextService::Deactivate() {
     Log("deactivate");
+    pending_ = {};
+    if (composition_ && compositionContext_) {
+        // 入力中の文字をそのまま確定させる（下線つきのまま残らないように）
+        ComPtr<ITfContext> context = compositionContext_;
+        EditSync(context.Get(), TF_ES_READWRITE, [this](TfEditCookie ec) {
+            EndComposition(ec);
+            return S_OK;
+        });
+    }
     if (engine_) {
         engine_->Send({"bye"});
         engine_->Close();  // 読み取りのスレッドを止めてから窓を壊す（窓への投げ込みが残らないように）
@@ -181,12 +195,15 @@ bool TextService::Connect() {
 }
 
 STDMETHODIMP TextService::OnSetFocus(ITfDocumentMgr* focus, ITfDocumentMgr*) {
+    pending_ = {};
     // 別の入力欄へ移ったら、入力中の文字はそのまま確定させる（エンジンの入力は捨てる）
     if (composition_ && compositionContext_) {
         ComPtr<ITfContext> context = compositionContext_;
+        ComPtr<ITfComposition> captured = composition_;
         ComPtr<ITfTextInputProcessorEx> self(this);
-        auto* session = new EditSession([this, self](TfEditCookie ec) {
-            EndComposition(ec);
+        auto* session = new EditSession([this, self, captured](TfEditCookie ec) {
+            // 後回しになっているあいだに新しい入力欄で入力が始まっていたら、そちらには触らない
+            if (composition_.Get() == captured.Get()) EndComposition(ec);
             return S_OK;
         });
         HRESULT hr;
@@ -284,36 +301,95 @@ bool TextService::ProcessKey(ITfContext* context, const std::vector<std::string>
     return true;
 }
 
-BOOL TextService::TestKey(ITfContext* context, WPARAM wParam, LPARAM lParam, bool down) {
-    std::vector<std::string> fields = KeyFields(wParam, lParam, down);
-    // 同じキーをもう一度聞かれた（OnKeyDown の前に2回）ときは、取っておいた答えを返す
-    if (pending_.valid && pending_.fields == fields) return TRUE;
+TextService::KeyId TextService::MakeKeyId(WPARAM wParam, LPARAM lParam, bool down) {
+    // エンジンに送る中身（仮想キー・文字・修飾キー・連打か）で見分ける。lParam やメッセージの時刻は使わない
+    // （IMM のアプリでは OnTestKeyDown と OnKeyDown で lParam の印や時刻が違い、同じキーと見分けられず2回処理した）。
+    // 押し続けの連打は中身が同じだが、OnKeyDown で取っておいたものを使い切るので、次の打鍵とは混ざらない
+    return {KeyFields(wParam, lParam, down)};
+}
+
+void TextService::DropPending(ITfContext* context) {
+    // 書くものを残したまま捨てるときは、二重に処理しないよう、エンジンに送り直さずに書く
+    if (pending_.valid && !pending_.reply.commands.empty() && context) ApplyCommands(context, std::move(pending_.reply.commands), false);
     pending_ = {};
+}
+
+BOOL TextService::TestKey(ITfContext* context, WPARAM wParam, LPARAM lParam, bool down) {
+    KeyId id = MakeKeyId(wParam, lParam, down);
+    // 同じキーをもう一度聞かれた（OnKeyDown の前に2回）ときは、取っておいた答えを返す
+    if (pending_.valid && pending_.id == id) return TRUE;
+    DropPending(context);
     Reply reply;
-    if (!ProcessKey(context, fields, down, &reply)) return FALSE;
+    if (!ProcessKey(context, KeyFields(wParam, lParam, down), down, &reply)) {
+        EndCompositionLater();
+        return FALSE;
+    }
     // 使わず、書くものもないキーは、そのままアプリへ
     if (!reply.consumed && reply.commands.empty()) return FALSE;
     // 書くものがあるとき（使わないキーでも、入力中の文字を先に確定するなど）は OnKeyDown で書く
-    pending_ = {true, std::move(fields), std::move(reply)};
+    pending_ = {true, id, std::move(reply)};
     return TRUE;
 }
 
 void TextService::HandleKey(ITfContext* context, WPARAM wParam, LPARAM lParam, bool down, BOOL* eaten) {
-    std::vector<std::string> fields = KeyFields(wParam, lParam, down);
+    KeyId id = MakeKeyId(wParam, lParam, down);
     Reply reply;
-    if (pending_.valid && pending_.fields == fields) {
+    if (pending_.valid && pending_.id == id) {
         reply = std::move(pending_.reply);
         pending_ = {};
     } else {
-        pending_ = {};
-        if (!ProcessKey(context, fields, down, &reply)) return;
+        DropPending(context);
+        if (!ProcessKey(context, KeyFields(wParam, lParam, down), down, &reply)) {
+            EndCompositionLater();
+            return;
+        }
     }
+    keySeq_++;
     bool modeChanged = false;
+    bool hasCommands = !reply.commands.empty();
     for (const auto& c : reply.commands) modeChanged = modeChanged || c[0] == "mode";
-    if (!reply.commands.empty()) ApplyCommands(context, std::move(reply.commands), true);
+    if (hasCommands) ApplyCommands(context, std::move(reply.commands), true);
     // 「あ」「A」をカーソルの近くに出すため、切り替えたらカーソルの位置を送る
     if (modeChanged && context && !composition_) SendSelectionCaret(context);
     *eaten = reply.consumed;
+    // 入力中の文字を確定してからキーをアプリへ渡すとき、IMM のアプリ（一時的な文書）では FALSE を返してもキーが届かない。
+    // キーを食べて、確定のあとで同じキーを送り直す（送り直したキーは、入力中の文字がないのでそのままアプリへ届く）
+    if (down && !reply.consumed && hasCommands && context && IsTransitory(context)) {
+        *eaten = TRUE;
+        Resend(wParam, lParam);
+    }
+}
+
+void TextService::EndCompositionLater() {
+    // エンジンにつながらない・返事がないとき、入力中の文字をそのまま確定させる（下線つきのまま残らないように）
+    if (!composition_ || !compositionContext_) return;
+    ComPtr<ITfContext> context = compositionContext_;
+    ComPtr<ITfComposition> captured = composition_;
+    ComPtr<ITfTextInputProcessorEx> self(this);
+    auto* session = new EditSession([this, self, captured](TfEditCookie ec) {
+        if (composition_.Get() == captured.Get()) EndComposition(ec);
+        return S_OK;
+    });
+    HRESULT hr;
+    context->RequestEditSession(clientId_, session, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &hr);
+    session->Release();
+}
+
+bool TextService::IsTransitory(ITfContext* context) {
+    TF_STATUS status = {};
+    return SUCCEEDED(context->GetStatus(&status)) && (status.dwStaticFlags & TF_SS_TRANSITORY);
+}
+
+void TextService::Resend(WPARAM wParam, LPARAM lParam) {
+    INPUT in[2] = {};
+    for (int i = 0; i < 2; i++) {
+        in[i].type = INPUT_KEYBOARD;
+        in[i].ki.wVk = static_cast<WORD>(wParam);
+        in[i].ki.wScan = static_cast<WORD>((lParam >> 16) & 0xFF);
+        in[i].ki.dwFlags = (lParam & (1 << 24) ? KEYEVENTF_EXTENDEDKEY : 0) | (i == 1 ? KEYEVENTF_KEYUP : 0);
+    }
+    // 押して離すまでを送る（本物の「離した」が先に並んでいても、押したままにならないように）
+    SendInput(2, in, sizeof(INPUT));
 }
 
 void TextService::SendContext(ITfContext* context) {
@@ -392,14 +468,24 @@ void TextService::ApplyCommands(ITfContext* context, std::vector<Command> comman
         return S_OK;
     });
     HRESULT hr = E_FAIL;
-    context->RequestEditSession(clientId_, session, (sync ? TF_ES_SYNC : TF_ES_ASYNCDONTCARE) | TF_ES_READWRITE, &hr);
+    HRESULT requested = context->RequestEditSession(clientId_, session, (sync ? TF_ES_SYNC : TF_ES_ASYNCDONTCARE) | TF_ES_READWRITE, &hr);
+    if (sync && (FAILED(requested) || hr == TF_E_SYNCHRONOUS || hr == TF_E_LOCKED)) {
+        // 文書がロックされているなど、同期では書けないアプリ。命令を捨てずに非同期で頼み直す
+        Log("sync edit session refused %08lx %08lx, retry async", requested, hr);
+        requested = context->RequestEditSession(clientId_, session, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &hr);
+    }
     session->Release();
-    if (FAILED(hr)) Log("edit session failed %08lx", hr);
+    if (FAILED(requested) || FAILED(hr)) Log("edit session failed %08lx %08lx", requested, hr);
 }
 
 void TextService::OnPushMessage() {
     if (!engine_) return;
     for (auto& batch : engine_->TakePushes()) {
+        // 届いたあとにキーを処理していたら、この入力中の文字（並べ替えの結果など）は古い。確定の文やモードは捨てない
+        unsigned long long seq = keySeq_;
+        for (auto& c : batch) {
+            if (c[0] == "compose") c.insert(c.begin() + 1, "@" + std::to_string(seq));
+        }
         ComPtr<ITfContext> context = compositionContext_;
         if (!context && threadMgr_) {
             ComPtr<ITfDocumentMgr> doc;
@@ -441,7 +527,11 @@ STDMETHODIMP TextService::OnChange(REFGUID guid) {
     }
     VARIANT v;
     VariantInit(&v);
-    if (FAILED(openClose->GetValue(&v)) || v.vt != VT_I4) return S_OK;
+    if (FAILED(openClose->GetValue(&v))) return S_OK;
+    if (v.vt != VT_I4) {
+        VariantClear(&v);
+        return S_OK;
+    }
     bool on = v.lVal != 0;
     if (on != japanese_) {
         japanese_ = on;
