@@ -2,7 +2,7 @@
 # Windows 版を to-fu（Windows 11）で作って試す。手元（Linux）から ssh で投げる（emu.sh と同じやり方）
 #   scripts/win.sh engine           エンジン（Kotlin）を手元でビルドして to-fu へ送る
 #   scripts/win.sh data             辞書・zenz のモデルを to-fu の %LOCALAPPDATA%\Kanade\data へ送る
-#   scripts/win.sh tsf [Release]    TSF の DLL（windows/tsf）を to-fu の MSVC でビルドする
+#   scripts/win.sh tsf [Release [x86]]  TSF の DLL（windows/tsf）を to-fu の MSVC でビルドする（x86 は 32bit のアプリ用。DLL だけ）
 #   scripts/win.sh eng <args...>    to-fu でエンジンを動かす（例: eng type '{Henkan}nihongo'）
 #   scripts/win.sh whisper          whisper.cpp の kanade_whisper.dll を同じようにビルドして置く
 #   scripts/win.sh zenz             zenz（llama.cpp）の kanade_zenz.dll を to-fu でビルドし、%USERPROFILE%\kanade\native に置く（エンジンには -Dkanade.native で渡す）
@@ -46,7 +46,7 @@ case "$1" in
     ps "New-Item -ItemType Directory -Force $REMOTE | Out-Null"
     scp -q -o BatchMode=yes "$TMP/tsf.tgz" "tofu:kanade/tsf.tgz"
     ps "Set-Location $REMOTE; if (Test-Path tsf-src) { Remove-Item -Recurse -Force tsf-src }; tar -xzf tsf.tgz; Rename-Item tsf tsf-src; Remove-Item tsf.tgz"
-    ps "cmd /c $REMOTE\\tsf-src\\build.cmd $CONFIG" ;;
+    ps "cmd /c $REMOTE\\tsf-src\\build.cmd $CONFIG ${3:-}" ;;
   eng)
     shift
     args=""
@@ -86,6 +86,7 @@ JNI
     ps "\$tip = '0411:{92CD23E6-D514-4099-84D0-81969040EE41}{92A70E2C-B06A-4AD4-B6CB-7B6DF9CED95E}'; \$l = Get-WinUserLanguageList; \$ja = \$l | Where-Object LanguageTag -eq 'ja'; [void]\$ja.InputMethodTips.Remove(\$tip); Set-WinUserLanguageList \$l -Force; \$dll = (Get-ItemProperty 'HKLM:\\Software\\Classes\\CLSID\\{92CD23E6-D514-4099-84D0-81969040EE41}\\InprocServer32' -ErrorAction SilentlyContinue).'(default)'; if (\$dll) { \$p = Start-Process regsvr32 -ArgumentList '/s','/u',\$dll -Wait -PassThru; 'unregistered ' + \$p.ExitCode + ' ' + \$dll }" ;;
   package)
     "$0" tsf Release | tail -2
+    "$0" tsf Release x86 | tail -1
     ./gradlew -q :desktop:installDist
     A=app/build/generated/kanadeAssets
     mkdir -p "$TMP/Kanade/data"

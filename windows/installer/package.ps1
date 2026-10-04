@@ -8,6 +8,9 @@ $d = Join-Path $Root 'dist\Kanade'
 New-Item -ItemType Directory -Force (Join-Path $d 'native'), (Join-Path $d 'tsf') | Out-Null
 Copy-Item (Join-Path $Root 'native\kanade_zenz.dll'), (Join-Path $Root 'native\kanade_whisper.dll') (Join-Path $d 'native')
 Copy-Item (Join-Path $Root 'tsf-build-release\kanade_tsf.dll') (Join-Path $d 'tsf')
+# 32bit のアプリ用の DLL
+New-Item -ItemType Directory -Force (Join-Path $d 'tsf\x86') | Out-Null
+Copy-Item (Join-Path $Root 'tsf-build-x86\kanade_tsf.dll') (Join-Path $d 'tsf\x86')
 # 音声のモデルは、この PC に置いてあるもの（whisper small・ReazonSpeech）を写す
 $models = Join-Path $env:LOCALAPPDATA 'Kanade\data'
 if (Test-Path "$models\ggml-small-q5_1.bin") { Copy-Item "$models\ggml-small-q5_1.bin" (Join-Path $d 'data') }

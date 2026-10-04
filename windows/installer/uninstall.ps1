@@ -13,6 +13,9 @@ if ($ja -and $ja.InputMethodTips -contains $tip) {
     [void]$ja.InputMethodTips.Remove($tip)
     Set-WinUserLanguageList $list -Force
 }
+Get-ChildItem (Join-Path $dest 'tsf\x86') -Filter 'kanade_tsf-*.dll' -ErrorAction SilentlyContinue | ForEach-Object {
+    Start-Process (Join-Path $env:windir 'SysWOW64\regsvr32.exe') -ArgumentList '/s', '/u', "`"$($_.FullName)`"" -Wait
+}
 Get-ChildItem (Join-Path $dest 'tsf') -Filter 'kanade_tsf-*.dll' -ErrorAction SilentlyContinue | ForEach-Object {
     Start-Process regsvr32 -ArgumentList '/s', '/u', "`"$($_.FullName)`"" -Wait
 }
