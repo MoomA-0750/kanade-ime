@@ -16,5 +16,6 @@
 | SenseVoice-Small（FunAudioLLM、sherpa-onnx の int8 版 `sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17`） | 設定画面の「SenseVoice をダウンロード」で HuggingFace から落とす | モデルのライセンス（FunASR Model License）を公開前に確かめる | |
 | parakeet-tdt_ctc-0.6b-ja（NVIDIA、sherpa-onnx の int8 版 `sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8`） | 設定画面の「parakeet-ja をダウンロード」で HuggingFace から落とす | CC-BY-4.0（公開するなら表示が要る） | |
 | Material Symbols（Google、Rounded の 24px。`app/src/main/res/drawable/sym_*.xml` に変換して同梱） | リポジトリ・APK | Apache-2.0 | 画面キーボードと設定画面のアイコン |
+| FrequencyWords の英語の上位5万語（hermitdave/FrequencyWords、`content/2018/en/en_50k.txt`、コミット 525f9b5。OpenSubtitles 2018 由来） | ビルド時に取得して、グライド入力の英単語（`glide-en.txt`）として assets へ | CC BY-SA 4.0（コードは MIT） | 公開するときは出典の表示と、同じ許諾での単語リストの公開が要る |
 | Unicode の emoji-test.txt（Emoji 16.0） | ビルド時に取得して、絵文字パネルの並び（`emoji-panel.tsv`）にして assets へ | Unicode License v3 | |
 | 見本の音声 `eval/voice-sample-ja.wav` | リポジトリ・APK | Windows の音声合成（Microsoft Haruka）で作成 | 公開前に扱いを確かめる |
