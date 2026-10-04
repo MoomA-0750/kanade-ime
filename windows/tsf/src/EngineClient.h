@@ -54,6 +54,7 @@ private:
     ULONGLONG lastAttempt_ = 0;
     int nextId_ = 1;
     bool wsa_ = false;
+    int lastError_ = 0;
 
     std::mutex mutex_;
     std::condition_variable cv_;

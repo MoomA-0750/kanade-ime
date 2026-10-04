@@ -3,16 +3,16 @@
 #include <windows.h>
 #include <shlobj.h>
 
+#include <algorithm>
 #include <cstdarg>
 #include <cstdio>
-#include <share.h>
 #include <mutex>
 
 namespace kanade {
 
 namespace {
 std::once_flag g_once;
-FILE* g_file = nullptr;
+HANDLE g_file = INVALID_HANDLE_VALUE;
 
 void Open() {
     PWSTR local = nullptr;
@@ -27,13 +27,15 @@ void Open() {
     name = name ? name + 1 : exe;
     wchar_t path[MAX_PATH * 2];
     swprintf_s(path, L"%s\\%s-%lu.log", dir.c_str(), name, GetCurrentProcessId());
-    g_file = _wfsopen(path, L"ab", _SH_DENYNO);
+    // 同じプロセスに別の版の DLL が読み込まれていても書けるよう、共有して開く
+    g_file = CreateFileW(path, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_ALWAYS,
+                         FILE_ATTRIBUTE_NORMAL, nullptr);
 }
 }  // namespace
 
 void Log(const char* fmt, ...) {
     std::call_once(g_once, Open);
-    if (!g_file) return;
+    if (g_file == INVALID_HANDLE_VALUE) return;
     char buf[2048];
     va_list args;
     va_start(args, fmt);
@@ -41,10 +43,12 @@ void Log(const char* fmt, ...) {
     va_end(args);
     SYSTEMTIME t;
     GetLocalTime(&t);
-    static std::mutex m;
-    std::lock_guard lock(m);
-    fprintf(g_file, "%02d:%02d:%02d.%03d [%lu] %s\n", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds, GetCurrentThreadId(), buf);
-    fflush(g_file);
+    char line[2200];
+    int n = snprintf(line, sizeof(line), "%02d:%02d:%02d.%03d [%lu] %s\r\n", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds,
+                     GetCurrentThreadId(), buf);
+    if (n <= 0) return;
+    DWORD written = 0;
+    WriteFile(g_file, line, static_cast<DWORD>(std::min<size_t>(n, sizeof(line) - 1)), &written, nullptr);
 }
 
 }  // namespace kanade

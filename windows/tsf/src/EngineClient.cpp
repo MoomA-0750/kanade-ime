@@ -10,7 +10,7 @@ namespace kanade {
 namespace {
 std::string SocketPath() {
     PWSTR local = nullptr;
-    if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &local))) return {};
+    if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_NO_APPCONTAINER_REDIRECTION, nullptr, &local))) return {};
     std::wstring path = std::wstring(local) + L"\\Kanade\\engine.sock";
     CoTaskMemFree(local);
     // Java（エンジン）もソケットの場所を ANSI のコードページで渡すので、それに合わせる
@@ -47,9 +47,13 @@ EngineClient::State EngineClient::EnsureConnected() {
     addr.sun_family = AF_UNIX;
     memcpy(addr.sun_path, path.c_str(), path.size());
     if (connect(s, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
+        int error = WSAGetLastError();
+        if (error != lastError_) Log("connect failed %d", error);
+        lastError_ = error;
         closesocket(s);
         return State::Failed;
     }
+    lastError_ = 0;
     socket_ = s;
     connected_ = true;
     reader_ = std::thread([this, s] { ReadLoop(s); });

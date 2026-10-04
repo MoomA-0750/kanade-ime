@@ -29,6 +29,7 @@ class SocketServer(private val path: Path, private val host: EngineHost, private
         Files.createDirectories(path.parent)
         val server = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
         server.bind(UnixDomainSocketAddress.of(path))
+        if (System.getProperty("os.name").startsWith("Windows")) allowAppContainers()
         log("listening ${path.absolutePathString()}")
         Thread({
             while (true) {
@@ -41,6 +42,21 @@ class SocketServer(private val path: Path, private val host: EngineHost, private
     }
 
     private fun alive() = isAlive(path)
+
+    /**
+     * 隔離されたアプリ（スタートメニューの検索など、AppContainer で整合性が低い）からもつなげるようにする。
+     * ソケットへの接続には書き込みの権限が要るので、ALL APPLICATION PACKAGES（S-1-15-2-1・S-1-15-2-2）に許し、整合性を低にする
+     */
+    private fun allowAppContainers() {
+        val result = runCatching {
+            val p = ProcessBuilder(
+                "icacls", path.absolutePathString(), "/grant", "*S-1-15-2-1:(M)", "*S-1-15-2-2:(M)", "/setintegritylevel", "L",
+            ).redirectErrorStream(true).start()
+            val out = p.inputStream.readAllBytes()
+            if (p.waitFor() != 0) String(out) else null
+        }.getOrElse { it.toString() }
+        if (result != null) log("ソケットの権限を変えられない: $result")
+    }
 
     private fun serve(client: SocketClient) {
         log("client ${client.id} connected")
