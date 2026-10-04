@@ -68,6 +68,15 @@ bool Named(std::string name) {
         Pump(500);
         return true;
     }
+    // F12（録音キー）を2秒押し続ける
+    if (name == "f12hold") {
+        if (!Foreground()) return false;
+        Key(VK_F12, false);
+        Pump(2000);
+        Key(VK_F12, true);
+        Pump(40);
+        return true;
+    }
     std::vector<WORD> mods;
     for (size_t plus; (plus = name.find('+')) != std::string::npos; name = name.substr(plus + 1)) {
         std::string m = name.substr(0, plus);
@@ -77,7 +86,7 @@ bool Named(std::string name) {
         {"enter", VK_RETURN, false}, {"space", VK_SPACE, false}, {"bs", VK_BACK, false}, {"esc", VK_ESCAPE, false},
         {"left", VK_LEFT, true}, {"right", VK_RIGHT, true}, {"up", VK_UP, true}, {"down", VK_DOWN, true},
         {"henkan", VK_CONVERT, false}, {"muhenkan", VK_NONCONVERT, false}, {"f6", VK_F6, false}, {"f7", VK_F7, false},
-        {"f8", VK_F8, false}, {"f9", VK_F9, false}, {"f10", VK_F10, false}, {"ralt", VK_RMENU, true}, {"tab", VK_TAB, false},
+        {"f8", VK_F8, false}, {"f9", VK_F9, false}, {"f10", VK_F10, false}, {"f12", VK_F12, false}, {"ralt", VK_RMENU, true}, {"tab", VK_TAB, false},
     };
     for (auto& k : keys) {
         if (name == k.name) return Press(mods, k.vk, k.ext);

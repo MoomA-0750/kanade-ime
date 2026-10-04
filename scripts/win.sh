@@ -4,6 +4,7 @@
 #   scripts/win.sh data             辞書・zenz のモデルを to-fu の %LOCALAPPDATA%\Kanade\data へ送る
 #   scripts/win.sh tsf [Release]    TSF の DLL（windows/tsf）を to-fu の MSVC でビルドする
 #   scripts/win.sh eng <args...>    to-fu でエンジンを動かす（例: eng type '{Henkan}nihongo'）
+#   scripts/win.sh whisper          whisper.cpp の kanade_whisper.dll を同じようにビルドして置く
 #   scripts/win.sh zenz             zenz（llama.cpp）の kanade_zenz.dll を to-fu でビルドし、%USERPROFILE%\kanade\native に置く（エンジンには -Dkanade.native で渡す）
 #   scripts/win.sh reg | unreg      ビルドした DLL を登録して日本語のキーボードの一覧に足す/外す（管理者。ssh は管理者で入る）
 #                                   使用中の DLL は上書きできないので、毎回別の名前（tsf-bin\kanade_tsf-<時刻>.dll）に写して登録し直す
@@ -48,7 +49,8 @@ case "$1" in
     args=""
     for a in "$@"; do args+=" '${a//\'/\'\'}'"; done
     ps "\$env:JAVA_HOME='$JBR'; [Console]::OutputEncoding=[Text.Encoding]::UTF8; & $REMOTE\\engine\\bin\\kanade-engine.bat$args" ;;
-  zenz)
+  zenz|whisper)
+    LIB=$1
     # llama.cpp は大きいので、要らないもの（.git・models・docs）を除いて送る。JNI のヘッダーは手元の JDK から（jni_md.h は Windows 用に書く）
     mkdir -p "$TMP/src/jni/win32"
     cp "$JAVA_HOME/include/jni.h" "$TMP/src/jni/"
@@ -63,12 +65,18 @@ typedef long long jlong;
 typedef signed char jbyte;
 #endif
 JNI
-    tar -czf "$TMP/zenz.tgz" --exclude=.git --exclude='third_party/llama.cpp/models' --exclude='third_party/llama.cpp/docs' \
-      native/CMakeLists.txt native/zenz_bridge.cpp native/build-windows.cmd third_party/llama.cpp -C "$TMP/src" jni
+    if [ "$LIB" = zenz ]; then
+      tar -czf "$TMP/zenz.tgz" --exclude=.git --exclude='third_party/llama.cpp/models' --exclude='third_party/llama.cpp/docs' \
+        native/CMakeLists.txt native/zenz_bridge.cpp native/build-windows.cmd third_party/llama.cpp -C "$TMP/src" jni
+    else
+      tar -czf "$TMP/zenz.tgz" --exclude=.git --exclude='third_party/whisper.cpp/models' --exclude='third_party/whisper.cpp/examples' \
+        --exclude='third_party/whisper.cpp/bindings' --exclude='third_party/whisper.cpp/samples' \
+        native/whisper native/build-windows.cmd third_party/whisper.cpp -C "$TMP/src" jni
+    fi
     ps "New-Item -ItemType Directory -Force $REMOTE\\zenz-src | Out-Null"
     scp -q -o BatchMode=yes "$TMP/zenz.tgz" "tofu:kanade/zenz-src/zenz.tgz"
     ps "Set-Location $REMOTE\\zenz-src; Remove-Item -Recurse -Force native,third_party,jni -ErrorAction SilentlyContinue; tar -xzf zenz.tgz; Remove-Item zenz.tgz"
-    ps "cmd /c $REMOTE\\zenz-src\\native\\build-windows.cmd $REMOTE\\zenz-src $REMOTE\\zenz-src\\jni 2>&1 | Select-Object -Last 5; New-Item -ItemType Directory -Force $REMOTE\\native | Out-Null; Copy-Item $REMOTE\\zenz-src\\build-zenz\\kanade_zenz.dll $REMOTE\\native\\ -Force; Get-Item $REMOTE\\native\\kanade_zenz.dll | Select-Object Name,Length" ;;
+    ps "cmd /c $REMOTE\\zenz-src\\native\\build-windows.cmd $REMOTE\\zenz-src $REMOTE\\zenz-src\\jni $LIB 2>&1 | Select-Object -Last 5; New-Item -ItemType Directory -Force $REMOTE\\native | Out-Null; Copy-Item $REMOTE\\zenz-src\\build-$LIB\\kanade_$LIB.dll $REMOTE\\native\\ -Force; Get-Item $REMOTE\\native\\kanade_$LIB.dll | Select-Object Name,Length" ;;
   reg)
     ps "\$bin = '$REMOTE\\tsf-bin'; New-Item -ItemType Directory -Force \$bin | Out-Null; \$dll = Join-Path \$bin ('kanade_tsf-' + (Get-Date -Format 'MMddHHmmss') + '.dll'); Copy-Item $REMOTE\\tsf-build\\kanade_tsf.dll \$dll; icacls \$bin /grant '*S-1-15-2-1:(OI)(CI)(RX)' '*S-1-15-2-2:(OI)(CI)(RX)' /T /Q | Out-Null; \$p = Start-Process regsvr32 -ArgumentList '/s',\$dll -Wait -PassThru; 'regsvr32 ' + \$p.ExitCode + ' ' + \$dll; \$tip = '0411:{92CD23E6-D514-4099-84D0-81969040EE41}{92A70E2C-B06A-4AD4-B6CB-7B6DF9CED95E}'; \$l = Get-WinUserLanguageList; \$ja = \$l | Where-Object LanguageTag -eq 'ja'; if (\$ja.InputMethodTips -notcontains \$tip) { \$ja.InputMethodTips.Add(\$tip); Set-WinUserLanguageList \$l -Force }; (Get-WinUserLanguageList | Where-Object LanguageTag -eq 'ja').InputMethodTips; Get-ChildItem \$bin -Filter *.dll | Sort-Object LastWriteTime -Descending | Select-Object -Skip 5 | Remove-Item -ErrorAction SilentlyContinue" ;;
   unreg)

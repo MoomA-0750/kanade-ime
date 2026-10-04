@@ -93,6 +93,11 @@ windows/installer/   DLL の登録（regsvr32）、エンジンをログオン�
   - JNI のヘッダーは JBR にないので、手元の JDK の jni.h と Windows 用の jni_md.h を送る
   - 残り: GGML_NATIVE で to-fu の CPU（AVX2）向けにビルドしている。配るときは CPU の機能で切り替える形にする（フェーズ7）。クリックで候補を選ぶ（WS_EX_NOACTIVATE のためのネイティブの部品）も残り
 
+- フェーズ6 第1弾（2026-10-05 夜）: 録音キー（F12、Android 版の既定と同じ）を押している間だけ録音し、離したら whisper small で句読点付きの文にして確定する（`DesktopVoice.kt`）。録音は javax.sound（16kHz モノラル）。whisper.cpp は zenz と同じく MSVC でビルド（`scripts/win.sh whisper`）。話した句読点（「まる」→「。」）も Android 版と同じく直す
+  - 測った: 8.8 秒の見本の音声を約 1.0 秒（Ryzen 7 3700X、8スレッド）。モデルの読み込み約 0.2 秒（録音を始めたときに裏で読む）。5分使わなければ放す
+  - 試験: `-Dkanade.voiceWav=<wav>` で録った音の代わりに wav を使える（声を出さずに、F12 → 認識 → アプリへの確定まで通しで確かめた）。`kanade-engine voice <wav> | --mic 秒`
+  - 残り: 話しながら途中の文字を出す（sherpa-onnx の ReazonSpeech。Java 版の sherpa-onnx を Windows で使う）、モデルの選択（kotoba・turbo・SenseVoice・parakeet）とダウンロード（設定の画面、フェーズ7）、録音キーの変更
+
 ## 本人に確かめること（始める前に。答えは上）
 
 - to-fu で、作った IME の DLL を登録してよいか（`regsvr32` は管理者権限が要る。登録すると全アプリに読み込まれる。登録の解除で戻せる）

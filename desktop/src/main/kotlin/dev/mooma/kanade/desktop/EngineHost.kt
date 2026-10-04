@@ -20,6 +20,8 @@ interface CandidateView {
     /** 入力中の文字の、画面上の位置（DLL が ITfContextView::GetTextExt で取ったもの） */
     fun caret(left: Int, top: Int, right: Int, bottom: Int) {}
     fun mode(japanese: Boolean) {}
+    /** 音声入力の様子（「録音中」「認識中」）。null で消す */
+    fun voice(status: String?) {}
 }
 
 /** 言語モデルでの並べ替え（zenz）。重いので裏のスレッドから呼ぶ。できなければ null */
@@ -41,6 +43,9 @@ class EngineHost(
     val engine: InputEngine,
     private val view: CandidateView = object : CandidateView {},
     private val reranker: RerankService? = null,
+    private val voice: VoiceService? = null,
+    /** 録音キー（押している間だけ録音）。Android 版と同じ F12 */
+    private val voiceKey: Int = VK.F12,
 ) {
     private val lock = Any()
     private val mapper = WinKeyMapper()
@@ -124,6 +129,7 @@ class EngineHost(
      * 回したキーでも、エンジンが使わなければ OnKeyDown で素通しにする（そのときアプリへ届く）ので、多めに答えてよい
      */
     private fun test(client: Client, key: WinKey): Boolean {
+        if (voice != null && key.vk == voiceKey) return true
         if (!key.down) return mapper.onKeyUpWouldToggle(key)
         // 状態（右 Alt と一緒に押したか）は OnKeyDown で同じキーをもう一度通しても同じになるので、ここで進めてよい
         val input = mapper.onKeyDown(key) ?: return false
@@ -138,11 +144,45 @@ class EngineHost(
     }
 
     private fun key(client: Client, id: Int, key: WinKey): List<String> {
+        if (voice != null && key.vk == voiceKey) return voiceKey(client, id, key)
         val input = if (key.down) mapper.onKeyDown(key) else mapper.onKeyUp(key)
         if (input == null) return reply(id, emptyList(), false)
         activate(client)
         val result = engine.handle(input)
         return reply(id, run(result.commands), result.consumed)
+    }
+
+    private var recording = false
+
+    /** 録音キー: 押したら（入力中の文字を確定して）録音を始め、離したら文字にして、そのときの相手の DLL へ確定を送る */
+    private fun voiceKey(client: Client, id: Int, key: WinKey): List<String> {
+        val v = voice ?: return reply(id, emptyList(), false)
+        if (key.down) {
+            if (key.repeat || recording) return reply(id, emptyList(), true)
+            activate(client)
+            val commands = run(engine.commitAll())
+            recording = v.start()
+            view.voice(if (recording) "録音中" else "マイクを使えません")
+            return reply(id, commands, true)
+        }
+        if (!recording) {
+            view.voice(null)
+            return reply(id, emptyList(), true)
+        }
+        recording = false
+        view.voice("認識中")
+        v.stop { text ->
+            synchronized(lock) {
+                view.voice(null)
+                val target = active ?: return@synchronized
+                if (text.isNullOrEmpty()) return@synchronized
+                // 認識しているあいだに打ち始めていたら、その文字を先に確定する
+                val commands = run(engine.commitAll()) + ImeCommand.Commit(text)
+                engine.leftContext = (engine.leftContext + text).takeLast(InputEngine.MAX_CONTEXT)
+                target.send(reply(0, commands, false))
+            }
+        }
+        return reply(id, emptyList(), true)
     }
 
     /** 命令のうち、DLL に送らずエンジンで済ませるもの（候補の窓・並べ替え）を片付け、残りを返す */

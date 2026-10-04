@@ -25,6 +25,7 @@ fun main(args: Array<String>) {
         "type" -> typeLocal(data, opts.drop(1))
         "send" -> sendOverSocket(socket, opts.drop(1))
         "zenz" -> zenzCheck(data, opts.drop(1))
+        "voice" -> voiceCheck(data, opts.drop(1))
         else -> {
             println(
                 """
@@ -32,6 +33,7 @@ fun main(args: Array<String>) {
                 kanade-engine type [--data DIR] <キー列>...         エンジンを同じプロセスで動かし、キー列を流して結果を出す
                 kanade-engine send [--socket PATH] <キー列>...      動いているエンジンへソケット越しにキー列を流す
                 kanade-engine zenz [--data DIR] <読み>...           zenz を読み、辞書の候補を並べ替えた結果を出す（ネイティブの確認）
+                kanade-engine voice [--data DIR] <wav> | --mic 秒    whisper で wav（16kHz モノラル）を文字にする / マイクで録って文字にする
                 キー列: 文字はそのまま、特別なキーは {Space} {Enter} {BS} {Esc} {F7} {Ctrl+Space} {RAlt} {Henkan} など
                 """.trimIndent(),
             )
@@ -53,8 +55,17 @@ private fun newHost(data: File, view: CandidateView = object : CandidateView {})
         log("zenz なし（${library.path}、モデル ${model?.path}）")
         null
     }
-    return EngineHost(InputEngine(candidateSource = source), view, reranker)
+    val whisperLibrary = DesktopVoice.libraryFile()
+    val whisperModel = File(data, WHISPER_MODEL)
+    val voice = if (whisperLibrary.exists() && whisperModel.exists()) DesktopVoice(whisperLibrary, whisperModel, ::log) else {
+        log("音声入力なし（${whisperLibrary.path}、モデル ${whisperModel.path}）")
+        null
+    }
+    return EngineHost(InputEngine(candidateSource = source), view, reranker, voice)
 }
+
+/** 音声入力のモデル（Android 版の既定と同じ whisper small）。設定の画面で選べるようにするのはフェーズ7 */
+private const val WHISPER_MODEL = "ggml-small-q5_1.bin"
 
 private fun serve(data: File, socket: Path) {
     // DLL が javaw で起動する（コンソールがない）ので、記録は自分でファイルに書く。1MB を超えたら前のものは捨てる
@@ -132,4 +143,18 @@ private fun zenzCheck(data: File, readings: List<String>) {
         val ranked = reranker.rerank(dev.mooma.kanade.core.ImeCommand.RequestRerank(1, "", reading, candidates))
         println("$reading: 辞書 $candidates -> zenz $ranked (${(System.nanoTime() - started) / 1_000_000}ms)")
     }
+}
+
+private fun voiceCheck(data: File, args: List<String>) {
+    val voice = DesktopVoice(DesktopVoice.libraryFile(), File(data, WHISPER_MODEL), ::log)
+    if (args.firstOrNull() == "--mic") {
+        val seconds = args.getOrNull(1)?.toLongOrNull() ?: 3
+        if (!voice.start()) return
+        Thread.sleep(seconds * 1000)
+        val done = java.util.concurrent.CountDownLatch(1)
+        voice.stop { println("マイク: ${it ?: "（なし）"}"); done.countDown() }
+        done.await()
+        return
+    }
+    for (wav in args) println("$wav: ${voice.transcribeWav(File(wav))}")
 }

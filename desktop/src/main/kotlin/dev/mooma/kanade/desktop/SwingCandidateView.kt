@@ -33,8 +33,8 @@ class SwingCandidateView : CandidateView {
     private val dim = if (dark) Color(0x99, 0x99, 0x99) else Color(0x88, 0x88, 0x88)
     private val selectedBg = if (dark) Color(0x2E, 0x5C, 0x8A) else Color(0xC8, 0xDD, 0xF5)
     private val border = if (dark) Color(0x44, 0x44, 0x48) else Color(0xD8, 0xD8, 0xDC)
-    private val font = Font("Yu Gothic UI", Font.PLAIN, px(15))
-    private val small = Font("Yu Gothic UI", Font.PLAIN, px(11))
+    private val textFont = Font("Yu Gothic UI", Font.PLAIN, px(15))
+    private val smallFont = Font("Yu Gothic UI", Font.PLAIN, px(11))
 
     private var caret = Rectangle(100, 100, 0, 20)
     private var modeShownAt = 0L
@@ -81,6 +81,18 @@ class SwingCandidateView : CandidateView {
         modeShownAt = System.currentTimeMillis()
         // 位置が届かないアプリもあるので、少し待って届かなければ前の位置に出す
         Timer(120) { pendingMode?.let { showMode(it); pendingMode = null } }.apply { isRepeats = false }.start()
+    }
+
+    override fun voice(status: String?) = SwingUtilities.invokeLater {
+        if (status == null) {
+            modeWindow.isVisible = false
+            return@invokeLater
+        }
+        modeTimer.stop()
+        modeLabel.text = status
+        modeWindow.size = modeLabel.preferredSize
+        place(modeWindow)
+        modeWindow.isVisible = true
     }
 
     private fun showMode(japanese: Boolean) {
@@ -141,8 +153,8 @@ class SwingCandidateView : CandidateView {
         private val pageItems get() = items.subList(pageStart, minOf(items.size, pageStart + PAGE))
 
         private fun measure(): Dimension {
-            val fm = getFontMetrics(font)
-            val sm = getFontMetrics(small)
+            val fm = getFontMetrics(textFont)
+            val sm = getFontMetrics(smallFont)
             val numberWidth = fm.stringWidth("9") + padX
             val textWidth = pageItems.maxOfOrNull { fm.stringWidth(it) } ?: 0
             val labelWidth = pageItems.indices.maxOfOrNull { i -> labels.getOrNull(pageStart + i)?.let { sm.stringWidth(it) + padX } ?: 0 } ?: 0
@@ -154,8 +166,8 @@ class SwingCandidateView : CandidateView {
         override fun paintComponent(g0: Graphics) {
             val g = antialias(g0)
             roundBackground(g, width, height)
-            val fm = getFontMetrics(font)
-            val sm = getFontMetrics(small)
+            val fm = getFontMetrics(textFont)
+            val sm = getFontMetrics(smallFont)
             val numberWidth = fm.stringWidth("9") + padX
             var y = px(4)
             for ((i, text) in pageItems.withIndex()) {
@@ -165,13 +177,13 @@ class SwingCandidateView : CandidateView {
                     g.fillRoundRect(px(4), y, width - px(8), rowHeight, px(6), px(6))
                 }
                 val baseline = y + (rowHeight + fm.ascent - fm.descent) / 2
-                g.font = font
+                g.font = textFont
                 g.color = dim
                 g.drawString("${i + 1}", padX, baseline)
                 g.color = fg
                 g.drawString(text, padX + numberWidth, baseline)
                 labels.getOrNull(index)?.let { label ->
-                    g.font = small
+                    g.font = smallFont
                     g.color = dim
                     g.drawString(label, width - padX - sm.stringWidth(label), baseline)
                 }
@@ -179,7 +191,7 @@ class SwingCandidateView : CandidateView {
             }
             if (items.size > PAGE) {
                 val page = "${selected + 1}/${items.size}"
-                g.font = small
+                g.font = smallFont
                 g.color = dim
                 g.drawString(page, width - padX - sm.stringWidth(page), y + sm.ascent + px(2))
             }
@@ -190,6 +202,8 @@ class SwingCandidateView : CandidateView {
         var text = "あ"
             set(value) {
                 field = value
+                val w = getFontMetrics(textFont).stringWidth(value) + px(16)
+                preferredSize = Dimension(maxOf(px(30), w), px(30))
                 repaint()
             }
 
@@ -200,7 +214,7 @@ class SwingCandidateView : CandidateView {
         override fun paintComponent(g0: Graphics) {
             val g = antialias(g0)
             roundBackground(g, width, height)
-            g.font = font
+            g.font = textFont
             g.color = fg
             val fm = g.fontMetrics
             g.drawString(text, (width - fm.stringWidth(text)) / 2, (height + fm.ascent - fm.descent) / 2)
