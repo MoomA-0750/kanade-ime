@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import dev.mooma.kanade.LAYOUTS
 import dev.mooma.kanade.KanadeSettings
 import dev.mooma.kanade.ToggleTrigger
 import java.io.File
@@ -110,9 +111,25 @@ fun ColumnScope.KeyboardScreen() {
         )
     }
 
-    Section("配列", "キーボードの左下のキーを上に払っても、グライド → フルキー → テンキーの順に切り替わります（グライドは ?123、フルキーは Ctrl、テンキーは「あa1」）。") {
+    Section("配列", "キーボードの左下のキー（グライドは ?123、フルキーは Ctrl、テンキーは「あa1」）を上に払うと、使う配列の中で次の配列に切り替わります。") {
+        val names = mapOf("GLIDE" to "グライド", "QWERTY" to "フルキー", "FLICK" to "テンキー")
+        var enabled by rememberPref({ settings.enabledLayouts }, { settings.enabledLayouts = it })
         var layout by rememberPref({ settings.softKeyboardLayout }, { settings.softKeyboardLayout = it })
-        ConnectedChoices(listOf("GLIDE" to "グライド", "QWERTY" to "フルキー", "FLICK" to "テンキー"), layout, { layout = it })
+        Note("使う配列（左下のキーで切り替えるときは、この中だけを回ります）")
+        for (id in LAYOUTS) {
+            SwitchRow(names.getValue(id), id in enabled, { on ->
+                // 最後の1つは外せない
+                val next = if (on) enabled + id else enabled - id
+                if (next.isNotEmpty()) {
+                    enabled = next
+                    if (layout !in next) layout = LAYOUTS.first { it in next }
+                }
+            })
+        }
+        if (enabled.size > 1) {
+            Note("いまの配列")
+            ConnectedChoices(LAYOUTS.filter { it in enabled }.map { it to names.getValue(it) }, layout, { layout = it })
+        }
         Note(
             when (layout) {
                 "GLIDE" -> "QWERTY の文字のキーの上を指でなぞると、語を入れます（日本語はローマ字でなぞると、かなになります）。数字・記号は ?123 のページにあります。"

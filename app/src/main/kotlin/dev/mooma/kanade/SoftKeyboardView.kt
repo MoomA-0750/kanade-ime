@@ -45,6 +45,8 @@ class SoftKeyboardView(
         val ys: FloatArray,
         val keys: Map<Char, Pair<Float, Float>>,
         val keyWidth: Float,
+        /** キーの高さ（段の間隔） */
+        val keyHeight: Float,
         /** Shift が効いていた（英語なら頭を大文字にする） */
         val shift: Boolean,
     )
@@ -536,7 +538,7 @@ class SoftKeyboardView(
                     xs += event.getX(i)
                     ys += event.getY(i)
                     val unit = (width - gap) / 10f
-                    onGlide(GlideInput(xs.toFloatArray(), ys.toFloatArray(), letterCenters(), unit, isOn(Mod.SHIFT)))
+                    onGlide(GlideInput(xs.toFloatArray(), ys.toFloatArray(), letterCenters(), unit, rowHeight, isOn(Mod.SHIFT)))
                     consumeOnceModifiers()
                     fadeTrail()
                     syncLatchedPills()

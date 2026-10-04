@@ -38,6 +38,12 @@ const val EMOJI_TEST_SHA256 = "24f0c534e86cf142e2496953e8f0e46a3e702392911eddcd2
 const val ENGLISH_WORDS_URL = "https://raw.githubusercontent.com/hermitdave/FrequencyWords/525f9b560de45753a5ea01069454e72e9aa541c6/content/2018/en/en_50k.txt"
 const val ENGLISH_WORDS_SHA256 = "5351ff405b1126ef555791dd4d9798a48e3e9a501a9fc481a9da957752cfb458"
 
+/** 英単語のふるい（SCOWL 2020.12.07。英語として正しい語だけを残し、字幕の切れ端（ust など）や人名を外す） */
+const val SCOWL_URL = "https://downloads.sourceforge.net/project/wordlist/SCOWL/2020.12.07/scowl-2020.12.07.tar.gz"
+const val SCOWL_SHA256 = "5587667caa20c4891390c2d42dbb4d5c4c3f41bee77af1457ece3ba23fb859cc"
+/** SCOWL の大きさ（よく使う語から順に 10〜95。70 は大きめの辞書にあたる） */
+val SCOWL_SIZES = listOf(10, 20, 35, 40, 50, 55, 60, 70)
+
 /** グライド入力の日本語に入れる読みの数（よく使うものから） */
 const val GLIDE_JAPANESE_READINGS = 60000
 
@@ -58,7 +64,8 @@ fun main(args: Array<String>) {
         "zenz" -> zenzTry(File(args[1]), File(args[2]), File(args[3]), args.drop(4))
         "eval-context" -> evaluateContext(File(args[1]), File(args[2]), File(args[3]), File(args[4]))
         "whisper" -> whisperTry(File(args[1]), File(args[2]), args.drop(3).map(::File))
-        "eval-glide" -> evaluateGlide(File(args[1]), args.getOrNull(2)?.toFloat() ?: 0.2f)
+        "eval-glide" -> evaluateGlide(File(args[1]), args.getOrNull(2)?.toFloat() ?: 0.25f)
+        "tune-glide" -> tuneGlide(File(args[1]), args.getOrNull(2)?.toFloat() ?: 0.25f)
         "eval-zenz" -> evaluateZenz(File(args[1]), File(args[2]), File(args[3]), File(args[4]), args.getOrNull(5)?.toInt() ?: 10, args.getOrNull(6)?.toFloat() ?: 1.0f)
         else -> {
             System.err.println(
@@ -70,7 +77,8 @@ fun main(args: Array<String>) {
                   build <mozcDir> <outDir>      system.kdic と connection.kcon を書く
                   eval <outDir> <evaluation.tsv> Mozc の評価セットで1位一致率などを測る
                   convert <outDir> <かな...>     変換を試す
-                  eval-glide <assetsDir> [ゆれ]  グライドの読み取りを、キーの中心を結んで揺らした軌跡で測る（ゆれはキーの幅に対する割合）
+                  eval-glide <assetsDir> [ずれ]  グライドの読み取りを、人の指に近い軌跡で測る（ずれは狙いのずれ。キーの幅に対する割合）
+                  tune-glide <assetsDir> [ずれ]  グライドの重みを探す
                   zenz <outDir> <gguf> <libkanade_zenz.so> <かな...>        zenz の並べ替えと生成を試す
                   eval-zenz <outDir> <tsv> <gguf> <libkanade_zenz.so> [topK] zenz ありで評価する
                   eval-context <outDir> <tsv> <gguf> <libkanade_zenz.so>   左の文脈ありとなしで並べ替えを比べる
@@ -146,10 +154,26 @@ fun fetchEnglishWords(cacheDir: File): File {
 }
 
 /**
- * グライド入力の日本語の読み: Mozc の辞書の読みごとにいちばん小さいコストを取り、よく使う順に [GLIDE_JAPANESE_READINGS] 個。
- * 1行に「読み<TAB>コスト」
+ * グライド入力の日本語の読み。1行に「読み<TAB>コスト」で、コストは読みだけを変換したときのいちばん良い変換の道のりのコスト
+ * （語のコストに、文の始め・終わりとのつながりのコストを足したもの）。Mozc の語のコストは 0 の語が多くて頻度の差が出ないため。
+ * 語のコストの小さい読みから候補を取り、道のりのコストの小さい順に [GLIDE_JAPANESE_READINGS] 個。時間がかかるので [built] に残して使い回す
  */
-fun glideJapanese(mozcDir: File): String {
+fun glideJapanese(mozcDir: File, built: File): String {
+    val cache = File(built, "glide-ja-r$GLIDE_JA_REVISION.tsv")
+    if (cache.exists()) return cache.readText()
+    val converter = loadConverter(built)
+    val candidates = glideReadings(mozcDir).take(GLIDE_JAPANESE_READINGS * 3 / 2)
+    val costs = candidates.mapNotNull { r -> converter.convert(r, n = 1).firstOrNull()?.let { r to it.cost } }
+    val text = costs.sortedBy { it.second }.take(GLIDE_JAPANESE_READINGS).joinToString("") { "${it.first}\t${it.second}\n" }
+    cache.writeText(text)
+    return text
+}
+
+/** グライド入力の日本語の読みの数え直しの番号（作り方を変えたら上げる） */
+const val GLIDE_JA_REVISION = 1
+
+/** Mozc の辞書の読み（語のコストの小さい順） */
+fun glideReadings(mozcDir: File): List<String> {
     val best = HashMap<String, Int>()
     for (i in 0..9) {
         File(mozcDir, "dictionary0$i.txt").forEachLine { line ->
@@ -162,7 +186,95 @@ fun glideJapanese(mozcDir: File): String {
             if (old == null || w.cost < old) best[r] = w.cost
         }
     }
-    return best.entries.sortedBy { it.value }.take(GLIDE_JAPANESE_READINGS).joinToString("") { "${it.key}\t${it.value}\n" }
+    return best.entries.sortedBy { it.value }.map { it.key }
+}
+
+fun fetchScowl(cacheDir: File): File {
+    val f = File(cacheDir, "scowl-2020.12.07.tar.gz")
+    if (!f.exists() || sha256(f) != SCOWL_SHA256) {
+        println("取得: $SCOWL_URL")
+        val tmp = File(cacheDir, "scowl.tmp")
+        URI(SCOWL_URL).toURL().openStream().use { input -> tmp.outputStream().use { input.copyTo(it) } }
+        check(sha256(tmp) == SCOWL_SHA256) { "SCOWL のハッシュが合わない" }
+        tmp.renameTo(f)
+    }
+    return f
+}
+
+/** tar.gz の中のファイルを、名前と中身で順に渡す（tar の 512 バイトの見出しだけを読む簡単なもの） */
+fun readTarGz(f: File, each: (name: String, bytes: ByteArray) -> Unit) {
+    java.util.zip.GZIPInputStream(f.inputStream().buffered()).use { input ->
+        val header = ByteArray(512)
+        while (true) {
+            if (input.readNBytes(header, 0, 512) < 512) break
+            if (header.all { it == 0.toByte() }) break
+            val name = String(header, 0, 100, Charsets.ISO_8859_1).substringBefore('\u0000')
+            val size = String(header, 124, 12, Charsets.ISO_8859_1).trim('\u0000', ' ').toLong(8)
+            val bytes = input.readNBytes(size.toInt())
+            val pad = ((512 - size % 512) % 512).toInt()
+            input.readNBytes(pad)
+            each(name, bytes)
+        }
+    }
+}
+
+/** SCOWL の英単語（小文字。大きさ [SCOWL_SIZES] までの english-words と american-words） */
+fun scowlWords(cacheDir: File): Set<String> {
+    val names = SCOWL_SIZES.flatMap { listOf("final/english-words.$it", "final/american-words.$it") }.toSet()
+    val words = HashSet<String>()
+    readTarGz(fetchScowl(cacheDir)) { name, bytes ->
+        if (names.any { name.endsWith(it) }) {
+            // 大文字で始まる語（人名・地名）は入れない
+            String(bytes, Charsets.ISO_8859_1).lineSequence().filter { it.isNotEmpty() && it[0].isLowerCase() }.forEach { words += it }
+        }
+    }
+    return words
+}
+
+/**
+ * グライド入力の英単語: FrequencyWords の頻度のうち SCOWL にある語と、短縮形（i'm・don't など）。
+ * FrequencyWords は ' で語を切っている（don't が don と t になる）ので、短縮形は ' の後ろの切れ端の回数を、元の語の回数の割合で分けて作る
+ */
+fun glideEnglish(cacheDir: File): String {
+    val counts = LinkedHashMap<String, Long>()
+    fetchEnglishWords(cacheDir).forEachLine { line ->
+        val parts = line.split(' ')
+        if (parts.size == 2) parts[1].toLongOrNull()?.let { counts[parts[0]] = it }
+    }
+    val dictionary = scowlWords(cacheDir)
+    val out = LinkedHashMap<String, Long>()
+    for ((w, c) in counts) if (w.length >= 2 && w.all { it in 'a'..'z' } && w in dictionary) out[w] = c
+    // n't: 切れ端（don・didn など）の回数がそのまま短縮形の回数。can't・won't は 't の残りを 3:1 で分ける
+    val nt = mapOf(
+        "don't" to "don", "didn't" to "didn", "doesn't" to "doesn", "isn't" to "isn", "wasn't" to "wasn", "aren't" to "aren",
+        "couldn't" to "couldn", "wouldn't" to "wouldn", "shouldn't" to "shouldn", "haven't" to "haven", "hasn't" to "hasn",
+        "hadn't" to "hadn", "weren't" to "weren", "ain't" to "ain",
+    )
+    var ntSum = 0L
+    for ((w, fragment) in nt) counts[fragment]?.let { out[w] = it; ntSum += it }
+    val rest = maxOf(0L, (counts["'t"] ?: 0L) - ntSum)
+    out["can't"] = rest * 3 / 4
+    out["won't"] = rest / 4
+    // 'm は i'm だけ。're・'ll・'ve・'d・'s は、' の後ろの切れ端の回数を、元の語の回数の割合で分ける（'s は持ち主の 's もあるので半分）
+    out["i'm"] = counts["'m"] ?: 0L
+    val others = mapOf(
+        "'re" to listOf("you're", "we're", "they're"),
+        "'ll" to listOf("i'll", "you'll", "we'll", "he'll", "she'll", "it'll", "they'll", "that'll"),
+        "'ve" to listOf("i've", "you've", "we've", "they've", "could've", "would've", "should've"),
+        "'d" to listOf("i'd", "you'd", "he'd", "she'd", "we'd", "they'd"),
+        "'s" to listOf("it's", "that's", "he's", "she's", "what's", "there's", "let's", "who's", "here's", "where's"),
+    )
+    for ((suffix, words) in others) {
+        val total = (counts[suffix] ?: continue) * (if (suffix == "'s") 1 else 2) / 2
+        val weights = words.associateWith { (counts[it.substringBefore('\'')] ?: 1L).toDouble() }
+        val sum = weights.values.sum()
+        for (w in words) out[w] = maxOf(1L, (total * weights.getValue(w) / sum).toLong())
+    }
+    // 切れ端は語ではないので外す。don・won は語でもあるが、回数のほとんどは don't・won't なので減らす
+    for (fragment in nt.values) out.remove(fragment)
+    if ("don" in dictionary) out["don"] = 5000L
+    counts["won"]?.let { out["won"] = maxOf(1L, it - (out["won't"] ?: 0L)) }
+    return out.entries.sortedByDescending { it.value }.joinToString("") { "${it.key} ${it.value}\n" }
 }
 
 fun fetchSherpa(cacheDir: File): File {
@@ -210,8 +322,9 @@ fun assets(cacheDir: File, outDir: File) {
     // 検索に使う日本語の言葉は Mozc の emoji_data.tsv（読み・名前・説明）から
     val japanese = EmojiPanelData.japaneseFromMozc(File(mozcDir, "emoji_data.tsv").readLines())
     // グライド入力の語（日本語は Mozc の読み、英語は FrequencyWords）
-    File(outDir, "glide-ja.tsv").writeText(glideJapanese(mozcDir))
-    fetchEnglishWords(cacheDir).copyTo(File(outDir, "glide-en.txt"), overwrite = true)
+    File(outDir, "glide-ja.tsv").writeText(glideJapanese(mozcDir, built))
+    File(outDir, "glide-en.txt").writeText(glideEnglish(cacheDir))
+    readTarGz(fetchScowl(cacheDir)) { name, bytes -> if (name.endsWith("/Copyright")) File(outDir, "scowl-license.txt").writeBytes(bytes) }
     File(outDir, "emoji-panel.tsv").writeText(EmojiPanelData.fromUnicodeTest(fetchEmojiTest(cacheDir).readLines(), japanese).write())
 }
 
@@ -442,67 +555,152 @@ fun evaluateContext(outDir: File, tsv: File, model: File, lib: File) {
     }
 }
 
+/** グライドの試験に使うキーの並び（キーの幅 100、高さ [keyHeight]） */
+fun glideKeys(keyHeight: Float): Map<Char, Pair<Float, Float>> = buildMap {
+    listOf("qwertyuiop" to 0f, "asdfghjkl" to 0.5f, "zxcvbnm" to 1.5f).forEachIndexed { row, (letters, offset) ->
+        letters.forEachIndexed { i, c -> put(c, (offset + i + 0.5f) * 100f to (row + 0.5f) * keyHeight) }
+    }
+}
+
 /**
- * グライドの読み取りを測る。よく使う語を選び、キーの中心を結んだ線をキーの幅の [noise] 倍まで揺らした軌跡にして、1位・3位以内に入るかと時間を見る。
- * 人の指はもっと崩れるので、ここでの数字は上限の目安
+ * 人の指に近い軌跡: キーごとに狙いが中心からずれ（[aim] はずれの標準偏差、キーの幅に対する割合）、
+ * 角を丸めて（Chaikin の角切りを1回）通り、少し震える
  */
-fun evaluateGlide(assets: File, noise: Float) {
-    val kw = 100f
-    val kh = 150f
-    val keys = buildMap {
-        listOf("qwertyuiop" to 0f, "asdfghjkl" to 0.5f, "zxcvbnm" to 1.5f).forEachIndexed { row, (letters, offset) ->
-            letters.forEachIndexed { i, c -> put(c, (offset + i + 0.5f) * kw to (row + 0.5f) * kh) }
-        }
+fun humanGesture(spelling: String, keys: Map<Char, Pair<Float, Float>>, r: java.util.Random, aim: Float, keyHeight: Float = 100f): Pair<FloatArray, FloatArray> {
+    // 縦の狙いのずれは、キーの高さに比例する（横長のキーなら縦のずれも小さい）
+    val path = dev.mooma.kanade.core.glide.GlideLexicon.collapse(spelling).map { c ->
+        val (x, y) = keys.getValue(c)
+        (x + r.nextGaussian().toFloat() * aim * 100f) to (y + r.nextGaussian().toFloat() * aim * keyHeight)
     }
-    fun gesture(spelling: String, r: kotlin.random.Random): Pair<FloatArray, FloatArray> {
-        val path = dev.mooma.kanade.core.glide.GlideLexicon.collapse(spelling).map { keys.getValue(it) }
-        val xs = ArrayList<Float>()
-        val ys = ArrayList<Float>()
-        fun jitter() = (r.nextFloat() - 0.5f) * 2 * noise * kw
-        for (i in path.indices) {
-            if (i > 0) for (k in 1..7) {
-                val t = k / 8f
-                xs += path[i - 1].first + (path[i].first - path[i - 1].first) * t + jitter() / 2
-                ys += path[i - 1].second + (path[i].second - path[i - 1].second) * t + jitter() / 2
+    var pts = path
+    repeat(1) {
+        if (pts.size < 3) return@repeat
+        val next = ArrayList<Pair<Float, Float>>()
+        next += pts.first()
+        for (i in 0 until pts.size - 1) {
+            val (x0, y0) = pts[i]
+            val (x1, y1) = pts[i + 1]
+            if (i > 0) next += (0.75f * x0 + 0.25f * x1) to (0.75f * y0 + 0.25f * y1)
+            if (i < pts.size - 2) next += (0.25f * x0 + 0.75f * x1) to (0.25f * y0 + 0.75f * y1)
+        }
+        next += pts.last()
+        pts = next
+    }
+    val xs = ArrayList<Float>()
+    val ys = ArrayList<Float>()
+    for (i in pts.indices) {
+        if (i > 0) for (k in 1..4) {
+            val t = k / 5f
+            xs += pts[i - 1].first + (pts[i].first - pts[i - 1].first) * t + r.nextGaussian().toFloat() * 4f
+            ys += pts[i - 1].second + (pts[i].second - pts[i - 1].second) * t + r.nextGaussian().toFloat() * 4f
+        }
+        xs += pts[i].first
+        ys += pts[i].second
+    }
+    return xs.toFloatArray() to ys.toFloatArray()
+}
+
+/** よく使う語ほど多く出る見本（使う頻度に近づける。上位 [top] 語から、順位の逆数の重みで [n] 語） */
+fun <T> zipfSample(items: List<T>, n: Int, top: Int, r: java.util.Random): List<T> {
+    val pool = items.take(top)
+    val weights = pool.indices.map { 1.0 / (it + 10) }
+    val total = weights.sum()
+    return List(n) {
+        var x = r.nextDouble() * total
+        var i = 0
+        while (i < pool.size - 1 && x > weights[i]) {
+            x -= weights[i]
+            i++
+        }
+        pool[i]
+    }
+}
+
+class GlideEvalSet(val name: String, val lexicon: dev.mooma.kanade.core.glide.GlideLexicon, val cases: List<Pair<String, String>>)
+
+/** 試験の見本（綴り → 正しい出力）。日本語は読みをヘボン式でなぞる */
+fun glideEvalSets(assets: File, n: Int): List<GlideEvalSet> {
+    val r = java.util.Random(11)
+    val jaLines = File(assets, "glide-ja.tsv").readLines()
+    val ja = dev.mooma.kanade.core.glide.GlideLexicon.japanese(jaLines.asSequence())
+    val jaCases = zipfSample(jaLines.map { it.substringBefore('\t') }, n, 8000, r).mapNotNull { kana ->
+        dev.mooma.kanade.core.glide.KanaSpelling.spellings(kana).lastOrNull()?.let { it to kana }
+    }.filter { dev.mooma.kanade.core.glide.GlideLexicon.collapse(it.first).length >= 2 }
+    val enLines = File(assets, "glide-en.txt").readLines()
+    val en = dev.mooma.kanade.core.glide.GlideLexicon.english(enLines.asSequence())
+    val enCases = zipfSample(enLines.map { it.substringBefore(' ') }, n, 8000, r).map { w ->
+        w.filter { it != '\'' } to (if (w == "i" || w.startsWith("i'")) "I" + w.substring(1) else w)
+    }.filter { dev.mooma.kanade.core.glide.GlideLexicon.collapse(it.first).length >= 2 }
+    return listOf(GlideEvalSet("日本語", ja, jaCases), GlideEvalSet("英語", en, enCases))
+}
+
+data class GlideEvalResult(val top1: Double, val top3: Double, val medianMs: Double, val misses: List<String>)
+
+fun runGlideEval(set: GlideEvalSet, params: dev.mooma.kanade.core.glide.GlideParams, keyHeight: Float, aim: Float): GlideEvalResult {
+    val keys = glideKeys(keyHeight)
+    val decoder = dev.mooma.kanade.core.glide.GlideDecoder(set.lexicon, params)
+    val r = java.util.Random(5)
+    var top1 = 0
+    var top3 = 0
+    val times = ArrayList<Double>()
+    val misses = ArrayList<String>()
+    for ((spelling, expected) in set.cases) {
+        val (xs, ys) = humanGesture(spelling, keys, r, aim, keyHeight)
+        val t = System.nanoTime()
+        val result = decoder.decode(xs, ys, keys, 100f, limit = 9, keyHeight = if (System.getenv("GLIDE_SQUARE") != null) 100f else keyHeight).map { it.output }
+        times += (System.nanoTime() - t) / 1e6
+        if (result.firstOrNull() == expected) top1++ else if (misses.size < 10) misses += "$expected→${result.take(3)}"
+        if (expected in result.take(3)) top3++
+    }
+    times.sort()
+    return GlideEvalResult(100.0 * top1 / set.cases.size, 100.0 * top3 / set.cases.size, times[times.size / 2], misses)
+}
+
+/**
+ * グライドの読み取りを、人の指に近い軌跡（[humanGesture]）で測る。よく使う語ほど多く試す。
+ * 縦長のキー（スマホ、高さ 140）と横長のキー（Fold を開いた画面、高さ 65）の両方で見る
+ */
+fun evaluateGlide(assets: File, aim: Float) {
+    val sets = glideEvalSets(assets, 400)
+    for (set in sets) for (h in listOf(140f, 65f)) {
+        // GLIDE_OLD を付けると、比べるために前の重み（DTW なし）で測る
+        val params = if (System.getenv("GLIDE_OLD") != null) dev.mooma.kanade.core.glide.GlideParams()
+        else if (set.name == "英語") dev.mooma.kanade.core.glide.GlideParams.ENGLISH else dev.mooma.kanade.core.glide.GlideParams.JAPANESE
+        val res = runGlideEval(set, params, h, aim)
+        println("${set.name}（キーの高さ $h）: ${set.cases.size} 語で 1位 ${"%.0f".format(res.top1)}%・3位以内 ${"%.0f".format(res.top3)}%、中央値 ${"%.1f".format(res.medianMs)}ms")
+        println("  外れの例: ${res.misses.joinToString("、")}")
+    }
+}
+
+/** 重みを1つずつ動かして、1位の割合（3位以内も少し見る）がいちばん良いものを探す（2周） */
+fun tuneGlide(assets: File, aim: Float) {
+    val sets = glideEvalSets(assets, 250)
+    for (set in sets) {
+        var best = if (set.name == "英語") dev.mooma.kanade.core.glide.GlideParams(0.275f, 0.255f, 6f, 0.75f, dtwSigma = 0.25f)
+        else dev.mooma.kanade.core.glide.GlideParams(0.2f, 0.294f, 3f, 1.7f, dtwSigma = 0.2f)
+        fun score(p: dev.mooma.kanade.core.glide.GlideParams) = listOf(140f, 65f).sumOf { h ->
+            runGlideEval(set, p, h, aim).let { it.top1 + 0.3 * it.top3 }
+        } / 2
+        var bestScore = score(best)
+        println("${set.name}: 始め $best → ${"%.1f".format(bestScore)}")
+        repeat(2) {
+            for (variant in listOf<(dev.mooma.kanade.core.glide.GlideParams) -> List<dev.mooma.kanade.core.glide.GlideParams>>(
+                { p -> listOf(0.8f, 0.9f, 1.1f, 1.25f).map { p.copy(sigma = p.sigma * it) } },
+                { p -> listOf(0.7f, 0.85f, 1.2f, 1.4f).map { p.copy(endSigma = p.endSigma * it) } },
+                { p -> listOf(0.6f, 0.8f, 1.3f, 2f, 4f).map { p.copy(keySigma = p.keySigma * it) } },
+                { p -> listOf(0.6f, 0.8f, 1.25f, 1.6f).map { p.copy(priorWeight = p.priorWeight * it) } },
+                { p -> listOf(0.6f, 0.8f, 1.25f, 1.6f).map { p.copy(dtwSigma = p.dtwSigma * it) } },
+            )) {
+                for (p in variant(best)) {
+                    val sc = score(p)
+                    if (sc > bestScore) {
+                        bestScore = sc
+                        best = p
+                    }
+                }
             }
-            xs += path[i].first + jitter()
-            ys += path[i].second + jitter()
+            println("${set.name}: $best → ${"%.1f".format(bestScore)}")
+            System.out.flush()
         }
-        return xs.toFloatArray() to ys.toFloatArray()
-    }
-    for ((name, load, samples) in listOf(
-        Triple("日本語", { dev.mooma.kanade.core.glide.GlideLexicon.japanese(File(assets, "glide-ja.tsv").readLines().asSequence()) },
-            File(assets, "glide-ja.tsv").readLines().drop(300).filterIndexed { i, _ -> i % 40 == 0 }.take(300).map { it.substringBefore('\t') }),
-        Triple("英語", { dev.mooma.kanade.core.glide.GlideLexicon.english(File(assets, "glide-en.txt").readLines().asSequence()) },
-            File(assets, "glide-en.txt").readLines().map { it.substringBefore(' ') }.filter { w -> w.all { it in 'a'..'z' || it == '\'' } }
-                .filterIndexed { i, _ -> i % 20 == 0 }.take(300)),
-    )) {
-        val t0 = System.nanoTime()
-        val lexicon = load()
-        val loadMs = (System.nanoTime() - t0) / 1e6
-        val decoder = dev.mooma.kanade.core.glide.GlideDecoder(lexicon)
-        val r = kotlin.random.Random(7)
-        var top1 = 0
-        var top3 = 0
-        var tested = 0
-        val times = ArrayList<Double>()
-        val misses = ArrayList<String>()
-        for (word in samples) {
-            val spelling = if (name == "日本語") dev.mooma.kanade.core.glide.KanaSpelling.spellings(word).lastOrNull() ?: continue
-            else word.filter { it != '\'' }
-            if (dev.mooma.kanade.core.glide.GlideLexicon.collapse(spelling).length < 2) continue
-            val (xs, ys) = gesture(spelling, r)
-            val s = System.nanoTime()
-            val result = decoder.decode(xs, ys, keys, kw).map { it.output }
-            times += (System.nanoTime() - s) / 1e6
-            val expected = if (name == "英語" && (word == "i" || word.startsWith("i'"))) "I" + word.substring(1) else word
-            tested++
-            if (result.firstOrNull() == expected) top1++ else if (misses.size < 12) misses += "$expected→${result.take(3)}"
-            if (expected in result.take(3)) top3++
-        }
-        times.sort()
-        println("$name: 語 ${lexicon.size}、読み込み ${"%.0f".format(loadMs)}ms、$tested 語で 1位 ${100 * top1 / tested}%・3位以内 ${100 * top3 / tested}%、" +
-            "時間 中央値 ${"%.1f".format(times[times.size / 2])}ms・95% ${"%.1f".format(times[times.size * 95 / 100])}ms")
-        println("  外れの例: ${misses.joinToString("、")}")
     }
 }

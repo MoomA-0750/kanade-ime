@@ -205,6 +205,9 @@ class InputEngine(
     /** 確定済みのかな（読み）。綴りの途中は含まない */
     private val reading: String get() = units.joinToString("") { it.text }
 
+    /** 入力中の読み（ライブ変換の結果ではなく、かなのまま。変換中でも読み） */
+    val composingReading: String get() = reading + romaji.pending
+
     /** 未確定文字列として出すもの */
     /**
      * 入力中の読みの、カーソルの前の最後の1文字（変換中は null）。フリック入力の濁点・トグル入力で使う

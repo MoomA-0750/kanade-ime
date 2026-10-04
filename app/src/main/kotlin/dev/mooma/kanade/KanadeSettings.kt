@@ -10,6 +10,9 @@ enum class ToggleTrigger(val label: String) {
     F13("F13（QMK などから送る専用キー）"),
 }
 
+/** 画面キーボードの配列（切り替える順） */
+val LAYOUTS = listOf("GLIDE", "QWERTY", "FLICK")
+
 /** SharedPreferences の読み書き。IME とアクティビティの両方から使う */
 class KanadeSettings(context: Context) {
     private val prefs = context.getSharedPreferences("kanade", Context.MODE_PRIVATE)
@@ -101,10 +104,22 @@ class KanadeSettings(context: Context) {
         get() = prefs.getBoolean(KEY_SPOKEN_PUNCT, true)
         set(value) = prefs.edit().putBoolean(KEY_SPOKEN_PUNCT, value).apply()
 
-    /** 画面キーボードの配列: GLIDE（グライドの QWERTY）・QWERTY（払いで記号を出すフルキー）・FLICK（テンキー） */
+    /**
+     * 画面キーボードの配列: GLIDE（グライドの QWERTY）・QWERTY（払いで記号を出すフルキー）・FLICK（テンキー）。
+     * 使う配列（[enabledLayouts]）に入っていなければ、使う配列の最初のものにする
+     */
     var softKeyboardLayout: String
-        get() = prefs.getString(KEY_SOFT_KEYBOARD_LAYOUT, "QWERTY") ?: "QWERTY"
+        get() {
+            val enabled = enabledLayouts
+            val saved = prefs.getString(KEY_SOFT_KEYBOARD_LAYOUT, null)
+            return if (saved != null && saved in enabled) saved else LAYOUTS.first { it in enabled }
+        }
         set(value) = prefs.edit().putString(KEY_SOFT_KEYBOARD_LAYOUT, value).apply()
+
+    /** 使う配列（左下のキーの上払いで、この中を順に替える）。既定はグライドとテンキー。空にはしない */
+    var enabledLayouts: Set<String>
+        get() = prefs.getStringSet(KEY_ENABLED_LAYOUTS, null)?.filter { it in LAYOUTS }?.toSet()?.ifEmpty { null } ?: setOf("GLIDE", "FLICK")
+        set(value) = prefs.edit().putStringSet(KEY_ENABLED_LAYOUTS, value.filter { it in LAYOUTS }.toSet().ifEmpty { setOf("GLIDE") }).apply()
 
     /** 画面キーボードを浮かせる（好きな位置・幅に動かせる） */
     var softKeyboardFloating: Boolean
@@ -154,6 +169,7 @@ class KanadeSettings(context: Context) {
         const val KEY_SOFT_KEYBOARD_BOTTOM = "soft_keyboard_bottom"
         const val KEY_SOFT_KEYBOARD_LAYOUT = "soft_keyboard_layout"
         const val KEY_FLICK_TOGGLE = "flick_toggle"
+        const val KEY_ENABLED_LAYOUTS = "enabled_layouts"
         const val KEY_FLOAT = "soft_keyboard_floating"
         const val KEY_FLOAT_X = "float_x"
         const val KEY_FLOAT_Y = "float_y"
