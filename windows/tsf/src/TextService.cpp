@@ -1,6 +1,7 @@
 #include "TextService.h"
 
 #include "DisplayAttributes.h"
+#include "EngineLauncher.h"
 #include "Globals.h"
 #include "Log.h"
 
@@ -175,6 +176,7 @@ bool TextService::Connect() {
     if (!engine_) return false;
     EngineClient::State state = engine_->EnsureConnected();
     if (state == EngineClient::State::NewlyConnected) engine_->Send({"focus", "1"});
+    if (state == EngineClient::State::Failed) MaybeLaunchEngine();
     return state != EngineClient::State::Failed;
 }
 

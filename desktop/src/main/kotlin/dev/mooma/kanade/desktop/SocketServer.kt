@@ -40,9 +40,7 @@ class SocketServer(private val path: Path, private val host: EngineHost, private
         return true
     }
 
-    private fun alive(): Boolean = runCatching {
-        SocketChannel.open(UnixDomainSocketAddress.of(path)).use { true }
-    }.getOrDefault(false)
+    private fun alive() = isAlive(path)
 
     private fun serve(client: SocketClient) {
         log("client ${client.id} connected")
@@ -81,6 +79,11 @@ class SocketServer(private val path: Path, private val host: EngineHost, private
     }
 
     companion object {
+        /** そのソケットで、ほかのエンジンが待っているか */
+        fun isAlive(path: Path): Boolean = Files.exists(path) && runCatching {
+            SocketChannel.open(UnixDomainSocketAddress.of(path)).use { true }
+        }.getOrDefault(false)
+
         /** Windows は %LOCALAPPDATA%\Kanade\engine.sock、ほかは $XDG_RUNTIME_DIR/kanade-engine.sock */
         fun defaultPath(): Path {
             val local = System.getenv("LOCALAPPDATA")

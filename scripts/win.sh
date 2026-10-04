@@ -52,10 +52,10 @@ case "$1" in
   unreg)
     ps "\$tip = '0411:{92CD23E6-D514-4099-84D0-81969040EE41}{92A70E2C-B06A-4AD4-B6CB-7B6DF9CED95E}'; \$l = Get-WinUserLanguageList; \$ja = \$l | Where-Object LanguageTag -eq 'ja'; [void]\$ja.InputMethodTips.Remove(\$tip); Set-WinUserLanguageList \$l -Force; \$dll = (Get-ItemProperty 'HKLM:\\Software\\Classes\\CLSID\\{92CD23E6-D514-4099-84D0-81969040EE41}\\InprocServer32' -ErrorAction SilentlyContinue).'(default)'; if (\$dll) { \$p = Start-Process regsvr32 -ArgumentList '/s','/u',\$dll -Wait -PassThru; 'unregistered ' + \$p.ExitCode + ' ' + \$dll }" ;;
   start)
-    scp -q -o BatchMode=yes windows/run-engine.ps1 "tofu:kanade/run-engine.ps1"
-    ps "\$a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File $REMOTE\\run-engine.ps1'; \$p = New-ScheduledTaskPrincipal -UserId \$env:USERNAME -LogonType Interactive -RunLevel Limited; Register-ScheduledTask -TaskName KanadeEngine -Action \$a -Principal \$p -Force | Out-Null; Start-ScheduledTask KanadeEngine; Start-Sleep 3; Get-Content \$env:LOCALAPPDATA\\Kanade\\engine.log" ;;
+    # エンジンの起動の命令を HKCU\Software\Kanade\EngineCommand に書き（DLL がつながらないときに使う）、タスクで起動する
+    ps "\$java = '$JBR\\bin\\javaw.exe'; \$jargs = '-Xmx512m -Dfile.encoding=UTF-8 -Dstderr.encoding=UTF-8 -cp \"$REMOTE\\engine\\lib\\*\" dev.mooma.kanade.desktop.MainKt serve'; New-Item -Force HKCU:\\Software\\Kanade | Out-Null; Set-ItemProperty HKCU:\\Software\\Kanade EngineCommand ('\"' + \$java + '\" ' + \$jargs); \$a = New-ScheduledTaskAction -Execute \$java -Argument \$jargs; \$p = New-ScheduledTaskPrincipal -UserId \$env:USERNAME -LogonType Interactive -RunLevel Limited; Register-ScheduledTask -TaskName KanadeEngine -Action \$a -Principal \$p -Force | Out-Null; Start-ScheduledTask KanadeEngine; Start-Sleep 3; Get-Content -Encoding UTF8 \$env:LOCALAPPDATA\\Kanade\\engine.log -Tail 3" ;;
   stop)
-    ps "Stop-ScheduledTask KanadeEngine -ErrorAction SilentlyContinue; Get-Process java -ErrorAction SilentlyContinue | Where-Object { \$_.CommandLine -like '*desktop.MainKt*' } | Stop-Process -Force; 'stopped'" ;;
+    ps "Stop-ScheduledTask KanadeEngine -ErrorAction SilentlyContinue; Get-Process java,javaw -ErrorAction SilentlyContinue | Where-Object { \$_.CommandLine -like '*desktop.MainKt*' } | Stop-Process -Force; 'stopped'" ;;
   type)
     RICH=""
     if [ "${2:-}" = "--rich" ]; then RICH="--rich"; shift; fi

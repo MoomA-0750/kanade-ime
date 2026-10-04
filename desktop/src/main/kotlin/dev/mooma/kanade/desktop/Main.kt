@@ -38,7 +38,7 @@ fun main(args: Array<String>) {
     }
 }
 
-private fun log(s: String) = System.err.println("[kanade] $s")
+private fun log(s: String) = System.err.println("[kanade] ${java.time.LocalTime.now().withNano(0)} $s")
 
 private fun newHost(data: File): EngineHost {
     val started = System.nanoTime()
@@ -48,8 +48,23 @@ private fun newHost(data: File): EngineHost {
 }
 
 private fun serve(data: File, socket: Path) {
+    // DLL が javaw で起動する（コンソールがない）ので、記録は自分でファイルに書く。1MB を超えたら前のものは捨てる
+    System.getenv("LOCALAPPDATA")?.let { local ->
+        val file = File(local, "Kanade\\engine.log")
+        file.parentFile.mkdirs()
+        val append = file.length() < 1_000_000
+        System.setErr(java.io.PrintStream(java.io.FileOutputStream(file, append), true, Charsets.UTF_8))
+    }
+    if (SocketServer.isAlive(socket)) {
+        log("別のエンジンが動いている: $socket")
+        exitProcess(1)
+    }
     val host = newHost(data)
-    if (!SocketServer(socket, host, ::log).start()) {
+    val started = runCatching { SocketServer(socket, host, ::log).start() }.getOrElse {
+        log("待ち受けられない: $it")
+        false
+    }
+    if (!started) {
         log("別のエンジンが動いている: $socket")
         exitProcess(1)
     }
