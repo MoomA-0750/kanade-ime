@@ -108,6 +108,12 @@ windows/installer/   DLL の登録（regsvr32）、エンジンをログオン�
   - 分かったこと: IMM のアプリでは DLL がカーソルの前の文字を読めず、日本語オフのスニペットは効かない（打った文字はそのまま入る）
   - 残り: 設定の画面、インストーラー（jlink の JRE、DLL の登録、ログオン時の起動、モデルのダウンロード）、32bit の DLL、CPU の機能での ggml の切り替え
 
+- フェーズ7 第2弾（2026-10-05 夜）: インストーラー（`windows/installer`、`scripts/win.sh package`・`install`）。本体は `C:\Program Files\Kanade`（jlink の実行環境 46MB・エンジン・ネイティブ・DLL）、辞書・モデルは `%LOCALAPPDATA%\Kanade\data`。エンジンはログオン時（HKCU の Run）と、DLL がつながらないときに起動。インストーラー自身は起動しない（管理者権限のままエンジンが動かないように）。配布物は zip で 309MB（whisper small 190MB と ReazonSpeech 73MB を含む）
+  - jlink: Android Studio の JBR には jmods がないので、Temurin 21（手元と同じ 21.0.12.1）を to-fu の `kanade\jdk` に置いて使う。要るモジュールは java.base と java.desktop だけ（jdeps）
+  - to-fu には入れてある。開発中に `scripts/win.sh start` を使うと、エンジンの起動の命令が開発用（JBR と kanade\engine）に戻る
+  - DLL の見直し（レビューの指摘）: 確定してからキーを渡すとき、IMM のアプリではキーを食べて送り直す。送るときの上限 100ms、返事が間に合わなければ切る。後から届いた入力中の文字は、そのあとキーを処理していたら捨てる、ほか
+  - 使い方は `docs/WINDOWS-USAGE.md`
+
 ## 本人に確かめること（始める前に。答えは上）
 
 - to-fu で、作った IME の DLL を登録してよいか（`regsvr32` は管理者権限が要る。登録すると全アプリに読み込まれる。登録の解除で戻せる）
