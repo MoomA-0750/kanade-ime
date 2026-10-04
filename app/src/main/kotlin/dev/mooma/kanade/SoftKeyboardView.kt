@@ -33,7 +33,24 @@ class SoftKeyboardView(
     /** フリック配列に切り替える */
     private val onSwitchLayout: () -> Unit,
     private val onFloat: () -> Unit = {},
+    /** グライドの配列で、文字のキーの上をなぞった */
+    private val onGlide: (GlideInput) -> Unit = {},
+    /** キーイベントにできない文字（記号のページの「」・€ など）を入れる */
+    private val onText: (String) -> Unit = {},
 ) : View(context) {
+
+    /** なぞった軌跡と、そのときの文字のキーの中心・幅（同じ座標） */
+    class GlideInput(
+        val xs: FloatArray,
+        val ys: FloatArray,
+        val keys: Map<Char, Pair<Float, Float>>,
+        val keyWidth: Float,
+        /** Shift が効いていた（英語なら頭を大文字にする） */
+        val shift: Boolean,
+    )
+
+    /** グライドの配列のページ（文字・記号・その他の記号） */
+    enum class Page { LETTERS, SYMBOLS, MORE }
 
     /** 払う方向（上から時計回り） */
     enum class Dir { N, NE, E, SE, S, SW, W, NW }
@@ -61,11 +78,28 @@ class SoftKeyboardView(
         data object SwitchLayout : Action
         /** 浮かせる・固定に戻す */
         data object Float : Action
+        /** グライドの配列のページを替える（?123・ABC・=\\<） */
+        data class ToPage(val page: Page) : Action
     }
 
     class Key(val width: Float, val center: Action?, val corners: Map<Dir, Action> = emptyMap())
 
-    private val rows: List<List<Key>> = layout()
+    /**
+     * グライドの配列（払いの記号を置かず、文字のキーの上をなぞるとグライドになる）にするか。
+     * しないときは、払いで記号や修飾を出すフルキーの配列
+     */
+    var glideLayout = false
+        set(value) {
+            if (field == value) return
+            field = value
+            page = Page.LETTERS
+            rows = buildRows()
+            invalidate()
+        }
+    private var page = Page.LETTERS
+    private var rows: List<List<Key>> = buildRows()
+
+    private fun buildRows() = if (glideLayout) glideLayout(page) else layout()
 
     /** 修飾の状態: 次の1打だけ（ONCE）か、固定（LOCKED） */
     private enum class Latch { ONCE, LOCKED }
@@ -169,6 +203,20 @@ class SoftKeyboardView(
         var heldMod: Mod? = null
         /** Space を横にドラッグして、ここまでに動かしたカーソルの数（右が正） */
         var dragSteps = 0
+        /** グライドの配列で文字のキーから押したときの軌跡（なぞり始めたら [gliding]） */
+        var xs: ArrayList<Float>? = null
+        var ys: ArrayList<Float>? = null
+        var gliding = false
+    }
+
+    /** なぞった軌跡の表示（離したあと薄れて消える） */
+    private var trail: Touch? = null
+    private var trailAlpha = 0f
+    private var trailAnimator: android.animation.ValueAnimator? = null
+    private val trailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
     }
     private val touches = HashMap<Int, Touch>()
     private val keyRects = HashMap<Key, RectF>()
@@ -231,10 +279,48 @@ class SoftKeyboardView(
                 drawKey(canvas, key, rect)
             }
         }
+        drawTrail(canvas)
+    }
+
+    private fun drawTrail(canvas: Canvas) {
+        val t = trail ?: return
+        val xs = t.xs ?: return
+        val ys = t.ys ?: return
+        if (xs.size < 2 || trailAlpha <= 0f) return
+        val path = android.graphics.Path()
+        path.moveTo(xs[0], ys[0])
+        for (i in 1 until xs.size) path.lineTo(xs[i], ys[i])
+        trailPaint.color = palette.accent
+        trailPaint.alpha = (200 * trailAlpha).toInt()
+        trailPaint.strokeWidth = 6 * density
+        canvas.drawPath(path, trailPaint)
+    }
+
+    /** 離したあと、軌跡を薄くして消す */
+    private fun fadeTrail() {
+        trailAnimator?.cancel()
+        trailAnimator = android.animation.ValueAnimator.ofFloat(trailAlpha, 0f).apply {
+            duration = TRAIL_FADE_MS
+            addUpdateListener {
+                trailAlpha = it.animatedValue as Float
+                if (trailAlpha <= 0f) trail = null
+                invalidate()
+            }
+            start()
+        }
+    }
+
+    /** 文字のキー（a〜z）の中心 */
+    private fun letterCenters(): Map<Char, Pair<Float, Float>> = buildMap {
+        for ((key, rect) in keyRects) {
+            val c = (key.center as? Action.Text)?.char ?: continue
+            if (c in 'a'..'z') put(c, rect.centerX() to rect.centerY())
+        }
     }
 
     private fun drawKey(canvas: Canvas, key: Key, rect: RectF) {
-        val pressed = touches.values.any { it.key === key }
+        // なぞっている指は、押し始めたキーを押した色にしない
+        val pressed = touches.values.any { it.key === key && !it.gliding }
         val center = key.center!!
         val keyMods = (listOf(center) + key.corners.values).mapNotNull { (it as? Action.Modifier)?.mod }
         // 地と文字の色（Material 3 の役割: 文字のキー・機能のキー・強調（Enter・固定した修飾）・1打だけの修飾）
@@ -289,7 +375,7 @@ class SoftKeyboardView(
 
     /** 修飾・Esc・Tab・⌫・あ/A・🎤 は機能のキーの色にする */
     private fun isFunctionKey(action: Action) = when (action) {
-        is Action.Modifier, Action.ToggleJapanese, Action.Voice, Action.Emoji, Action.Clipboard, Action.SwitchLayout, Action.Float -> true
+        is Action.Modifier, Action.ToggleJapanese, Action.Voice, Action.Emoji, Action.Clipboard, Action.SwitchLayout, Action.Float, is Action.ToPage -> true
         is Action.Code -> true
         is Action.Text -> false
     }
@@ -321,7 +407,7 @@ class SoftKeyboardView(
         Action.SwitchLayout -> R.drawable.sym_dialpad
         Action.Float -> R.drawable.sym_picture_in_picture_alt
         is Action.Text -> if (action.char == ' ') R.drawable.sym_space_bar else null
-        Action.ToggleJapanese -> null
+        Action.ToggleJapanese, is Action.ToPage -> null
     }
 
     private fun drawIcon(canvas: Canvas, id: Int, cx: Float, cy: Float, size: Float, tint: Int, mirrored: Boolean = false) {
@@ -356,6 +442,11 @@ class SoftKeyboardView(
         Action.Clipboard -> "📋"
         Action.SwitchLayout -> "⌨"
         Action.Float -> "▭"
+        is Action.ToPage -> when (action.page) {
+            Page.LETTERS -> "ABC"
+            Page.SYMBOLS -> "?123"
+            Page.MORE -> "=\\<"
+        }
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -375,6 +466,11 @@ class SoftKeyboardView(
                     held[it.mod] = false
                 }
                 if (key.center == Action.Voice) onVoice(true)
+                // グライドの配列の文字のキーなら、軌跡を取り始める（なぞったらグライド、動かさず離したらその文字）
+                if (glideLayout && (key.center as? Action.Text)?.char?.let { it in 'a'..'z' } == true) {
+                    t.xs = arrayListOf(x)
+                    t.ys = arrayListOf(y)
+                }
                 scheduleRepeat(id, t)
                 performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
                 invalidate()
@@ -382,6 +478,29 @@ class SoftKeyboardView(
             MotionEvent.ACTION_MOVE -> {
                 for (p in 0 until event.pointerCount) {
                     val t = touches[event.getPointerId(p)] ?: continue
+                    val xs = t.xs
+                    val ys = t.ys
+                    if (xs != null && ys != null) {
+                        for (h in 0 until event.historySize) {
+                            xs += event.getHistoricalX(p, h)
+                            ys += event.getHistoricalY(p, h)
+                        }
+                        xs += event.getX(p)
+                        ys += event.getY(p)
+                        if (!t.gliding && hypot(event.getX(p) - t.x0, event.getY(p) - t.y0) > GLIDE_START_DP * density) {
+                            // なぞり始めた: 長押しの繰り返しをやめ、キーを離した形に戻して、軌跡を出す
+                            t.gliding = true
+                            handler.removeCallbacksAndMessages(event.getPointerId(p))
+                            animatePill(t.key, pressed = false)
+                            trailAnimator?.cancel()
+                            trail = t
+                            trailAlpha = 1f
+                        }
+                        if (t.gliding) {
+                            invalidate()
+                            continue
+                        }
+                    }
                     if (isSpace(t.key)) {
                         dragSpace(event.getPointerId(p), t, event.getX(p))
                         continue
@@ -411,6 +530,19 @@ class SoftKeyboardView(
                 val t = touches.remove(id) ?: return true
                 handler.removeCallbacksAndMessages(id)
                 if (touches.values.none { it.key === t.key }) animatePill(t.key, pressed = false)
+                if (t.gliding) {
+                    val xs = t.xs!!
+                    val ys = t.ys!!
+                    xs += event.getX(i)
+                    ys += event.getY(i)
+                    val unit = (width - gap) / 10f
+                    onGlide(GlideInput(xs.toFloatArray(), ys.toFloatArray(), letterCenters(), unit, isOn(Mod.SHIFT)))
+                    consumeOnceModifiers()
+                    fadeTrail()
+                    syncLatchedPills()
+                    invalidate()
+                    return true
+                }
                 t.dir = direction(t, event.getX(i), event.getY(i))
                 val mod = t.heldMod
                 if (t.key.center == Action.Voice) {
@@ -435,6 +567,7 @@ class SoftKeyboardView(
                 if (touches.values.any { it.key.center == Action.Voice }) onVoice(false)
                 touches.clear()
                 held.clear()
+                trail = null
                 syncLatchedPills()
                 invalidate()
             }
@@ -522,6 +655,11 @@ class SoftKeyboardView(
             Action.Clipboard -> onClipboard()
             Action.SwitchLayout -> onSwitchLayout()
             Action.Float -> onFloat()
+            is Action.ToPage -> {
+                page = action.page
+                rows = buildRows()
+                pill.clear()
+            }
             is Action.Code -> {
                 onKey(action.keyCode, currentMeta())
                 afterKey(consume)
@@ -546,7 +684,12 @@ class SoftKeyboardView(
             }
         }
         val events = KEY_MAP.getEvents(charArrayOf(c))
-        val down = events?.firstOrNull { it.action == KeyEvent.ACTION_DOWN && !KeyEvent.isModifierKey(it.keyCode) } ?: return
+        val down = events?.firstOrNull { it.action == KeyEvent.ACTION_DOWN && !KeyEvent.isModifierKey(it.keyCode) }
+        if (down == null) {
+            // キーイベントにできない文字（「」・€ など）は、文字のまま入れる
+            onText(c.toString())
+            return
+        }
         onKey(down.keyCode, (down.metaState and KeyEvent.META_SHIFT_MASK) or (currentMeta() and KeyEvent.META_SHIFT_MASK.inv()))
     }
 
@@ -588,6 +731,9 @@ class SoftKeyboardView(
         private const val PILL_OUT_MS = 280L
         private const val REPEAT_MS = 50L
         private const val DOUBLE_TAP_MS = 350L
+        /** これだけ指が動いたら、文字のキーのタップではなくグライドにする */
+        private const val GLIDE_START_DP = 14f
+        private const val TRAIL_FADE_MS = 220L
 
         private val KEY_MAP: android.view.KeyCharacterMap =
             android.view.KeyCharacterMap.load(android.view.KeyCharacterMap.VIRTUAL_KEYBOARD)
@@ -605,6 +751,56 @@ class SoftKeyboardView(
          * 並び（幅の合計は各行 10）。上の段の右上が数字、左上が Shift した記号。2段目は右上・左上に記号。
          * Space は左右に払うと矢印、Tab のキーは上下左右が矢印・四隅が Home/End/PgUp/PgDn、Backspace は右に払うと Delete
          */
+        /**
+         * グライドの配列（Gboard に近い）。文字のキーには払いを置かない（なぞるとグライドになるため）。
+         * 左下の ?123 で記号のページ、上に払うと配列の切り替え、下に払うとフロート。あ/A は上で絵文字・下でクリップボード
+         */
+        fun glideLayout(page: Page): List<List<Key>> {
+            val bottom = listOf(
+                Key(
+                    1.3f, Action.ToPage(if (page == Page.LETTERS) Page.SYMBOLS else Page.LETTERS),
+                    mapOf(Dir.N to Action.SwitchLayout, Dir.S to Action.Float),
+                ),
+                Key(1f, Action.ToggleJapanese, mapOf(Dir.N to Action.Emoji, Dir.S to Action.Clipboard)),
+                Key(0.9f, Action.Voice),
+                Key(
+                    3.4f, t(' '),
+                    mapOf(
+                        Dir.W to code(KeyEvent.KEYCODE_DPAD_LEFT, "←", repeat = true),
+                        Dir.E to code(KeyEvent.KEYCODE_DPAD_RIGHT, "→", repeat = true),
+                    ),
+                ),
+                Key(0.8f, t(','), mapOf(Dir.N to t('?'))),
+                Key(0.8f, t('.'), mapOf(Dir.N to t('!'))),
+                Key(1.8f, code(KeyEvent.KEYCODE_ENTER, "⏎")),
+            )
+            val backspace = Key(
+                1.5f, code(KeyEvent.KEYCODE_DEL, "⌫", repeat = true),
+                mapOf(Dir.E to code(KeyEvent.KEYCODE_FORWARD_DEL, "⌦", repeat = true)),
+            )
+            fun keys(s: String) = s.map { Key(1f, t(it)) }
+            return when (page) {
+                Page.LETTERS -> listOf(
+                    keys("qwertyuiop"),
+                    listOf(Key(0.5f, null)) + keys("asdfghjkl") + listOf(Key(0.5f, null)),
+                    listOf(Key(1.5f, Action.Modifier(Mod.SHIFT))) + keys("zxcvbnm") + listOf(backspace),
+                    bottom,
+                )
+                Page.SYMBOLS -> listOf(
+                    keys("1234567890"),
+                    keys("@#$%&-+()/"),
+                    listOf(Key(1.5f, Action.ToPage(Page.MORE))) + keys("*\"':;!?") + listOf(backspace),
+                    bottom,
+                )
+                Page.MORE -> listOf(
+                    keys("~`|\\{}[]<>"),
+                    keys("^_=€£¥°…・※"),
+                    listOf(Key(1.5f, Action.ToPage(Page.SYMBOLS))) + keys("「」『』〜♪→") + listOf(backspace),
+                    bottom,
+                )
+            }
+        }
+
         fun layout(): List<List<Key>> {
             val top = "qwertyuiop"
             val digits = "1234567890"

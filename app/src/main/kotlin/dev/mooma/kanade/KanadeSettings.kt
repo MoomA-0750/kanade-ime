@@ -101,7 +101,7 @@ class KanadeSettings(context: Context) {
         get() = prefs.getBoolean(KEY_SPOKEN_PUNCT, true)
         set(value) = prefs.edit().putBoolean(KEY_SPOKEN_PUNCT, value).apply()
 
-    /** 画面キーボードの配列: QWERTY・FLICK（ツールバーで切り替える） */
+    /** 画面キーボードの配列: GLIDE（グライドの QWERTY）・QWERTY（払いで記号を出すフルキー）・FLICK（テンキー） */
     var softKeyboardLayout: String
         get() = prefs.getString(KEY_SOFT_KEYBOARD_LAYOUT, "QWERTY") ?: "QWERTY"
         set(value) = prefs.edit().putString(KEY_SOFT_KEYBOARD_LAYOUT, value).apply()

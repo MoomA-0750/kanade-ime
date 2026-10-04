@@ -32,10 +32,10 @@ sealed interface KeyInput {
     data object ToggleJapanese : KeyInput
     data class ConvertWidth(val target: WidthTarget) : KeyInput
     /**
-     * 入力中の読みの、カーソルの前の1文字を [text] に置き換える（フリック入力のトグル・濁点）。
-     * 入力中でなければ使わない（consumed=false）
+     * 入力中の読みの、カーソルの前の [count] 文字を [text] に置き換える（フリック入力のトグル・濁点、グライドの候補の選び直し）。
+     * 入力中でなければ使わない（consumed=false）。読みを一度空にしないので、アプリ側の入力中の文字も途切れない
      */
-    data class ReplaceLast(val text: String) : KeyInput
+    data class ReplaceLast(val text: String, val count: Int = 1) : KeyInput
     /** 上記以外（Ctrl 併用など）。未確定があれば確定してからアプリへ渡す */
     data object Other : KeyInput
 }
@@ -346,7 +346,7 @@ class InputEngine(
                 showReading = false
                 widthBase = null
                 flushPending()
-                deleteLast()
+                repeat(input.count) { deleteLast() }
                 input.text.forEach { typeChar(it) }
             }
             KeyInput.DeleteForward -> {

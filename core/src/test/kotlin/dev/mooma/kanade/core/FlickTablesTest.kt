@@ -3,6 +3,7 @@ package dev.mooma.kanade.core
 import dev.mooma.kanade.core.flick.FlickTables
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.test.assertNull
 
 class FlickTablesTest {
@@ -51,5 +52,16 @@ class FlickTablesTest {
         assertEquals(listOf<ImeCommand>(ImeCommand.Commit("かい")), e.commitAll())
         // 入力中でなければ使わない
         assertEquals(false, e.handle(KeyInput.ReplaceLast("う")).consumed)
+    }
+
+    @Test
+    fun replaceSeveralWithoutEmptying() {
+        // グライドの候補の選び直し: 読み全体を置き換えても、途中で空の入力中の文字を出さない
+        val e = InputEngine().apply { handle(KeyInput.SetJapanese(true)) }
+        "ありがとう".forEach { e.handle(KeyInput.Text(it)) }
+        val r = e.handle(KeyInput.ReplaceLast("あいそう", 5))
+        assertEquals(true, r.consumed)
+        assertTrue(r.commands.none { it is ImeCommand.SetComposing && it.text.isEmpty() })
+        assertEquals(listOf<ImeCommand>(ImeCommand.Commit("あいそう")), e.commitAll())
     }
 }

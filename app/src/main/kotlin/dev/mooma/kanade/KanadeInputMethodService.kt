@@ -136,6 +136,7 @@ class KanadeInputMethodService : InputMethodService() {
         val keyboard = SoftKeyboardView(
             this, ::softKey, { handle(KeyInput.ToggleJapanese) }, ::softVoice, ::showEmojiPanel,
             onClipboard = ::showClipboard, onSwitchLayout = ::switchLayout, onFloat = ::toggleFloat,
+            onGlide = ::onGlide, onText = { flickActions.text(it) },
         )
         keyboardView = keyboard
         val panel = EmojiPanelView(
@@ -153,6 +154,7 @@ class KanadeInputMethodService : InputMethodService() {
         val h = InputViewHost(this, keyboard, flick, panel, createClipboardView())
         host = h
         h.flickLayout = settings.softKeyboardLayout == "FLICK"
+        keyboard.glideLayout = settings.softKeyboardLayout == "GLIDE"
         val f = FloatingFrame(
             this, h,
             onMoved = { x, y, w ->
@@ -278,10 +280,109 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     /** ツールバーの配列の切り替え（QWERTY ⇄ フリック）。次から使う配列として覚える */
+    /** 配列を順に替える（グライド → フルキー → テンキー → グライド） */
     private fun switchLayout() {
-        val h = host ?: return
-        h.flickLayout = !h.flickLayout
-        settings.softKeyboardLayout = if (h.flickLayout) "FLICK" else "QWERTY"
+        val next = when (settings.softKeyboardLayout) {
+            "GLIDE" -> "QWERTY"
+            "QWERTY" -> "FLICK"
+            else -> "GLIDE"
+        }
+        settings.softKeyboardLayout = next
+        applyKeyboardSettings()
+    }
+
+    /** グライドの読み取り（語の一覧は、グライドの配列を初めて出したときに裏で読む） */
+    private val glideThread = Executors.newSingleThreadExecutor { Thread(it, "kanade-glide") }
+    @Volatile private var glideJapanese: dev.mooma.kanade.core.glide.GlideDecoder? = null
+    @Volatile private var glideEnglish: dev.mooma.kanade.core.glide.GlideDecoder? = null
+    private var glideLoading = false
+
+    private fun loadGlide() {
+        if (glideLoading) return
+        glideLoading = true
+        glideThread.execute {
+            runCatching {
+                val ja = assets.open("glide-ja.tsv").bufferedReader().useLines { dev.mooma.kanade.core.glide.GlideLexicon.japanese(it) }
+                glideJapanese = dev.mooma.kanade.core.glide.GlideDecoder(ja)
+                val en = assets.open("glide-en.txt").bufferedReader().useLines { dev.mooma.kanade.core.glide.GlideLexicon.english(it) }
+                glideEnglish = dev.mooma.kanade.core.glide.GlideDecoder(en)
+                log("glide loaded ja=${ja.size} en=${en.size}")
+            }.onFailure { log("glide load failed: $it") }
+        }
+    }
+
+    /**
+     * 直前にグライドで入れたもの。候補の帯で別の語を選ぶと、これを置き換える。
+     * [text] は入れた文字（英語は前に足した空白も含む）、[japanese] は入力中の読みに入れたか
+     */
+    private class GlideResult(val candidates: List<String>, var text: String, val japanese: Boolean, val prefix: String)
+    private var lastGlide: GlideResult? = null
+    /** グライドの語を置き換えている途中（そのあいだの入力では、グライドの候補を消さない） */
+    private var replacingGlide = false
+
+    /** グライドの配列で文字のキーの上をなぞった。裏で読み取って、いちばん合う語を入れる */
+    private fun onGlide(input: SoftKeyboardView.GlideInput) {
+        val japanese = engine.japanese
+        val decoder = (if (japanese) glideJapanese else glideEnglish) ?: run {
+            loadGlide()
+            showIndicatorText("グライドの準備をしています。少し待ってからもう一度なぞってください", 2000)
+            return
+        }
+        glideThread.execute {
+            val result = runCatching { decoder.decode(input.xs, input.ys, input.keys, input.keyWidth) }.getOrDefault(emptyList())
+            main.post {
+                val words = result.map { c ->
+                    if (!japanese && input.shift) c.output.replaceFirstChar { it.uppercaseChar() } else c.output
+                }.distinct()
+                if (words.isNotEmpty()) insertGlide(words, japanese)
+            }
+        }
+    }
+
+    private fun insertGlide(words: List<String>, japanese: Boolean) {
+        val word = words.first()
+        if (japanese) {
+            // 読みとして入れる（そのあとはふつうに Space で変換する）
+            for (c in word) handle(KeyInput.Text(c))
+            lastGlide = GlideResult(words, word, true, "")
+        } else if (emojiSearching) {
+            for (c in word) emojiPanel?.typeSearch(c)
+            lastGlide = null
+            return
+        } else {
+            // 英語: 前が文字・数字・句読点なら、間に空白を入れる
+            val before = currentInputConnection?.getTextBeforeCursor(1, 0)?.lastOrNull()
+            val prefix = if (before != null && (before.isLetterOrDigit() || before in ".,!?;:)")) " " else ""
+            currentInputConnection?.commitText(prefix + word, 1)
+            lastCommitAt = android.os.SystemClock.uptimeMillis()
+            lastGlide = GlideResult(words, prefix + word, false, prefix)
+        }
+        if (words.size > 1) showBar { it.showCandidates(words, 0) }
+    }
+
+    /** グライドのあとの候補の帯で、別の語を選んだ */
+    private fun replaceGlide(index: Int): Boolean {
+        val g = lastGlide ?: return false
+        val word = g.candidates.getOrNull(index) ?: return false
+        if (g.japanese) {
+            // 入力中の読みの終わりが、グライドで入れたかなのままなら置き換える
+            if (!engine.isComposing || !engine.composingText.endsWith(g.text)) return false.also { lastGlide = null }
+            replacingGlide = true
+            try {
+                handle(KeyInput.ReplaceLast(word, g.text.length))
+            } finally {
+                replacingGlide = false
+            }
+            g.text = word
+        } else {
+            val ic = currentInputConnection ?: return false
+            if (ic.getTextBeforeCursor(g.text.length, 0)?.toString() != g.text) return false.also { lastGlide = null }
+            ic.deleteSurroundingText(g.text.length, 0)
+            ic.commitText(g.prefix + word, 1)
+            g.text = g.prefix + word
+        }
+        showBar { it.showCandidates(g.candidates, index) }
+        return true
     }
 
     /** 絵文字を検索しているか（このあいだ、IME の変換の結果はアプリではなく検索の欄へ回す） */
@@ -368,6 +469,8 @@ class KanadeInputMethodService : InputMethodService() {
         keyboardView?.floating = floating
         flickView?.floating = floating
         keyboardView?.let { k ->
+            k.glideLayout = settings.softKeyboardLayout == "GLIDE"
+            if (k.glideLayout) loadGlide()
             k.japanese = engine.japanese
             k.heightPercent = settings.softKeyboardHeight
             k.extraBottomDp = settings.softKeyboardBottom
@@ -438,6 +541,11 @@ class KanadeInputMethodService : InputMethodService() {
 
     /** 候補の窓で候補を指で選んだ */
     private fun onCandidateTapped(index: Int) {
+        if (lastGlide != null) {
+            // 帯を押した処理の途中で帯を消して出し直すと出なくなるので、押した処理が終わってから置き換える
+            main.post { if (!replaceGlide(index)) handle(KeyInput.SelectCandidate(index)) }
+            return
+        }
         handle(KeyInput.SelectCandidate(index))
     }
 
@@ -600,6 +708,11 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     private fun handle(input: KeyInput): Boolean {
+        // グライドの候補を出しているあいだにほかのキーを打ったら、グライドの候補はおしまい
+        if (lastGlide != null && input !is KeyInput.SelectCandidate && !replacingGlide) {
+            lastGlide = null
+            hideBar()
+        }
         if (input is KeyInput.Text && engine.japanese && !engine.isComposing) {
             // 入力の始まりに、カーソルの前後の文を言語モデルの文脈として取る（端末アプリなど帯に出すアプリでは取らない）
             engine.leftContext = if (previewInBar || emojiSearching) "" else currentInputConnection?.getTextBeforeCursor(InputEngine.MAX_CONTEXT, 0)?.toString().orEmpty()

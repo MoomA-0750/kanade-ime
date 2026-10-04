@@ -110,9 +110,16 @@ fun ColumnScope.KeyboardScreen() {
         )
     }
 
-    Section("配列", "キーボードの上で切り替えることもできます（QWERTY は Ctrl を上に払う、フリックは「あa1」を上に払う）。") {
+    Section("配列", "キーボードの左下のキーを上に払っても、グライド → フルキー → テンキーの順に切り替わります（グライドは ?123、フルキーは Ctrl、テンキーは「あa1」）。") {
         var layout by rememberPref({ settings.softKeyboardLayout }, { settings.softKeyboardLayout = it })
-        ConnectedChoices(listOf("QWERTY" to "QWERTY", "FLICK" to "フリック"), layout, { layout = it })
+        ConnectedChoices(listOf("GLIDE" to "グライド", "QWERTY" to "フルキー", "FLICK" to "テンキー"), layout, { layout = it })
+        Note(
+            when (layout) {
+                "GLIDE" -> "QWERTY の文字のキーの上を指でなぞると、語を入れます（日本語はローマ字でなぞると、かなになります）。数字・記号は ?123 のページにあります。"
+                "QWERTY" -> "キーを払うと数字・記号が出ます。Ctrl・Alt・Fn・Esc・Tab もあり、物理キーボードと同じように使えます。"
+                else -> "12 のキーをフリック（トグル入力も選べます）で打ちます。"
+            },
+        )
         if (layout == "FLICK") {
             var toggle by rememberPref({ settings.flickToggle }, { settings.flickToggle = it })
             SwitchRow("トグル入力", toggle, { toggle = it }, "同じキーを続けて押すと、次の文字になります（あ→い→う）。オフにするとフリックだけで入力します。")
@@ -136,7 +143,7 @@ fun ColumnScope.KeyboardScreen() {
         var floating by rememberPref({ settings.softKeyboardFloating }, { settings.softKeyboardFloating = it })
         SwitchRow("キーボードを浮かせる", floating, { floating = it })
         Note("キーボードの下のつまみの真ん中をドラッグすると動かせます。勢いよく払うと滑っていき、画面の端で跳ね返って端に収まります。右端をドラッグすると幅が変わり、左端を押すと画面の下に戻ります。")
-        Note("Ctrl を下に払う（フリックでは「あa1」を下に払う）と、キーボードからも浮かせる・戻すを切り替えられます。")
+        Note("左下のキー（?123・Ctrl・「あa1」）を下に払うと、キーボードからも浮かせる・戻すを切り替えられます。")
     }
 
     Section("操作") {
