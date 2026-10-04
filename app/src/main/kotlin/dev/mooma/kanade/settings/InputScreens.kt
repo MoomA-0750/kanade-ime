@@ -110,7 +110,7 @@ fun ColumnScope.KeyboardScreen() {
         )
     }
 
-    Section("配列", "キーボードの上で切り替えることもできます（QWERTY は Esc を上に払う、フリックは「あa1」を上に払う）。") {
+    Section("配列", "キーボードの上で切り替えることもできます（QWERTY は Ctrl を上に払う、フリックは「あa1」を上に払う）。") {
         var layout by rememberPref({ settings.softKeyboardLayout }, { settings.softKeyboardLayout = it })
         ConnectedChoices(listOf("QWERTY" to "QWERTY", "FLICK" to "フリック"), layout, { layout = it })
         if (layout == "FLICK") {
@@ -130,6 +130,13 @@ fun ColumnScope.KeyboardScreen() {
         var bottom by rememberPref({ settings.softKeyboardBottom }, { settings.softKeyboardBottom = it })
         SliderRow("下の余白", bottom, 0..64, 4, { bottom = it }) { "${it}dp" }
         Note("ナビゲーションバーに重なるときは、下の余白を増やしてください。次にキーボードを出したときから変わります。")
+    }
+
+    Section("フロート", "キーボードを画面の下から離して、好きな位置・幅に浮かせます。浮かせている間はアプリの画面が縮まず、キーボードの外を触ると下のアプリを操作できます。") {
+        var floating by rememberPref({ settings.softKeyboardFloating }, { settings.softKeyboardFloating = it })
+        SwitchRow("キーボードを浮かせる", floating, { floating = it })
+        Note("キーボードの下のつまみの真ん中をドラッグすると動かせます。右端をドラッグすると幅が変わり、左端を押すと画面の下に戻ります。")
+        Note("Ctrl を下に払う（フリックでは「あa1」を下に払う）と、キーボードからも浮かせる・戻すを切り替えられます。")
     }
 
     Section("操作") {

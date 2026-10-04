@@ -135,7 +135,7 @@ class KanadeInputMethodService : InputMethodService() {
     override fun onCreateInputView(): View {
         val keyboard = SoftKeyboardView(
             this, ::softKey, { handle(KeyInput.ToggleJapanese) }, ::softVoice, ::showEmojiPanel,
-            onClipboard = ::showClipboard, onSwitchLayout = ::switchLayout,
+            onClipboard = ::showClipboard, onSwitchLayout = ::switchLayout, onFloat = ::toggleFloat,
         )
         keyboardView = keyboard
         val panel = EmojiPanelView(
@@ -153,8 +153,42 @@ class KanadeInputMethodService : InputMethodService() {
         val h = InputViewHost(this, keyboard, flick, panel, createClipboardView())
         host = h
         h.flickLayout = settings.softKeyboardLayout == "FLICK"
+        val f = FloatingFrame(
+            this, h,
+            onMoved = { x, y, w ->
+                settings.floatX = x
+                settings.floatY = y
+                settings.floatWidth = w
+            },
+            onDock = ::toggleFloat,
+        )
+        frame = f
         applyKeyboardSettings()
-        return h
+        return f
+    }
+
+    /** いちばん外側（フロートのときはキーボードを浮かせる） */
+    private var frame: FloatingFrame? = null
+
+    /** 画面キーボードを浮かせる・固定に戻す */
+    private fun toggleFloat() {
+        settings.softKeyboardFloating = !settings.softKeyboardFloating
+        applyKeyboardSettings()
+    }
+
+    /**
+     * フロートのときは、アプリの画面を縮めず（キーボードの分を空けない）、浮いているキーボードの上だけを IME の当たり判定にする
+     * （外を触ると下のアプリに届く）
+     */
+    override fun onComputeInsets(outInsets: InputMethodService.Insets) {
+        super.onComputeInsets(outInsets)
+        val f = frame ?: return
+        if (!f.floating || !isInputViewShown) return
+        val h = window?.window?.decorView?.height ?: return
+        outInsets.contentTopInsets = h
+        outInsets.visibleTopInsets = h
+        outInsets.touchableInsets = InputMethodService.Insets.TOUCHABLE_INSETS_REGION
+        outInsets.touchableRegion.set(f.touchableRect)
     }
 
     /** フリック配列のキーでしてもらうこと */
@@ -191,6 +225,7 @@ class KanadeInputMethodService : InputMethodService() {
         override fun clipboard() = showClipboard()
         override fun voice(down: Boolean) = softVoice(down)
         override fun switchToQwerty() = switchLayout()
+        override fun toggleFloat() = this@KanadeInputMethodService.toggleFloat()
     }
 
     /** クリップボードの履歴（コピーされるたびに足す。設定で切れる） */
@@ -322,6 +357,16 @@ class KanadeInputMethodService : InputMethodService() {
             val flick = settings.softKeyboardLayout == "FLICK"
             if (h.flickLayout != flick) h.flickLayout = flick
         }
+        val floating = settings.softKeyboardFloating
+        frame?.let { f ->
+            f.posX = settings.floatX
+            f.posY = settings.floatY
+            f.widthFraction = settings.floatWidth
+            f.floating = floating
+            f.requestLayout()
+        }
+        keyboardView?.floating = floating
+        flickView?.floating = floating
         keyboardView?.let { k ->
             k.japanese = engine.japanese
             k.heightPercent = settings.softKeyboardHeight
@@ -443,7 +488,10 @@ class KanadeInputMethodService : InputMethodService() {
     /** カーソルの位置（重ねる窓を置く場所） */
     private val anchor = CursorAnchor().apply {
         keyboardTop = {
-            host?.takeIf { isInputViewShown && it.isShown && it.height > 0 }?.let {
+            // 浮かせているときは、キーボードが画面の下半分にあるときだけ、その上端を下の端として扱う
+            val f = frame
+            if (f != null && f.floating) f.floatingTopOnScreen()?.takeIf { it > resources.displayMetrics.heightPixels / 2 }
+            else host?.takeIf { isInputViewShown && it.isShown && it.height > 0 }?.let {
                 val loc = IntArray(2)
                 it.getLocationOnScreen(loc)
                 loc[1]

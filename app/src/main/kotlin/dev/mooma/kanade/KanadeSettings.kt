@@ -106,6 +106,22 @@ class KanadeSettings(context: Context) {
         get() = prefs.getString(KEY_SOFT_KEYBOARD_LAYOUT, "QWERTY") ?: "QWERTY"
         set(value) = prefs.edit().putString(KEY_SOFT_KEYBOARD_LAYOUT, value).apply()
 
+    /** 画面キーボードを浮かせる（好きな位置・幅に動かせる） */
+    var softKeyboardFloating: Boolean
+        get() = prefs.getBoolean(KEY_FLOAT, false)
+        set(value) = prefs.edit().putBoolean(KEY_FLOAT, value).apply()
+
+    /** 浮かせたキーボードの位置（空いている範囲の中の割合）と幅（画面の幅に対する割合。0 なら自動） */
+    var floatX: Float
+        get() = prefs.getFloat(KEY_FLOAT_X, 0.5f)
+        set(value) = prefs.edit().putFloat(KEY_FLOAT_X, value).apply()
+    var floatY: Float
+        get() = prefs.getFloat(KEY_FLOAT_Y, 1f)
+        set(value) = prefs.edit().putFloat(KEY_FLOAT_Y, value).apply()
+    var floatWidth: Float
+        get() = prefs.getFloat(KEY_FLOAT_WIDTH, 0f)
+        set(value) = prefs.edit().putFloat(KEY_FLOAT_WIDTH, value).apply()
+
     /** フリック配列でトグル入力（同じキーを続けて押すと次の文字）も使う。切るとフリックだけ */
     var flickToggle: Boolean
         get() = prefs.getBoolean(KEY_FLICK_TOGGLE, true)
@@ -138,6 +154,10 @@ class KanadeSettings(context: Context) {
         const val KEY_SOFT_KEYBOARD_BOTTOM = "soft_keyboard_bottom"
         const val KEY_SOFT_KEYBOARD_LAYOUT = "soft_keyboard_layout"
         const val KEY_FLICK_TOGGLE = "flick_toggle"
+        const val KEY_FLOAT = "soft_keyboard_floating"
+        const val KEY_FLOAT_X = "float_x"
+        const val KEY_FLOAT_Y = "float_y"
+        const val KEY_FLOAT_WIDTH = "float_width"
         const val KEY_CLIPBOARD_HISTORY = "clipboard_history"
         const val KEY_SPOKEN_PUNCT = "spoken_punctuation"
         const val KEY_VOICE_FINAL = "voice_final"

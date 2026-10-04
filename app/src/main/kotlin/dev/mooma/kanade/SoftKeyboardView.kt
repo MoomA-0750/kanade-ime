@@ -32,6 +32,7 @@ class SoftKeyboardView(
     private val onClipboard: () -> Unit,
     /** フリック配列に切り替える */
     private val onSwitchLayout: () -> Unit,
+    private val onFloat: () -> Unit = {},
 ) : View(context) {
 
     /** 払う方向（上から時計回り） */
@@ -58,6 +59,8 @@ class SoftKeyboardView(
         data object Emoji : Action
         data object Clipboard : Action
         data object SwitchLayout : Action
+        /** 浮かせる・固定に戻す */
+        data object Float : Action
     }
 
     class Key(val width: Float, val center: Action?, val corners: Map<Dir, Action> = emptyMap())
@@ -175,7 +178,15 @@ class SoftKeyboardView(
     private var bottomInset = 0
 
     /** キーの下に空けている高さ（絵文字パネルも同じだけ空ける） */
-    val bottomSpace: Int get() = bottomInset + (extraBottomDp * density).toInt()
+    val bottomSpace: Int get() = if (floating) 0 else bottomInset + (extraBottomDp * density).toInt()
+
+    /** 浮かせているとき（下の余白を取らない） */
+    var floating = false
+        set(value) {
+            if (field == value) return
+            field = value
+            requestLayout()
+        }
 
     init {
         setOnApplyWindowInsetsListener { _, insets ->
@@ -202,7 +213,7 @@ class SoftKeyboardView(
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec)
-        setMeasuredDimension(w, (rows.size * rowHeight + gap * 2 + extraBottomDp * density).toInt() + bottomInset)
+        setMeasuredDimension(w, (rows.size * rowHeight + gap * 2).toInt() + bottomSpace)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -278,7 +289,7 @@ class SoftKeyboardView(
 
     /** 修飾・Esc・Tab・⌫・あ/A・🎤 は機能のキーの色にする */
     private fun isFunctionKey(action: Action) = when (action) {
-        is Action.Modifier, Action.ToggleJapanese, Action.Voice, Action.Emoji, Action.Clipboard, Action.SwitchLayout -> true
+        is Action.Modifier, Action.ToggleJapanese, Action.Voice, Action.Emoji, Action.Clipboard, Action.SwitchLayout, Action.Float -> true
         is Action.Code -> true
         is Action.Text -> false
     }
@@ -308,6 +319,7 @@ class SoftKeyboardView(
         Action.Emoji -> R.drawable.sym_mood
         Action.Clipboard -> R.drawable.sym_content_paste
         Action.SwitchLayout -> R.drawable.sym_dialpad
+        Action.Float -> R.drawable.sym_picture_in_picture_alt
         is Action.Text -> if (action.char == ' ') R.drawable.sym_space_bar else null
         Action.ToggleJapanese -> null
     }
@@ -343,6 +355,7 @@ class SoftKeyboardView(
         Action.Emoji -> "☺"
         Action.Clipboard -> "📋"
         Action.SwitchLayout -> "⌨"
+        Action.Float -> "▭"
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -382,6 +395,11 @@ class SoftKeyboardView(
                         if (mod != null && old != null && mod != old) {
                             held[mod] = held.remove(old) ?: false
                             t.heldMod = mod
+                            invalidate()
+                        } else if (mod == null && old != null) {
+                            // 修飾キーを払って修飾でないもの（Ctrl→配列の切り替えなど）にしたら、押したままの修飾は外す
+                            held.remove(old)
+                            t.heldMod = null
                             invalidate()
                         }
                         // 払う方向が変わったら、長押しの繰り返しもその方向の動きで数え直す
@@ -503,6 +521,7 @@ class SoftKeyboardView(
             Action.Emoji -> onEmoji()
             Action.Clipboard -> onClipboard()
             Action.SwitchLayout -> onSwitchLayout()
+            Action.Float -> onFloat()
             is Action.Code -> {
                 onKey(action.keyCode, currentMeta())
                 afterKey(consume)
@@ -612,12 +631,13 @@ class SoftKeyboardView(
                     ),
                 )
             val row4 = listOf(
-                Key(1.1f, Action.Modifier(Mod.CTRL)),
+                // 上に払うと配列の切り替え、下に払うとフロート（フリックの「あa1」と同じ位置・向き）
+                Key(1.1f, Action.Modifier(Mod.CTRL), mapOf(Dir.N to Action.SwitchLayout, Dir.S to Action.Float)),
                 Key(0.8f, Action.Modifier(Mod.FN)),
                 // Meta（Windows キー・⌘ にあたる。DeX のショートカットなど）は Alt を上に払う
                 Key(0.8f, Action.Modifier(Mod.ALT), mapOf(Dir.N to Action.Modifier(Mod.META))),
                 // Esc のキーを上に払うと、フリック配列に切り替える
-                Key(1f, code(KeyEvent.KEYCODE_ESCAPE, "Esc"), mapOf(Dir.N to Action.SwitchLayout)),
+                Key(1f, code(KeyEvent.KEYCODE_ESCAPE, "Esc")),
                 Key(
                     2.4f, t(' '),
                     mapOf(

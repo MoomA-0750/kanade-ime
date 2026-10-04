@@ -42,6 +42,8 @@ class FlickKeyboardView(
         fun clipboard()
         fun voice(down: Boolean)
         fun switchToQwerty()
+        /** 浮かせる・固定に戻す */
+        fun toggleFloat()
     }
 
     enum class Layout(val table: List<FlickTables.Key>) { KANA(FlickTables.KANA), ALPHABET(FlickTables.ALPHABET), NUMBER(FlickTables.NUMBER) }
@@ -115,7 +117,15 @@ class FlickKeyboardView(
             requestLayout()
         }
     private var bottomInset = 0
-    val bottomSpace: Int get() = bottomInset + (extraBottomDp * density).toInt()
+    val bottomSpace: Int get() = if (floating) 0 else bottomInset + (extraBottomDp * density).toInt()
+
+    /** 浮かせているとき（下の余白を取らない） */
+    var floating = false
+        set(value) {
+            if (field == value) return
+            field = value
+            requestLayout()
+        }
 
     /** 日本語入力中か（「あa1」のキーの表示に使う。かなの配列のときだけ意味がある） */
     var japanese = true
@@ -249,7 +259,10 @@ class FlickKeyboardView(
                 drawIcon(canvas, R.drawable.sym_mic, cx, cell.rect.top + 10 * density, 11 * density, palette.dim)
                 drawIcon(canvas, R.drawable.sym_content_paste, cell.rect.left + 10 * density, cy, 11 * density, palette.dim)
             }
-            if (fn == "mode") drawIcon(canvas, R.drawable.sym_keyboard, cx, cell.rect.top + 10 * density, 11 * density, palette.dim)
+            if (fn == "mode") {
+                drawIcon(canvas, R.drawable.sym_keyboard, cx, cell.rect.top + 10 * density, 11 * density, palette.dim)
+                drawIcon(canvas, R.drawable.sym_picture_in_picture_alt, cx, cell.rect.bottom - 10 * density, 11 * density, palette.dim)
+            }
             return
         }
         val key = layout.table[(slot as Slot.Chars).index]
@@ -389,7 +402,11 @@ class FlickKeyboardView(
                     "space" -> actions.key(KeyEvent.KEYCODE_SPACE)
                     "enter" -> actions.key(KeyEvent.KEYCODE_ENTER)
                     "emoji" -> if (t.dir == FlickTables.Dir.LEFT) actions.clipboard() else actions.emoji()
-                    "mode" -> if (t.dir == FlickTables.Dir.UP) actions.switchToQwerty() else nextLayout()
+                    "mode" -> when (t.dir) {
+                        FlickTables.Dir.UP -> actions.switchToQwerty()
+                        FlickTables.Dir.DOWN -> actions.toggleFloat()
+                        else -> nextLayout()
+                    }
                 }
             }
             is Slot.Chars -> typeKey(slot.index, t.dir)
