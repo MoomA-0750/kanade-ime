@@ -74,9 +74,6 @@ class KanadeInputMethodService : InputMethodService() {
     /** 最後に確定した時刻。自分の確定に対する遅れた選択範囲の通知で、次の入力を捨てないため */
     private var lastCommitAt = 0L
 
-    /** アプリから最後に知らされた未確定文字列の先頭の位置（カーソルを未確定文字列の途中に置くのに使う） */
-    private var composingStart = -1
-
     /** 未確定文字列をアプリに出さず、帯に出すアプリを使っている */
     private var previewInBar = false
 
@@ -587,6 +584,7 @@ class KanadeInputMethodService : InputMethodService() {
             if (k.glideLayout) loadGlide()
             k.japanese = engine.japanese
             k.heightPercent = settings.softKeyboardHeight
+            k.swipePercent = settings.softKeyboardSwipe
             k.extraBottomDp = settings.softKeyboardBottom
         }
         flickView?.let { f ->
@@ -759,7 +757,6 @@ class KanadeInputMethodService : InputMethodService() {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         // クリックなどで未確定文字列が外から確定・消去されたら、こちらの状態も捨てる
         // （帯に出しているときはアプリに未確定文字列がないので、この判定はしない）
-        composingStart = candidatesStart
         log("selection old=$oldSelStart,$oldSelEnd new=$newSelStart,$newSelEnd composing=$candidatesStart,$candidatesEnd")
         // 自分が確定した直後の通知は、確定より前の状態を報告していることがあるので見ない（遅れて届くと次の入力を捨ててしまう）
         val justCommitted = android.os.SystemClock.uptimeMillis() - lastCommitAt < STALE_SELECTION_MS
@@ -921,11 +918,12 @@ class KanadeInputMethodService : InputMethodService() {
      * 未確定文字列の先頭の位置を知って setSelection する（先頭が分からなければ、アプリの文字列から求める）
      */
     private fun placeCursorInComposing(ic: android.view.inputmethod.InputConnection, length: Int, cursor: Int) {
-        var start = composingStart
-        if (start < 0) {
-            val extracted = ic.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0) ?: return
-            start = extracted.startOffset + extracted.selectionEnd - length
-        }
+        // 未確定文字列の先頭は、いま入れた直後のカーソル（未確定文字列の末尾）から求める。
+        // アプリから届く位置（onUpdateSelection）は遅れて届くので、確定してすぐ次を打つと前の未確定文字列の位置のままで、
+        // カーソルが前に打った文字の中へ飛び、前の文字が未確定文字列に混ざっていた（括弧を打ったときに起きていた）
+        val extracted = ic.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0)
+        val start = if (extracted != null) extracted.startOffset + extracted.selectionEnd - length else return
+        if (start < 0) return
         ic.setSelection(start + cursor, start + cursor)
     }
 

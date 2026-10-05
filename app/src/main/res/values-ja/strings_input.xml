@@ -95,4 +95,6 @@
     <string name="input_save">保存</string>
     <string name="input_edit">編集</string>
     <string name="input_delete">削除</string>
+    <string name="input_swipe_distance">払いと見なす距離</string>
+    <string name="input_swipe_distance_note">キーの幅に対して、どれだけ指を動かしたら払い（数字・記号）にするかです。文字を打ったつもりが記号や数字になるときは大きくしてください。</string>
 </resources>

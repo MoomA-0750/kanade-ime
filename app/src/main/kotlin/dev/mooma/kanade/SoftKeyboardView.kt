@@ -195,7 +195,12 @@ class SoftKeyboardView(
         }
 
     private val gap = 3 * density
-    private val swipeThreshold = 16 * density
+    /** 払いと見なす指の距離（キーの幅に対する %）。小さいと打ちたい文字が記号・数字になりやすい（設定で変えられる） */
+    var swipePercent = DEFAULT_SWIPE_PERCENT
+
+    /** 払いと見なす指の距離（px）。キーの幅に合わせるが、小さいキーでも最低これだけは要る */
+    private val swipeThreshold: Float
+        get() = maxOf(MIN_SWIPE_DP * density, (width - gap) / 10f * swipePercent / 100f)
 
     /** 押している指ごとの状態（速く打つときに前の指を離す前に次を押せるように） */
     private class Touch(val key: Key, val rect: RectF, val x0: Float, val y0: Float) {
@@ -733,6 +738,9 @@ class SoftKeyboardView(
         private const val PILL_OUT_MS = 280L
         private const val REPEAT_MS = 50L
         private const val DOUBLE_TAP_MS = 350L
+        /** 払いと見なす距離の既定（キーの幅の 45%）と、最低の距離 */
+        const val DEFAULT_SWIPE_PERCENT = 45
+        private const val MIN_SWIPE_DP = 18f
         /** これだけ指が動いたら、文字のキーのタップではなくグライドにする */
         private const val GLIDE_START_DP = 14f
         private const val TRAIL_FADE_MS = 220L

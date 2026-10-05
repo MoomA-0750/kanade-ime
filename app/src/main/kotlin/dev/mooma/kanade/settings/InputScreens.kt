@@ -160,6 +160,9 @@ fun ColumnScope.KeyboardScreen() {
     }
 
     Section(stringResource(R.string.input_gestures_title)) {
+        var swipe by rememberPref({ settings.softKeyboardSwipe }, { settings.softKeyboardSwipe = it })
+        SliderRow(stringResource(R.string.input_swipe_distance), swipe, 25..80, 5, { swipe = it }) { "$it%" }
+        Note(stringResource(R.string.input_swipe_distance_note))
         for (line in listOf(
             R.string.input_gesture_swipe_keys,
             R.string.input_gesture_modifiers,
