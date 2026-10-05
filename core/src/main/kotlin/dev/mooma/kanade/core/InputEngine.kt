@@ -98,6 +98,8 @@ data class EngineSettings(
     val candidateCount: Int = 10,
     /** 句読点（「,」「.」で入るもの）。「、。」「，．」「、．」「，。」 */
     val punctuation: String = "、。",
+    /** 開き括弧を打ったら閉じ括弧も入れ、カーソルを中に置く（[Brackets]） */
+    val pairBrackets: Boolean = true,
 )
 
 /** 文節（読みと、いま選んでいる表記） */
@@ -158,6 +160,18 @@ class InputEngine(
     /** カーソルが未確定文字列の途中にある（そのあいだはライブ変換せず、かなで出す） */
     private val caretInside: Boolean get() = caret < units.size
 
+    /**
+     * カーソルの後ろに、自動で入れた閉じ括弧より後ろの文字がある（途中を直している）。
+     * 後ろが自動の閉じ括弧だけなら、末尾で打っているのと同じに扱い、ライブ変換も続ける
+     */
+    private val editingInside: Boolean get() = caret < units.size && units.drop(caret).any { !it.autoClose }
+
+    /** 後ろに残している自動の閉じ括弧 */
+    private val trailingClosers: String get() = if (editingInside) "" else units.drop(caret).joinToString("") { it.text }
+
+    /** 空の括弧の対で Space を押して括弧を替えているとき、[Brackets.PAIRS] の位置。していなければ -1 */
+    private var bracketChoice = -1
+
     /** ライブ変換の候補（文全体。[candidatesFor] の読みに対するもの）。並べ替えが届いたら差し替わる */
     private var conversions: List<Conversion> = emptyList()
 
@@ -216,20 +230,28 @@ class InputEngine(
     val lastTypedChar: Char?
         get() = when {
             isConverting -> null
-            romaji.pending.isNotEmpty() && !caretInside -> romaji.pending.last()
+            romaji.pending.isNotEmpty() && !editingInside -> romaji.pending.last()
             else -> units.take(caret).lastOrNull()?.text?.lastOrNull()
         }
 
     val composingText: String
         get() {
             if (isConverting) return segs.joinToString("") { it.surface }
-            if (caretInside) return textBeforeCaret() + units.drop(caret).joinToString("") { it.text }
-            if (showReading || !settings.liveConversion) return reading + romaji.pending
-            return (bestFor(reading) ?: reading) + romaji.pending
+            if (editingInside) return textBeforeCaret() + units.drop(caret).joinToString("") { it.text }
+            val closers = trailingClosers
+            if (showReading || !settings.liveConversion) return textBeforeCaret() + closers
+            // 自動の閉じ括弧は変換の結果の末尾にも残る（残らなければ、かなで出す）
+            val best = bestFor(reading) ?: reading
+            if (!best.endsWith(closers)) return textBeforeCaret() + closers
+            return best.dropLast(closers.length) + romaji.pending + closers
         }
 
-    /** 未確定文字列の中のカーソルの位置（文字数）。末尾なら -1 */
-    private val composingCursor: Int get() = if (caretInside && !isConverting) textBeforeCaret().length else -1
+    /** 未確定文字列の中のカーソルの位置（文字数）。末尾なら -1（自動の閉じ括弧の手前にいるなら、その手前） */
+    private val composingCursor: Int get() = when {
+        isConverting || !caretInside -> -1
+        editingInside -> textBeforeCaret().length
+        else -> composingText.length - trailingClosers.length
+    }
 
     private fun textBeforeCaret() = units.take(caret).joinToString("") { it.text } + romaji.pending
 
@@ -276,8 +298,8 @@ class InputEngine(
         if (isConverting) return emptyList()
         candidates = (pinned + ranked).distinct()
         // カーソルが未確定文字列の途中にあるあいだは、かなで出しているので見た目は変わらない
-        if (caretInside) return emptyList()
-        return listOf(ImeCommand.SetComposing(composingText))
+        if (editingInside) return emptyList()
+        return listOf(ImeCommand.SetComposing(composingText, cursor = composingCursor))
     }
 
     /** アプリ側の事情（入力欄の切り替えなど）や Enter で、いま出しているものを確定させる */
@@ -311,6 +333,7 @@ class InputEngine(
         focus = 0
         segRerank = null
         showReading = false
+        bracketChoice = -1
         requestId++
     }
 
@@ -332,6 +355,28 @@ class InputEngine(
         if (isConverting) return handleConverting(input)
 
         val commands = mutableListOf<ImeCommand>()
+        // 空の括弧の対で Space（↓）・Shift+Space（↑）を押すと、別の括弧の対に替える。候補の窓からも選べる
+        val pair = emptyAutoPair()
+        if (pair >= 0 && (input == KeyInput.Space || input == KeyInput.Down || input == KeyInput.ShiftSpace || input == KeyInput.Up)) {
+            val step = if (input == KeyInput.ShiftSpace || input == KeyInput.Up) -1 else 1
+            bracketChoice = (pair + step + Brackets.PAIRS.size) % Brackets.PAIRS.size
+            setPair(bracketChoice)
+            return EngineResult(
+                listOf(ImeCommand.SetComposing(composingText, cursor = composingCursor), ImeCommand.ShowCandidates(Brackets.PAIRS, bracketChoice)),
+                consumed = true,
+            )
+        }
+        if (bracketChoice >= 0) {
+            if (input is KeyInput.SelectCandidate && pair >= 0 && input.index in Brackets.PAIRS.indices) {
+                setPair(input.index)
+                bracketChoice = -1
+                return EngineResult(listOf(ImeCommand.SetComposing(composingText, cursor = composingCursor), ImeCommand.HideCandidates), consumed = true)
+            }
+            // ほかのキーで、いまの括弧に決めて、そのキーをふつうに処理する（候補の窓は閉じる）
+            bracketChoice = -1
+            val rest = handleJapanese(input)
+            return rest.copy(commands = listOf(ImeCommand.HideCandidates) + rest.commands)
+        }
         when (input) {
             is KeyInput.Text -> {
                 showReading = false
@@ -386,7 +431,7 @@ class InputEngine(
             return EngineResult(commands, consumed = true)
         }
         // ライブ変換を切っているときは、打つたびに候補を作らない（Space を押したときに作る）
-        if (!showReading && !caretInside && settings.liveConversion) commands += refreshCandidates()
+        if (!showReading && !editingInside && settings.liveConversion) commands += refreshCandidates()
         commands += ImeCommand.SetComposing(composingText, cursor = composingCursor)
         return EngineResult(commands, consumed = true)
     }
@@ -648,13 +693,40 @@ class InputEngine(
             '.' -> settings.punctuation.getOrElse(1) { '。' }.toString()
             else -> PUNCTUATION[c]
         } ?: if (settings.fullWidthSymbols) CharWidth.toFullWidthAscii(c.toString()) else c.toString()
+        // 自動で入れた閉じ括弧と同じものを打ったら、入れずにその後ろへ進む
+        if (caret < units.size && units[caret].autoClose && units[caret].text == text) {
+            units[caret] = units[caret].copy(autoClose = false)
+            caret++
+            return
+        }
         insertUnits(listOf(KanaUnit(text, c.toString())))
+        // 開き括弧なら閉じ括弧も入れ、カーソルを中に置く
+        if (settings.pairBrackets) Brackets.closerOf(text)?.let { closer ->
+            units.add(caret, KanaUnit(closer, rawOf(closer), autoClose = true))
+        }
+    }
+
+    /** 入力中の読みが、自動で入れた空の括弧の対だけなら、その [Brackets.PAIRS] の位置。そうでなければ -1 */
+    private fun emptyAutoPair(): Int {
+        if (units.size != 2 || caret != 1 || romaji.pending.isNotEmpty() || !units[1].autoClose) return -1
+        return Brackets.pairIndex(units[0].text + units[1].text)
+    }
+
+    /** 空の括弧の対を、[Brackets.PAIRS] の [index] 番目に替える */
+    private fun setPair(index: Int) {
+        val p = Brackets.PAIRS[index]
+        units[0] = KanaUnit(p[0].toString(), rawOf(p[0].toString()))
+        units[1] = KanaUnit(p[1].toString(), rawOf(p[1].toString()), autoClose = true)
     }
 
     /** カーソルの前の1文字（綴りの途中なら1字）を消す */
     private fun deleteLast() {
         if (romaji.deleteLast()) return
         if (caret == 0) return
+        // 開き括弧を消すとき、すぐ後ろが自動で入れた閉じ括弧なら一緒に消す
+        if (caret < units.size && units[caret].autoClose && Brackets.closerOf(units[caret - 1].text) == units[caret].text) {
+            units.removeAt(caret)
+        }
         val last = units.removeAt(caret - 1)
         caret--
         if (last.text.length > 1) {

@@ -247,7 +247,16 @@ class KanadeInputMethodService : InputMethodService() {
     private var clipboardPanel: ClipboardPanelView? = null
 
     private fun createClipboardView(): View =
-        ClipboardPanelView(this, clipboardHistory, onPaste = ::pasteClip, onClose = ::hideEmojiPanel).also { clipboardPanel = it }
+        ClipboardPanelView(this, clipboardHistory, onPaste = ::pasteClip, onClose = ::hideEmojiPanel, currentSensitive = ::currentSensitiveClip)
+            .also { clipboardPanel = it }
+
+    /** いまのコピーが機密の印つき（パスワード管理アプリなど）の文字なら、その文字（IME はいまの入力方法なので読める） */
+    private fun currentSensitiveClip(): String? {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) return null
+        val clip = runCatching { clipboardManager.primaryClip }.getOrNull() ?: return null
+        if (clip.description.extras?.getBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE) != true) return null
+        return clip.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()?.takeIf { it.isNotEmpty() }
+    }
 
     /** クリップボードの項目を貼り付ける。画像は、入力欄が受け付けるなら画像として、受け付けなければクリップボードに入れて知らせる */
     private fun pasteClip(item: ClipboardHistory.Item) {

@@ -33,6 +33,8 @@ class ClipboardPanelView(
     private val history: ClipboardHistory,
     private val onPaste: (ClipboardHistory.Item) -> Unit,
     private val onClose: () -> Unit,
+    /** いまのコピーが機密の印つき（パスワードなど）なら、その文字。履歴には残さず、伏せて出して貼り付けられるようにする */
+    private val currentSensitive: () -> String? = { null },
 ) : FrameLayout(context) {
     private val palette = KeyboardPalette.of(context)
     private val density = resources.displayMetrics.density
@@ -78,6 +80,10 @@ class ClipboardPanelView(
 
     fun refresh() {
         list.removeAllViews()
+        // パスワード管理アプリ（1Password など）のコピーは機密の印が付いていて履歴に残さないので、いまクリップボードにある間だけ伏せて出す
+        currentSensitive()?.let { secret ->
+            section("いまのコピー（機密）", listOf(ClipboardHistory.Item(SENSITIVE_ID, secret, null, null, false, 0L)))
+        }
         val items = history.all()
         if (items.isEmpty()) {
             list.addView(TextView(context).apply {
@@ -131,7 +137,8 @@ class ClipboardPanelView(
             }
         } else {
             TextView(context).apply {
-                text = item.text
+                // 機密のコピーは中身を出さない
+                text = if (item.id == SENSITIVE_ID) "••••••••\n（${item.text?.length ?: 0} 文字。押すと貼り付けます）" else item.text
                 setTextColor(palette.text)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
                 maxLines = 4
@@ -146,7 +153,7 @@ class ClipboardPanelView(
             onPaste(item)
         }
         view.setOnLongClickListener {
-            menu(it, item)
+            if (item.id != SENSITIVE_ID) menu(it, item)
             true
         }
         if (!item.pinned) return view
@@ -312,5 +319,10 @@ class ClipboardPanelView(
             val h = max(1, (crop.height() * scale).toInt()).coerceAtMost(bitmap.height - y)
             return Bitmap.createBitmap(bitmap, x, y, w, h)
         }
+    }
+
+    private companion object {
+        /** 機密のコピーを伏せて出すときの仮の項目の id（履歴には入れない） */
+        const val SENSITIVE_ID = "sensitive"
     }
 }

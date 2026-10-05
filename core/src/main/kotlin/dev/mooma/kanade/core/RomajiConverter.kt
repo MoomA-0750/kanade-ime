@@ -1,7 +1,7 @@
 package dev.mooma.kanade.core
 
-/** 確定したかな1まとまりと、その元になったローマ字 */
-data class KanaUnit(val text: String, val raw: String)
+/** 確定したかな1まとまりと、その元になったローマ字。[autoClose] は開き括弧を打ったときに自動で入れた閉じ括弧 */
+data class KanaUnit(val text: String, val raw: String, val autoClose: Boolean = false)
 
 /**
  * ローマ字を1文字ずつ受け取り、かなが決まった分を [KanaUnit] で返す。

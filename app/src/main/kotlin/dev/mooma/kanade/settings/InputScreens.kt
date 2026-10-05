@@ -49,6 +49,11 @@ fun ColumnScope.InputScreen() {
     Section("文字") {
         var fullWidth by rememberPref({ settings.fullWidthSymbols }, { settings.fullWidthSymbols = it })
         SwitchRow("数字・記号を全角で入力する", fullWidth, { fullWidth = it }, "オフにすると半角で入力します（変換の候補には両方出ます）。")
+        var pairBrackets by rememberPref({ settings.pairBrackets }, { settings.pairBrackets = it })
+        SwitchRow(
+            "括弧を対で入れる", pairBrackets, { pairBrackets = it },
+            "「（ などを打つと閉じ括弧も入れ、カーソルを中に置きます。空の括弧で Space を押すと、「」『』【】などに替わります。",
+        )
         Text("句読点（, と . で入るもの）")
         var punctuation by rememberPref({ settings.punctuation }, { settings.punctuation = it })
         ConnectedChoices(listOf("、。", "，．", "、．", "，。").map { it to it }, punctuation, { punctuation = it })
@@ -78,20 +83,7 @@ fun ColumnScope.InputScreen() {
         }
     }
 
-    Section("入力中の文字を帯に出すアプリ", "入力中の文字をうまく出せないアプリ（Termux などの端末アプリ）では、入力中の文字を帯に出します。パッケージ名をカンマで区切って入れます。") {
-        var saved by remember { mutableStateOf(settings.previewInBarPackages.sorted().joinToString(", ")) }
-        var text by remember { mutableStateOf(saved) }
-        OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth(), singleLine = true)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilledTonalButton(
-                onClick = {
-                    settings.previewInBarPackages = text.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
-                    saved = text
-                },
-                enabled = text != saved,
-            ) { Text("保存") }
-        }
-    }
+    PreviewAppsSection()
 }
 
 /** 画面キーボード */
@@ -99,7 +91,7 @@ fun ColumnScope.InputScreen() {
 fun ColumnScope.KeyboardScreen() {
     val settings = rememberSettings()
 
-    Section("出すとき", "物理キーボードがつながっていないときに使う画面キーボードです（Unexpected Keyboard と同じ考え方です）。") {
+    Section("出すとき", "物理キーボードがつながっていないときに使う画面キーボードです。") {
         var mode by rememberPref({ settings.softKeyboard }, { settings.softKeyboard = it })
         ConnectedChoices(listOf("AUTO" to "自動", "ALWAYS" to "いつも", "NEVER" to "出さない"), mode, { mode = it })
         Note(
@@ -116,6 +108,11 @@ fun ColumnScope.KeyboardScreen() {
         var enabled by rememberPref({ settings.enabledLayouts }, { settings.enabledLayouts = it })
         var layout by rememberPref({ settings.softKeyboardLayout }, { settings.softKeyboardLayout = it })
         Note("使う配列（左下のキーで切り替えるときは、この中だけを回ります）")
+        val descriptions = mapOf(
+            "GLIDE" to "QWERTY の文字のキーの上を指でなぞると、語を入れます（日本語はローマ字でなぞると、かなになります）。数字・記号は ?123 のページにあります。",
+            "QWERTY" to "キーを払うと数字・記号が出ます。Ctrl・Alt・Fn・Esc・Tab もあり、物理キーボードと同じように使えます。",
+            "FLICK" to "12 のキーをフリック（トグル入力も選べます）で打ちます。",
+        )
         for (id in LAYOUTS) {
             SwitchRow(names.getValue(id), id in enabled, { on ->
                 // 最後の1つは外せない
@@ -124,19 +121,8 @@ fun ColumnScope.KeyboardScreen() {
                     enabled = next
                     if (layout !in next) layout = LAYOUTS.first { it in next }
                 }
-            })
+            }, descriptions.getValue(id))
         }
-        if (enabled.size > 1) {
-            Note("いまの配列")
-            ConnectedChoices(LAYOUTS.filter { it in enabled }.map { it to names.getValue(it) }, layout, { layout = it })
-        }
-        Note(
-            when (layout) {
-                "GLIDE" -> "QWERTY の文字のキーの上を指でなぞると、語を入れます（日本語はローマ字でなぞると、かなになります）。数字・記号は ?123 のページにあります。"
-                "QWERTY" -> "キーを払うと数字・記号が出ます。Ctrl・Alt・Fn・Esc・Tab もあり、物理キーボードと同じように使えます。"
-                else -> "12 のキーをフリック（トグル入力も選べます）で打ちます。"
-            },
-        )
         if ("GLIDE" in enabled) {
             var glideZenz by rememberPref({ settings.glideZenz }, { settings.glideZenz = it })
             SwitchRow(
@@ -144,7 +130,7 @@ fun ColumnScope.KeyboardScreen() {
                 "日本語のグライドで、前の文とのつながりを zenz（変換の並べ替えに使う言語モデル）に見てもらいます。辞書の1位を先に入れ、zenz が別の語を選んだら少し遅れて入れ替えます。",
             )
         }
-        if (layout == "FLICK") {
+        if ("FLICK" in enabled) {
             var toggle by rememberPref({ settings.flickToggle }, { settings.flickToggle = it })
             SwitchRow("トグル入力", toggle, { toggle = it }, "同じキーを続けて押すと、次の文字になります（あ→い→う）。オフにするとフリックだけで入力します。")
         }
@@ -161,13 +147,6 @@ fun ColumnScope.KeyboardScreen() {
         var bottom by rememberPref({ settings.softKeyboardBottom }, { settings.softKeyboardBottom = it })
         SliderRow("下の余白", bottom, 0..64, 4, { bottom = it }) { "${it}dp" }
         Note("ナビゲーションバーに重なるときは、下の余白を増やしてください。次にキーボードを出したときから変わります。")
-    }
-
-    Section("フロート", "キーボードを画面の下から離して、好きな位置・幅に浮かせます。浮かせている間はアプリの画面が縮まず、キーボードの外を触ると下のアプリを操作できます。") {
-        var floating by rememberPref({ settings.softKeyboardFloating }, { settings.softKeyboardFloating = it })
-        SwitchRow("キーボードを浮かせる", floating, { floating = it })
-        Note("キーボードの下のつまみの真ん中をドラッグすると動かせます。勢いよく払うと滑っていき、画面の端で跳ね返って端に収まります。右端をドラッグすると幅が変わり、左端を押すと画面の下に戻ります。")
-        Note("左下のキー（?123・Ctrl・「あa1」）を下に払うと、キーボードからも浮かせる・戻すを切り替えられます。")
     }
 
     Section("操作") {

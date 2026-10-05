@@ -44,6 +44,16 @@ const val SCOWL_SHA256 = "5587667caa20c4891390c2d42dbb4d5c4c3f41bee77af1457ece3b
 /** SCOWL の大きさ（よく使う語から順に 10〜95。70 は大きめの辞書にあたる） */
 val SCOWL_SIZES = listOf(10, 20, 35, 40, 50, 55, 60, 70)
 
+/**
+ * カタカナ→英語の表記（アップル→Apple）。jmdict-simplified の JSON（JMdict の英語版・JMnedict。EDRDG、CC BY-SA 4.0）。
+ * EDRDG の配布元は毎日更新されてハッシュで固定できないので、版の付いたものを使う
+ */
+const val JMDICT_VERSION = "3.6.2+20260928191014"
+const val JMDICT_URL = "https://github.com/scriptin/jmdict-simplified/releases/download/3.6.2%2B20260928191014/jmdict-eng-3.6.2%2B20260928191014.json.zip"
+const val JMDICT_SHA256 = "39d57329e4e17cba037072f3189ccd23b2a6bd5d98b563fbe3feef040f1dcdb3"
+const val JMNEDICT_URL = "https://github.com/scriptin/jmdict-simplified/releases/download/3.6.2%2B20260928191014/jmnedict-all-3.6.2%2B20260928191014.json.zip"
+const val JMNEDICT_SHA256 = "fc6b1ec1b48cd8cbe4f3908ae5cd3e38ae3f705f1afe581077a6809c92f53a35"
+
 /** グライド入力の日本語に入れる読みの数（よく使うものから） */
 const val GLIDE_JAPANESE_READINGS = 60000
 
@@ -326,6 +336,10 @@ fun assets(cacheDir: File, outDir: File) {
     // グライド入力の語（日本語は Mozc の読み、英語は FrequencyWords）
     File(outDir, "glide-ja.tsv").writeText(glideJapanese(mozcDir, built))
     File(outDir, "glide-en.txt").writeText(glideEnglish(cacheDir))
+    // カタカナ→英語の表記（アップル→Apple）
+    val english = File(built, "english-$JMDICT_VERSION.ksym")
+    if (!english.exists()) english.writeText(englishTable(cacheDir))
+    english.copyTo(File(outDir, "english.ksym"), overwrite = true)
     readTarGz(fetchScowl(cacheDir)) { name, bytes -> if (name.endsWith("/Copyright")) File(outDir, "scowl-license.txt").writeBytes(bytes) }
     File(outDir, "emoji-panel.tsv").writeText(EmojiPanelData.fromUnicodeTest(fetchEmojiTest(cacheDir).readLines(), japanese).write())
 }
@@ -772,4 +786,110 @@ fun evaluateGlideZenz(assets: File, built: File, gguf: File, lib: File, aim: Flo
             println("  辞書の頻度を残す ${keep}・zenz の重み $w: 1位 ${100 * t1 / plain}%・3位以内 ${100 * t3 / plain}%、文脈つき ${c1}/${contextCases.size}")
         }
     }
+}
+
+fun fetchPinned(cacheDir: File, name: String, url: String, sha: String): File {
+    val f = File(cacheDir, name)
+    if (!f.exists() || sha256(f) != sha) {
+        println("取得: $url")
+        val tmp = File(cacheDir, "$name.tmp")
+        URI(url).toURL().openStream().use { input -> tmp.outputStream().use { input.copyTo(it) } }
+        check(sha256(tmp) == sha) { "$name のハッシュが合わない" }
+        tmp.renameTo(f)
+    }
+    return f
+}
+
+/** jmdict-simplified の JSON（zip の中の1ファイル）の words の要素を1つずつ渡す */
+fun eachJmWord(zip: File, each: (com.fasterxml.jackson.databind.JsonNode) -> Unit) {
+    java.util.zip.ZipFile(zip).use { z ->
+        val entry = z.entries().asSequence().first { it.name.endsWith(".json") }
+        val mapper = com.fasterxml.jackson.databind.ObjectMapper()
+        mapper.factory.createParser(z.getInputStream(entry)).use { p ->
+            while (p.nextToken() != null) {
+                if (p.currentToken == com.fasterxml.jackson.core.JsonToken.FIELD_NAME && p.currentName() == "words") {
+                    p.nextToken() // START_ARRAY
+                    while (p.nextToken() == com.fasterxml.jackson.core.JsonToken.START_OBJECT) each(mapper.readTree(p))
+                    return
+                }
+            }
+        }
+    }
+}
+
+private val KATAKANA_WORD = Regex("^[ァ-ヺー・]+$")
+/** 英字の表記（「pan-」のような接頭辞の書き方は入れない） */
+private val LATIN_WORD = Regex("^[A-Za-z0-9]([A-Za-z0-9 .&'+!-]*[A-Za-z0-9.!+])?$")
+
+/** カタカナのおおまかな子音の並び（英語の綴りと発音が近いかを見るため） */
+private val KATAKANA_CONSONANT: Map<Char, Char> = buildMap {
+    fun row(kana: String, c: Char) = kana.forEach { put(it, c) }
+    row("カキクケコ", 'k'); row("ガギグゲゴ", 'g'); row("サシスセソ", 's'); row("ザジズゼゾヂヅ", 'z'); row("タツテト", 't'); row("チ", 't')
+    row("ダデド", 'd'); row("ナニヌネノン", 'n'); row("ハヒヘホ", 'h'); row("フ", 'h'); row("バビブベボヴ", 'b'); row("パピプペポ", 'p')
+    row("マミムメモ", 'm'); row("ヤユヨ", 'y'); row("ラリルレロ", 'r')
+}
+
+private fun dedupe(s: String) = buildString { for (c in s) if (isEmpty() || last() != c) append(c) }
+
+/** カタカナと英語の綴りの、子音の並びの近さ（0〜1） */
+fun soundSimilarity(katakana: String, english: String): Double {
+    val a = dedupe(katakana.mapNotNull { KATAKANA_CONSONANT[it] }.joinToString(""))
+    var e = english.lowercase()
+    for ((from, to) in listOf("ph" to "f", "th" to "s", "ch" to "t", "sh" to "s", "ck" to "k", "x" to "ks")) e = e.replace(from, to)
+    val b = dedupe(e.mapNotNull { c ->
+        when (c) {
+            in "aeiouyw" -> null
+            'c', 'q' -> 'k'
+            'l' -> 'r'
+            'v' -> 'b'
+            'f' -> 'h'
+            'j' -> 'z'
+            in 'a'..'z' -> c
+            else -> null
+        }
+    }.joinToString(""))
+    if (a.isEmpty() && b.isEmpty()) return 1.0
+    // 最長共通部分列の長さで比べる
+    val dp = Array(a.length + 1) { IntArray(b.length + 1) }
+    for (i in 1..a.length) for (j in 1..b.length) {
+        dp[i][j] = if (a[i - 1] == b[j - 1]) dp[i - 1][j - 1] + 1 else maxOf(dp[i - 1][j], dp[i][j - 1])
+    }
+    return 2.0 * dp[a.length][b.length] / (a.length + b.length)
+}
+
+/**
+ * カタカナの読み（ひらがなにしたもの）→英語の表記の表（english.ksym）。
+ * - JMnedict（固有名）: カタカナだけの読みと、英字の表記（グーグル→Google、トヨタ→Toyota）
+ * - JMdict（外来語）: 漢字の無い語で、英語が元の語（ほかの言語・和製英語でない）の意味のうち、綴りと発音が近いもの（アップル→apple）
+ */
+fun englishTable(cacheDir: File): String {
+    val map = LinkedHashMap<String, MutableList<String>>()
+    fun add(katakana: String, english: String) {
+        val reading = dev.mooma.kanade.core.CharWidth.toHiragana(katakana.replace("・", ""))
+        val list = map.getOrPut(reading) { ArrayList() }
+        if (english !in list && list.size < 6) list += english
+    }
+    eachJmWord(fetchPinned(cacheDir, "jmdict-eng-$JMDICT_VERSION.json.zip", JMDICT_URL, JMDICT_SHA256)) { w ->
+        if (w["kanji"].size() > 0) return@eachJmWord
+        val readings = w["kana"].map { it["text"].asText() }.filter { KATAKANA_WORD.matches(it) }
+        if (readings.isEmpty()) return@eachJmWord
+        for (sense in w["sense"]) {
+            val sources = sense["languageSource"]
+            if (sources.any { it["lang"].asText() != "eng" || it["wasei"].asBoolean() }) continue
+            for (g in sense["gloss"]) {
+                val t = g["text"].asText()
+                if (!LATIN_WORD.matches(t) || t.split(' ').size > 2) continue
+                for (r in readings) if (soundSimilarity(r, t) >= 0.6) add(r, t)
+            }
+        }
+    }
+    eachJmWord(fetchPinned(cacheDir, "jmnedict-all-$JMDICT_VERSION.json.zip", JMNEDICT_URL, JMNEDICT_SHA256)) { w ->
+        val readings = w["kana"].map { it["text"].asText() }.filter { KATAKANA_WORD.matches(it) }
+        if (readings.isEmpty()) return@eachJmWord
+        for (t in w["translation"]) for (x in t["translation"]) {
+            val text = x["text"].asText()
+            if (LATIN_WORD.matches(text)) for (r in readings) add(r, text)
+        }
+    }
+    return dev.mooma.kanade.core.dict.SymbolTable(map).write()
 }

@@ -18,5 +18,6 @@
 | Material Symbols（Google、Rounded の 24px。`app/src/main/res/drawable/sym_*.xml` に変換して同梱） | リポジトリ・APK | Apache-2.0 | 画面キーボードと設定画面のアイコン |
 | FrequencyWords の英語の上位5万語（hermitdave/FrequencyWords、`content/2018/en/en_50k.txt`、コミット 525f9b5。OpenSubtitles 2018 由来） | ビルド時に取得して、グライド入力の英単語（`glide-en.txt`）として assets へ | CC BY-SA 4.0（コードは MIT） | 公開するときは出典の表示と、同じ許諾での単語リストの公開が要る |
 | SCOWL 2020.12.07（Kevin Atkinson ほか。english-words・american-words の大きさ 70 まで） | ビルド時に取得して、グライドの英単語のふるいに使う（辞書にある語だけを残す）。著作権表示を `scowl-license.txt` として assets へ | MIT に近い許諾（著作権表示と許諾文を添える） | |
+| JMdict（英語版）・JMnedict（EDRDG。jmdict-simplified 3.6.2+20260928191014 の JSON） | ビルド時に取得して、カタカナ→英語の表記の表（`english.ksym`）にして assets へ | CC BY-SA 4.0（EDRDG のライセンス。「This package uses the JMdict/EDICT and JMnedict files. These files are the property of the Electronic Dictionary Research and Development Group, and are used in conformance with the Group's licence.」の表示が要る） | 公開するときは、アプリの中にもこの表示を出す |
 | Unicode の emoji-test.txt（Emoji 16.0） | ビルド時に取得して、絵文字パネルの並び（`emoji-panel.tsv`）にして assets へ | Unicode License v3 | |
 | 見本の音声 `eval/voice-sample-ja.wav` | リポジトリ・APK | Windows の音声合成（Microsoft Haruka）で作成 | 公開前に扱いを確かめる |

@@ -36,6 +36,7 @@ object ConversionResources {
         fun table(name: String) = SymbolTable.parse(app.assets.open(name).bufferedReader().readText())
         return DictionaryCandidateSource(
             converter(app), Segmenter(PosTable.read(mapAsset(app, "pos.kpos"))), table("symbol.ksym"), table("emoji.ksym"),
+            english = table("english.ksym"),
         )
     }
 

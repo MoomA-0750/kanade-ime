@@ -10,6 +10,14 @@
     <!-- モデルを落とす前に Wi-Fi かを確かめる -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- 「入力中の文字を帯に出すアプリ」を選ぶとき、ホーム画面に出るアプリの一覧を見る -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <application
         android:label="@string/app_name"
         android:icon="@drawable/ic_mode_ja"

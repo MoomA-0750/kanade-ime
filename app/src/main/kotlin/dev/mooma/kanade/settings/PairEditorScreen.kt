@@ -1,6 +1,7 @@
 package dev.mooma.kanade.settings
 
 import android.content.Context
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -103,21 +104,33 @@ fun ColumnScope.PairEditorScreen(kind: PairKind) {
 
     if (!textMode) {
         Section("登録したもの") {
-            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                Text(kind.keyLabel, Modifier.width(140.dp), style = MaterialTheme.typography.labelLarge)
-                Text(kind.valueLabel, style = MaterialTheme.typography.labelLarge)
+            // 列の見出し（登録したものと見分けられるよう、地の色を付けて小さく薄い字にする）
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.shapes.small)
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            ) {
+                val header = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.onSecondaryContainer)
+                Text(kind.keyLabel, Modifier.width(128.dp), style = header)
+                Text(kind.valueLabel, style = header)
             }
-            HorizontalDivider()
             for (e in list) {
                 Row(
                     Modifier
                         .fillMaxWidth()
                         .clickable { editing = e }
-                        .padding(vertical = 12.dp),
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
                 ) {
                     // キーと値を2列に並べる（値に「→」のような記号があっても区切りと紛れないように）
-                    Text(e.key, Modifier.width(140.dp), fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(e.value.replace("\n", " ⏎ "), Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        e.key, Modifier.width(128.dp), style = MaterialTheme.typography.bodyLarge, fontFamily = FontFamily.Monospace,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        e.value.replace("\n", " ⏎ "), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 HorizontalDivider()
             }

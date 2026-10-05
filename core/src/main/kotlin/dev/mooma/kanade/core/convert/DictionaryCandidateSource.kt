@@ -14,6 +14,8 @@ class DictionaryCandidateSource(
     private val symbols: SymbolTable = SymbolTable(emptyMap()),
     private val emoji: SymbolTable = SymbolTable(emptyMap()),
     private val dates: DateCandidates = DateCandidates(),
+    /** カタカナの読み→英語の表記（アップル→Apple。JMdict・JMnedict から作る） */
+    private val english: SymbolTable = SymbolTable(emptyMap()),
 ) : CandidateSource {
     /** 設定画面で編集されたら差し替える。ラティスにも入れる */
     var userDictionary: UserDictionary
@@ -54,7 +56,9 @@ class DictionaryCandidateSource(
      */
     override fun segmentCandidates(reading: String, n: Int): List<String> {
         val lattice = converter.convert(reading, maxOf(n, LATTICE_CANDIDATES)).map { it.text }
+        // 括弧1文字の文節には、ほかの括弧も出す（フリックの「や」で打った（ から「 『 【 などへ）
         val base = userDictionary.lookup(reading) + lattice.take(SYMBOL_POSITION) + reading + CharWidth.toKatakana(reading) +
+            dev.mooma.kanade.core.Brackets.alternatives(reading) + english.lookup(reading) +
             dates.lookup(reading) + symbols.lookup(reading) + emoji.lookup(reading) + lattice.drop(SYMBOL_POSITION) + converter.exactWords(reading)
         // 日付・時刻には全角/半角の別の形を足さない（数字が多く、候補が倍に膨らむため）
         val dateSet = dates.lookup(reading).toSet()
@@ -68,6 +72,7 @@ class DictionaryCandidateSource(
         candidate == CharWidth.toKatakana(reading) && candidate != reading -> "カタカナ"
         candidate in dates.lookup(reading) -> if (reading in TIME_READINGS) "時刻" else "日付"
         candidate in emoji.lookup(reading) -> "絵文字"
+        candidate in english.lookup(reading) -> "英語"
         candidate in symbols.lookup(reading) || CharWidth.toHalfWidthAscii(candidate) in symbols.lookup(reading) ||
             CharWidth.toFullWidthAscii(candidate) in symbols.lookup(reading) -> when {
             CharWidth.hasHalfWidthAscii(candidate) -> "記号・半角"

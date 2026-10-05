@@ -19,6 +19,8 @@ dependencies {
     implementation(project(":core"))
     implementation(project(":zenz"))
     implementation(project(":whisper"))
+    // JMdict・JMnedict（jmdict-simplified の JSON）を少しずつ読む（ビルドのときだけ使う）
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.18.2")
 }
 
 application {

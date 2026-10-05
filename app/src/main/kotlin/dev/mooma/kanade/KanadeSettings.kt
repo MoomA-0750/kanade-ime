@@ -161,7 +161,14 @@ class KanadeSettings(context: Context) {
         get() = prefs.getString(KEY_PUNCTUATION, "、。") ?: "、。"
         set(value) = prefs.edit().putString(KEY_PUNCTUATION, value).apply()
 
-    fun engineSettings() = EngineSettings(fullWidthSymbols = fullWidthSymbols, liveConversion = liveConversion, punctuation = punctuation)
+    /** 開き括弧を打ったら閉じ括弧も入れ、カーソルを中に置く */
+    var pairBrackets: Boolean
+        get() = prefs.getBoolean(KEY_PAIR_BRACKETS, true)
+        set(value) = prefs.edit().putBoolean(KEY_PAIR_BRACKETS, value).apply()
+
+    fun engineSettings() = EngineSettings(
+        fullWidthSymbols = fullWidthSymbols, liveConversion = liveConversion, punctuation = punctuation, pairBrackets = pairBrackets,
+    )
 
     private companion object {
         const val KEY_TRIGGERS = "toggle_triggers"
@@ -176,6 +183,7 @@ class KanadeSettings(context: Context) {
         const val KEY_FLICK_TOGGLE = "flick_toggle"
         const val KEY_ENABLED_LAYOUTS = "enabled_layouts"
         const val KEY_GLIDE_ZENZ = "glide_zenz"
+        const val KEY_PAIR_BRACKETS = "pair_brackets"
         const val KEY_FLOAT = "soft_keyboard_floating"
         const val KEY_FLOAT_X = "float_x"
         const val KEY_FLOAT_Y = "float_y"
