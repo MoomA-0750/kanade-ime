@@ -34,10 +34,12 @@ object ConversionResources {
     fun candidateSource(context: Context): DictionaryCandidateSource {
         val app = context.applicationContext
         fun table(name: String) = SymbolTable.parse(app.assets.open(name).bufferedReader().readText())
-        return DictionaryCandidateSource(
+        val source = DictionaryCandidateSource(
             converter(app), Segmenter(PosTable.read(mapAsset(app, "pos.kpos"))), table("symbol.ksym"), table("emoji.ksym"),
-            english = table("english.ksym"),
         )
+        // カタカナ→英語の表（約11万の読み）は読むのに時間がかかるので、起動を止めないよう裏で読んで差し替える
+        Thread({ runCatching { source.setEnglishTable(table("english.ksym")) } }, "kanade-english").start()
+        return source
     }
 
     /** zenz を読む。重いので UI スレッドから呼ばないこと。失敗したら null（辞書だけで変換する） */

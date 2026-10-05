@@ -833,9 +833,11 @@ private fun dedupe(s: String) = buildString { for (c in s) if (isEmpty() || last
 
 /** カタカナと英語の綴りの、子音の並びの近さ（0〜1） */
 fun soundSimilarity(katakana: String, english: String): Double {
-    val a = dedupe(katakana.mapNotNull { KATAKANA_CONSONANT[it] }.joinToString(""))
+    // 有声・無声の違い（ザとサ、ドとト）は英語の綴りと合わないことが多いので同じに見る
+    fun voiceless(c: Char) = when (c) { 'z' -> 's'; 'd' -> 't'; 'g' -> 'k'; 'b' -> 'p'; else -> c }
+    val a = dedupe(katakana.mapNotNull { KATAKANA_CONSONANT[it]?.let(::voiceless) }.joinToString(""))
     var e = english.lowercase()
-    for ((from, to) in listOf("ph" to "f", "th" to "s", "ch" to "t", "sh" to "s", "ck" to "k", "x" to "ks")) e = e.replace(from, to)
+    for ((from, to) in listOf("ph" to "f", "th" to "s", "ch" to "t", "sh" to "s", "ck" to "k", "x" to "ks", "gn" to "n", "kn" to "n", "gh" to "", "mb" to "m")) e = e.replace(from, to)
     val b = dedupe(e.mapNotNull { c ->
         when (c) {
             in "aeiouyw" -> null
@@ -846,7 +848,7 @@ fun soundSimilarity(katakana: String, english: String): Double {
             'j' -> 'z'
             in 'a'..'z' -> c
             else -> null
-        }
+        }?.let(::voiceless)
     }.joinToString(""))
     if (a.isEmpty() && b.isEmpty()) return 1.0
     // 最長共通部分列の長さで比べる
@@ -870,16 +872,23 @@ fun englishTable(cacheDir: File): String {
         if (english !in list && list.size < 6) list += english
     }
     eachJmWord(fetchPinned(cacheDir, "jmdict-eng-$JMDICT_VERSION.json.zip", JMDICT_URL, JMDICT_SHA256)) { w ->
-        if (w["kanji"].size() > 0) return@eachJmWord
+        // カタカナの読み（ページ／頁 のように漢字の書き方もある語も入れる）
         val readings = w["kana"].map { it["text"].asText() }.filter { KATAKANA_WORD.matches(it) }
         if (readings.isEmpty()) return@eachJmWord
+        var first = true
         for (sense in w["sense"]) {
+            // 擬音語・擬態語（ゴロゴロ→rumbling）と、英語以外・和製英語が元の意味は使わない
+            if (sense["misc"].any { it.asText() == "on-mim" }) continue
             val sources = sense["languageSource"]
             if (sources.any { it["lang"].asText() != "eng" || it["wasei"].asBoolean() }) continue
             for (g in sense["gloss"]) {
-                val t = g["text"].asText()
-                if (!LATIN_WORD.matches(t) || t.split(' ').size > 2) continue
-                for (r in readings) if (soundSimilarity(r, t) >= 0.6) add(r, t)
+                // 「access (to a place, …)」「(computer) image」のような括弧の注を外す
+                val t = g["text"].asText().replace(Regex("\\s*\\([^)]*\\)"), "").trim()
+                val isFirst = first
+                first = false
+                if (!LATIN_WORD.matches(t) || t.split(' ').size > 3 || "..." in t) continue
+                // 外来語の最初の意味の最初の語は、たいてい元の語（デザイン→design、ユーザー→user）。それ以外は綴りと発音が近いものだけ
+                for (r in readings) if ((isFirst && t.split(' ').size <= 2) || soundSimilarity(r, t) >= 0.5) add(r, t)
             }
         }
     }

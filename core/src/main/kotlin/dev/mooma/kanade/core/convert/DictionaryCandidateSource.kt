@@ -15,8 +15,15 @@ class DictionaryCandidateSource(
     private val emoji: SymbolTable = SymbolTable(emptyMap()),
     private val dates: DateCandidates = DateCandidates(),
     /** カタカナの読み→英語の表記（アップル→Apple。JMdict・JMnedict から作る） */
-    private val english: SymbolTable = SymbolTable(emptyMap()),
+    english: SymbolTable = SymbolTable(emptyMap()),
 ) : CandidateSource {
+    /** カタカナ→英語の表記。表は大きいので、IME は起動のあとに裏で読んでから差し替える（[setEnglishTable]） */
+    @Volatile private var english = dev.mooma.kanade.core.dict.EnglishSpelling(english)
+
+    fun setEnglishTable(table: SymbolTable) {
+        english = dev.mooma.kanade.core.dict.EnglishSpelling(table)
+    }
+
     /** 設定画面で編集されたら差し替える。ラティスにも入れる */
     var userDictionary: UserDictionary
         get() = converter.userDictionary
@@ -46,8 +53,16 @@ class DictionaryCandidateSource(
         }
     }
 
-    override fun convert(reading: String, n: Int): List<Conversion> =
-        converter.convert(reading, n).map { Conversion(segmenter.segments(it.words)) }
+    override fun convert(reading: String, n: Int): List<Conversion> {
+        val list = converter.convert(reading, n).map { Conversion(segmenter.segments(it.words)) }
+        // カタカナの語（英語の表記がある）が文節に分かれていたら、1つの文節にまとめる（Space で英語の表記も選べるように）
+        val katakana = CharWidth.toKatakana(reading)
+        val top = list.firstOrNull() ?: return list
+        if (top.segments.size > 1 && top.text == katakana && english.lookup(reading).isNotEmpty()) {
+            return listOf(Conversion(listOf(dev.mooma.kanade.core.Segment(reading, katakana)))) + list.drop(1)
+        }
+        return list
+    }
 
     /**
      * ユーザー辞書、ラティスの上位3件、ひらがな・カタカナ、記号・絵文字、ラティスの残り、

@@ -36,7 +36,7 @@ You can choose the punctuation that `,` and `.` produce under "Input and convers
 
 ## English spellings for katakana words
 
-When you type a word by its katakana reading, the English spelling also appears among the candidates (アップル→Apple, グーグル→Google, ニューヨーク→New York, キーボード→keyboard). In the candidate window it is labeled "English".
+When you type a word by its katakana reading, the English spelling also appears among the candidates (アップル→Apple, グーグル→Google, ニューヨーク→New York, キーボード→keyboard). In the candidate window it is labeled "English". Words not in the table are tried with and without a final long vowel (コンピュータ / コンピューター), and built from known words (ワールドカップ → World Cup).
 
 ## Brackets
 
