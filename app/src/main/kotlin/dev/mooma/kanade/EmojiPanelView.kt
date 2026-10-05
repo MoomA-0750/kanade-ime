@@ -86,7 +86,7 @@ class EmojiPanelView(
         val searchPill = pill().apply {
             addView(icon(R.drawable.sym_search, palette.dim), LayoutParams(dp(20), dp(20)).apply { setMargins(dp(12), 0, dp(8), 0) })
             addView(TextView(context).apply {
-                text = "絵文字を検索"
+                text = context.getString(R.string.ime_emoji_search)
                 setTextColor(palette.dim)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             })
@@ -239,8 +239,8 @@ class EmojiPanelView(
         val kana = EmojiPanelData.toKana(full.lowercase())
         // 直接入力のローマ字は、かなにしたものも並べて見せる（どちらでも探している）。変換中の文字には下線
         queryView.text = when {
-            full.isEmpty() -> "ローマ字・かな・英語で検索"
-            composing.isEmpty() && kana != full.lowercase() && kana.none { it in 'a'..'z' } -> "$full（$kana）"
+            full.isEmpty() -> context.getString(R.string.ime_emoji_search_hint)
+            composing.isEmpty() && kana != full.lowercase() && kana.none { it in 'a'..'z' } -> context.getString(R.string.ime_emoji_search_query_with_kana, full, kana)
             else -> android.text.SpannableString(full).apply {
                 if (composing.isNotEmpty()) setSpan(android.text.style.UnderlineSpan(), query.length, full.length, 0)
             }
@@ -265,7 +265,7 @@ class EmojiPanelView(
         val found = data.search(full).filter { glyphPaint.hasGlyph(it) }
         if (query.isNotEmpty() && found.isEmpty()) {
             results.addView(TextView(context).apply {
-                text = "見つかりません"
+                text = context.getString(R.string.ime_emoji_not_found)
                 setTextColor(palette.dim)
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(16), 0, dp(16), 0)
@@ -303,7 +303,7 @@ class EmojiPanelView(
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
                 }
             }
-            view.contentDescription = if (i == 0) "最近使った絵文字" else data.groups.getOrNull(i - 1)?.name
+            view.contentDescription = if (i == 0) context.getString(R.string.ime_emoji_recent) else data.groups.getOrNull(i - 1)?.name
             view.setOnClickListener { selectTab(i) }
             tabBar.addView(view, LayoutParams(dp(52), LayoutParams.MATCH_PARENT))
         }

@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 音声入力の画面とモデル（既定は英語。日本語は values-ja/strings_voice.xml） -->
+<resources>
+    <!-- Record key -->
+    <string name="voice_key_section_title">Record key</string>
+    <string name="voice_key_section_description">Hold the record key to record, and release it to transcribe on the device and insert the text (audio never leaves the device). A short press starts continuous listening, which inserts text each time you finish speaking (press again or stay silent for 1 minute to stop).</string>
+    <string name="voice_key_label">Record key</string>
+    <string name="voice_key_note_soft_keyboard">On the on-screen keyboard, use the microphone key.</string>
+    <string name="voice_key_dialog_title">Record key (current: %1$s)</string>
+    <string name="voice_key_dialog_note">Press a key on your physical keyboard to use it. You can also pick one from the list.</string>
+    <string name="voice_close">Close</string>
+    <string name="voice_cancel">Cancel</string>
+
+    <!-- Speaking -->
+    <string name="voice_speaking_section_title">Speaking</string>
+    <string name="voice_streaming_title">Show text while speaking</string>
+    <string name="voice_streaming_summary">Shows text while you are still speaking, using ReazonSpeech.</string>
+    <string name="voice_spoken_punctuation_title">Speak punctuation</string>
+    <string name="voice_spoken_punctuation_summary">Say these Japanese words: くてん→。 とうてん→、 かいぎょう→new line はてなマーク→？ びっくりマーク→！ かぎかっこ／かぎかっことじ→「」 かっこ／かっことじ→（） なかぐろ→・</string>
+    <string name="voice_threads_label">Recognition threads</string>
+
+    <!-- Benchmark -->
+    <string name="voice_bench_section_title">Test with a sample</string>
+    <string name="voice_bench_section_description">Runs an 8.8-second Japanese sample (synthesized speech) through every downloaded model to compare time and results.</string>
+    <string name="voice_bench_button">Run test</string>
+    <string name="voice_bench_no_models">No models have been downloaded.</string>
+    <string name="voice_bench_threads">%1$d threads (the first run includes loading time)</string>
+    <string name="voice_bench_result">%1$s: %2$dms\n%3$s</string>
+    <string name="voice_bench_not_recognized">(Could not recognize speech)</string>
+
+    <!-- Models -->
+    <string name="voice_models_section_title">Models</string>
+    <string name="voice_models_section_description">Tap \"Apply\" to choose the model that produces the text inserted into the input field. Text shown while you speak always comes from ReazonSpeech.</string>
+    <string name="voice_models_fallback_note">The applied model isn\'t downloaded, so %1$s is being used.</string>
+    <string name="voice_models_none_note">No models yet. Download one to get started.</string>
+    <string name="voice_model_in_use">In use</string>
+    <string name="voice_download_button">Download</string>
+    <string name="voice_apply_button">Apply</string>
+    <string name="voice_delete_button">Delete</string>
+    <string name="voice_import_button">Import a model not on the list</string>
+
+    <string name="voice_metered_dialog_title">Not connected to Wi-Fi</string>
+    <string name="voice_metered_dialog_text">Download %1$s (about %2$dMB) over mobile data?</string>
+    <string name="voice_metered_dialog_confirm">Download</string>
+    <string name="voice_delete_dialog_title">Delete %1$s?</string>
+    <string name="voice_delete_dialog_text_custom">The imported files will be deleted and the model removed from the list.</string>
+    <string name="voice_delete_dialog_text_downloaded">The downloaded files will be deleted. You can download them again to use this model.</string>
+    <string name="voice_delete_dialog_confirm">Delete</string>
+
+    <!-- Download -->
+    <string name="voice_download_result">%1$s: %2$s</string>
+    <string name="voice_download_done">Downloaded</string>
+    <string name="voice_download_cancelled">Stopped (the partial download is kept, and the next download will resume from there)</string>
+    <string name="voice_download_failed">Couldn\'t download: %1$s (the next download will resume from where it stopped)</string>
+    <string name="voice_download_size_mismatch">The file size doesn\'t match (%1$d / %2$d)</string>
+    <string name="voice_download_rename_failed">Couldn\'t rename the file</string>
+
+    <!-- Import -->
+    <string name="voice_import_dialog_title">Import a model</string>
+    <string name="voice_import_default_name">Imported model</string>
+    <string name="voice_import_selected_files">Selected files: %1$s</string>
+    <string name="voice_import_name_label">Name</string>
+    <string name="voice_import_format_label">Format</string>
+    <string name="voice_import_missing_files">Missing files: %1$s (files are identified by names containing encoder, decoder, joiner, tokens, etc.)</string>
+    <string name="voice_import_failed">Couldn\'t import: %1$s</string>
+    <string name="voice_import_copying">Importing…</string>
+    <string name="voice_import_confirm">Import</string>
+    <string name="voice_list_separator">", "</string>
+
+    <!-- Import formats -->
+    <string name="voice_format_whisper_cpp">whisper.cpp (ggml)</string>
+    <string name="voice_format_whisper_cpp_short">whisper.cpp</string>
+    <string name="voice_format_whisper_cpp_help">A single ggml-*.bin file</string>
+    <string name="voice_format_transducer">sherpa-onnx transducer (zipformer, etc.)</string>
+    <string name="voice_format_transducer_short">sherpa-onnx transducer</string>
+    <string name="voice_format_transducer_help">encoder, decoder, and joiner .onnx files plus tokens.txt</string>
+    <string name="voice_format_nemo_ctc">sherpa-onnx NeMo CTC (parakeet, etc.)</string>
+    <string name="voice_format_nemo_ctc_short">sherpa-onnx NeMo CTC</string>
+    <string name="voice_format_sensevoice">sherpa-onnx SenseVoice</string>
+    <string name="voice_format_sensevoice_short">sherpa-onnx SenseVoice</string>
+    <string name="voice_format_model_onnx_help">model .onnx file plus tokens.txt</string>
+
+    <!-- Model tags and notes -->
+    <string name="voice_tag_japanese">Japanese</string>
+    <string name="voice_tag_zh_en_ja_ko">Zh / En / Ja / Ko</string>
+    <string name="voice_tag_multilingual">Multilingual</string>
+    <string name="voice_tag_accuracy_high">High accuracy</string>
+    <string name="voice_tag_accuracy_medium">Medium accuracy</string>
+    <string name="voice_tag_accuracy_low">Low accuracy</string>
+    <string name="voice_tag_very_fast">Very fast</string>
+    <string name="voice_tag_fast">Fast</string>
+    <string name="voice_tag_slow">Slow</string>
+    <string name="voice_tag_very_slow">Very slow</string>
+    <string name="voice_tag_punctuation_yes">Punctuation</string>
+    <string name="voice_tag_punctuation_few">Little punctuation</string>
+    <string name="voice_tag_punctuation_no">No punctuation</string>
+    <string name="voice_tag_live_preview">Live preview</string>
+    <string name="voice_tag_imported">Imported</string>
+    <string name="voice_note_parakeet">A Japanese-only model from NVIDIA.</string>
+    <string name="voice_note_reazon">Also used to show text while you speak. To add punctuation, say words like \"くてん\".</string>
+    <string name="voice_note_kotoba">A whisper model tuned for Japanese.</string>
+
+    <!-- VoiceModel (whisper) labels -->
+    <string name="voice_model_label_whisper_small">whisper small (190MB, fast, moderate accuracy)</string>
+    <string name="voice_model_label_kotoba_whisper">kotoba-whisper v2.0 (538MB, for Japanese, high accuracy, heavy)</string>
+    <string name="voice_model_label_whisper_turbo">whisper large-v3-turbo (574MB, multilingual, high accuracy, heavy)</string>
+</resources>

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 入力と変換・画面キーボード・入力中の文字を帯に出すアプリ・ユーザー辞書／スニペットの画面（英語） -->
+<resources>
+    <!-- 日本語オン/オフのキー（ToggleTrigger） -->
+    <string name="input_trigger_right_alt_tap">Tap right Alt alone</string>
+    <string name="input_trigger_ctrl_space">Ctrl+Space</string>
+    <string name="input_trigger_f13">F13 (a dedicated key sent from QMK, etc.)</string>
+
+    <!-- 入力と変換 -->
+    <string name="input_toggle_keys_title">Japanese on/off keys</string>
+    <string name="input_toggle_keys_description">Choose the keys to use with a US layout. On a JIS layout, Henkan (on), Muhenkan (off), Kana (on), and Hankaku/Zenkaku (toggle) always work.</string>
+    <string name="input_switch_input_method">Switch input method</string>
+    <string name="input_characters_title">Characters</string>
+    <string name="input_full_width_symbols_title">Type numbers and symbols in full width</string>
+    <string name="input_full_width_symbols_summary">When off, they are typed in half width. Both appear as conversion candidates.</string>
+    <string name="input_pair_brackets_title">Insert brackets in pairs</string>
+    <string name="input_pair_brackets_summary">Typing 「 or （ also inserts the closing bracket and puts the cursor inside. Pressing Space on empty brackets cycles through 「」『』【】 and more.</string>
+    <string name="input_punctuation_label">Punctuation (typed with , and .)</string>
+    <string name="input_conversion_title">Conversion</string>
+    <string name="input_live_conversion_title">Live conversion</string>
+    <string name="input_live_conversion_summary">Shows the converted result as you type.</string>
+    <string name="input_learning_title">Learn</string>
+    <string name="input_learning_summary">Candidates you picked before appear higher next time.</string>
+    <string name="input_clear_learning">Clear learning</string>
+    <string name="input_clear_learning_message">Deletes all learned candidates. Your user dictionary is kept.</string>
+    <string name="input_clear">Clear</string>
+    <string name="input_cancel">Cancel</string>
+
+    <!-- 画面キーボード -->
+    <string name="input_show_keyboard_title">When to show</string>
+    <string name="input_show_keyboard_description">The on-screen keyboard is used when no physical keyboard is connected.</string>
+    <string name="input_show_keyboard_auto">Auto</string>
+    <string name="input_show_keyboard_always">Always</string>
+    <string name="input_show_keyboard_never">Never</string>
+    <string name="input_show_keyboard_auto_note">Shows only when there is no physical keyboard.</string>
+    <string name="input_show_keyboard_always_note">Shows even when a physical keyboard is connected.</string>
+    <string name="input_show_keyboard_never_note">Never shows (physical keyboard only).</string>
+    <string name="input_layouts_title">Layouts</string>
+    <string name="input_layouts_description">Swipe up on the bottom-left key (?123 on Glide, Ctrl on Full keyboard, “あa1” on 12-key) to switch to the next of your enabled layouts.</string>
+    <string name="input_layout_glide">Glide</string>
+    <string name="input_layout_qwerty">Full keyboard</string>
+    <string name="input_layout_flick">12-key</string>
+    <string name="input_layouts_enabled_note">Layouts to use (the bottom-left key cycles only through these)</string>
+    <string name="input_layout_glide_description">Slide your finger over the QWERTY letter keys to enter a word. For Japanese, slide through the romaji to get kana. Numbers and symbols are on the ?123 page.</string>
+    <string name="input_layout_qwerty_description">Swipe a key to get numbers and symbols. Ctrl, Alt, Fn, Esc, and Tab are also there, so you can use it like a physical keyboard.</string>
+    <string name="input_layout_flick_description">Type on 12 keys by flicking (toggle input is also available).</string>
+    <string name="input_glide_zenz_title">Reorder Glide candidates with zenz</string>
+    <string name="input_glide_zenz_summary">For Japanese glide typing, zenz (the language model used to reorder conversions) checks how the word fits with the preceding text. The top dictionary match is entered first, and if zenz picks a different word, it is swapped in shortly after.</string>
+    <string name="input_flick_toggle_title">Toggle input</string>
+    <string name="input_flick_toggle_summary">Pressing the same key repeatedly moves to the next character (あ→い→う). When off, only flicks are used.</string>
+    <string name="input_clipboard_title">Clipboard</string>
+    <string name="input_clipboard_description">Swipe down on the あ/A key (on the keypad, swipe left on ☺) to see the history of copied text and images. Tap to paste; long-press to pin, crop, or delete. Copies marked as sensitive, such as passwords, are not kept.</string>
+    <string name="input_clipboard_history">Keep copy history</string>
+    <string name="input_size_title">Size</string>
+    <string name="input_height">Height</string>
+    <string name="input_bottom_margin">Bottom margin</string>
+    <string name="input_size_note">If the keyboard overlaps the navigation bar, increase the bottom margin. Changes apply the next time the keyboard opens.</string>
+    <string name="input_gestures_title">Gestures</string>
+    <string name="input_gesture_swipe_keys">• Swipe a key toward a corner or edge to get the small character (number or symbol) printed on it.</string>
+    <string name="input_gesture_modifiers">• Shift, Ctrl, Alt, and Fn apply to the next key only; press twice to lock. You can also hold one while pressing another key.</string>
+    <string name="input_gesture_modifier_events">• Modifier presses and releases are sent too, so Shift+arrow selection and app shortcuts work just like on a physical keyboard.</string>
+    <string name="input_gesture_meta_fn">• Swipe up on Alt for Meta (⌘). Fn+number enters F1–F10, and Fn+- = enters F11 and F12.</string>
+    <string name="input_gesture_arrows">• Swipe Space left or right for arrow keys. Swipe the Tab key in a direction for arrow keys, or toward a corner for Home, End, PgUp, and PgDn. Swipe Backspace right for Delete.</string>
+    <string name="input_gesture_mic">• The mic key records only while held. A short press keeps listening.</string>
+
+    <!-- 入力中の文字を帯に出すアプリ -->
+    <string name="input_preview_apps_title">Apps that show typing in the bar</string>
+    <string name="input_preview_apps_description">In apps that can\'t display text being typed (terminal apps such as Termux), the text being typed is shown in the bar instead.</string>
+    <string name="input_preview_apps_header">App</string>
+    <string name="input_none_yet">None yet.</string>
+    <string name="input_add">Add</string>
+    <string name="input_preview_apps_remove_message">Text being typed will no longer be shown in the bar for this app.</string>
+    <string name="input_remove">Remove</string>
+    <string name="input_add_app_title">Add app</string>
+    <string name="input_add_app_search">Search by name or package name</string>
+    <string name="input_add_app_package">Add \"%1$s\"</string>
+
+    <!-- ユーザー辞書・スニペット -->
+    <string name="input_dictionary_title">User dictionary</string>
+    <string name="input_dictionary_key_label">Reading (hiragana)</string>
+    <string name="input_dictionary_value_label">Word</string>
+    <string name="input_dictionary_description">Register readings and words. Registered words are preferred in conversion and appear first in the candidates, marked \"User dictionary\" (like the macOS user dictionary). They are also more likely to be used for that reading in the middle of a sentence.</string>
+    <string name="input_dictionary_text_help">Write \"reading word\" on each line (split at the first space). Lines starting with # are ignored.</string>
+    <string name="input_snippets_title">Snippets</string>
+    <string name="input_snippets_key_label">Key (characters typed)</string>
+    <string name="input_snippets_value_label">Output</string>
+    <string name="input_snippets_description">As soon as you finish typing a key, it is replaced with the output (e.g. @@ → email address, -&gt; → →). Works both in Japanese input and direct input. The key is matched against the characters you actually type (before they become kana or full width). Keys of only letters also react to romaji, so keys that include symbols are recommended. Longer keys take priority.</string>
+    <string name="input_snippets_text_help">Write \"key output\" on each line (split at the first space). \\n in the output is a line break. Lines starting with # are ignored.</string>
+    <string name="input_mode_list">List</string>
+    <string name="input_mode_text">Text</string>
+    <string name="input_entry_count">Entries: %1$d</string>
+    <string name="input_registered_title">Registered</string>
+    <string name="input_edit_as_text_title">Edit as text</string>
+    <string name="input_edit_as_text_description">%1$s You can write everything at once in an editor, or copy from here to export.</string>
+    <string name="input_save">Save</string>
+    <string name="input_edit">Edit</string>
+    <string name="input_delete">Delete</string>
+</resources>

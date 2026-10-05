@@ -56,22 +56,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import dev.mooma.kanade.R
 import androidx.compose.ui.unit.dp
 
-/** 左の一覧の区画 */
-enum class CategoryGroup(val title: String) { INPUT("入力"), WORDS("辞書"), OTHER("その他") }
+/** 左の一覧の区画（見出しは文字列リソース） */
+enum class CategoryGroup(val title: Int) { INPUT(R.string.app_group_input), WORDS(R.string.app_group_words), OTHER(R.string.app_group_other) }
 
-/** 設定のまとまり。左の一覧に区画ごとに並べ、選ぶと中身を出す。アイコンは Material Symbols */
-enum class Category(val title: String, val summary: String, val icon: Int, val group: CategoryGroup) {
-    INPUT("入力と変換", "日本語オン/オフのキー・句読点・ライブ変換・学習", R.drawable.sym_translate, CategoryGroup.INPUT),
-    KEYBOARD("画面キーボード", "出すとき・高さ・操作", R.drawable.sym_keyboard, CategoryGroup.INPUT),
-    VOICE("音声入力", "モデル・録音キー・話し方", R.drawable.sym_mic, CategoryGroup.INPUT),
-    DICTIONARY("ユーザー辞書", "読みと語を登録して、変換で優先します", R.drawable.sym_dictionary, CategoryGroup.WORDS),
-    SNIPPETS("スニペット", "打った瞬間に置き換える文字列", R.drawable.sym_bolt, CategoryGroup.WORDS),
-    BACKUP("書き出しと読み込み", "設定・辞書・スニペットをファイルに保存して、別の端末に移します", R.drawable.sym_upload_file, CategoryGroup.OTHER),
-    TOOLS("試験と記録", "試し打ち・変換の試験・キー記録", R.drawable.sym_science, CategoryGroup.OTHER),
-    USAGE("使い方", "Kanade の使い方", R.drawable.sym_help, CategoryGroup.OTHER),
+/** 設定のまとまり。左の一覧に区画ごとに並べ、選ぶと中身を出す。見出しと説明は文字列リソース、アイコンは Material Symbols */
+enum class Category(val title: Int, val summary: Int, val icon: Int, val group: CategoryGroup) {
+    INPUT(R.string.app_category_input_title, R.string.app_category_input_summary, R.drawable.sym_translate, CategoryGroup.INPUT),
+    KEYBOARD(R.string.app_category_keyboard_title, R.string.app_category_keyboard_summary, R.drawable.sym_keyboard, CategoryGroup.INPUT),
+    VOICE(R.string.app_category_voice_title, R.string.app_category_voice_summary, R.drawable.sym_mic, CategoryGroup.INPUT),
+    DICTIONARY(R.string.app_category_dictionary_title, R.string.app_category_dictionary_summary, R.drawable.sym_dictionary, CategoryGroup.WORDS),
+    SNIPPETS(R.string.app_category_snippets_title, R.string.app_category_snippets_summary, R.drawable.sym_bolt, CategoryGroup.WORDS),
+    LANGUAGE(R.string.app_category_language_title, R.string.app_category_language_summary, R.drawable.sym_language, CategoryGroup.OTHER),
+    BACKUP(R.string.app_category_backup_title, R.string.app_category_backup_summary, R.drawable.sym_upload_file, CategoryGroup.OTHER),
+    TOOLS(R.string.app_category_tools_title, R.string.app_category_tools_summary, R.drawable.sym_science, CategoryGroup.OTHER),
+    USAGE(R.string.app_category_usage_title, R.string.app_category_usage_summary, R.drawable.sym_help, CategoryGroup.OTHER),
 }
 
 /** 幅がこれ以上なら2カラム（左に一覧、右に中身）。Fold の内側の画面や DeX の広い窓 */
@@ -118,7 +120,7 @@ private fun ListPane(resumeTick: Int, selected: Category?, onSelect: (Category) 
         topBar = {
             LargeFlexibleTopAppBar(
                 title = { Text("Kanade") },
-                subtitle = { Text("物理キーボードのための日本語入力") },
+                subtitle = { Text(stringResource(R.string.app_header_subtitle)) },
                 scrollBehavior = scroll,
             )
         },
@@ -142,7 +144,7 @@ private fun ListPane(resumeTick: Int, selected: Category?, onSelect: (Category) 
 private fun CategoryList(selected: Category?, onSelect: (Category) -> Unit) {
     for (group in CategoryGroup.entries) {
         Text(
-            group.title,
+            stringResource(group.title),
             Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.primary,
@@ -168,8 +170,8 @@ private fun CategoryGroupList(items: List<Category>, selected: Category?, onSele
                 color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer,
             ) {
                 ListItem(
-                    headlineContent = { Text(c.title, style = MaterialTheme.typography.titleMedium) },
-                    supportingContent = { Text(c.summary) },
+                    headlineContent = { Text(stringResource(c.title), style = MaterialTheme.typography.titleMedium) },
+                    supportingContent = { Text(stringResource(c.summary)) },
                     leadingContent = {
                         Box(
                             Modifier.size(40.dp),
@@ -201,29 +203,29 @@ private fun SetupCards(resumeTick: Int) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (!state.imeEnabled) {
             SetupCard(
-                "Kanade を入力方法として有効にしてください",
-                "Android の「入力方法」で Kanade をオンにすると、キーボードで日本語が打てるようになります。",
-                "入力方法の設定を開く",
+                stringResource(R.string.app_setup_enable_title),
+                stringResource(R.string.app_setup_enable_why),
+                stringResource(R.string.app_setup_enable_action),
             ) { context.startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) }
         } else if (!state.imeSelected) {
             SetupCard(
-                "Kanade に切り替えてください",
-                "Kanade は有効になっていますが、今使っている入力方法が Kanade ではありません。",
-                "入力方法を選ぶ",
+                stringResource(R.string.app_setup_select_title),
+                stringResource(R.string.app_setup_select_why),
+                stringResource(R.string.app_setup_select_action),
             ) { context.getSystemService(InputMethodManager::class.java).showInputMethodPicker() }
         }
         if (!state.overlay) {
             SetupCard(
-                "「他のアプリの上に重ねて表示」を許可してください",
-                "変換候補と「あ」「A」の表示を、カーソルの近くに出すのに使います。許可しないと、Galaxy で物理キーボードを使っているときに候補が出ないことがあります。",
-                "許可する",
+                stringResource(R.string.app_setup_overlay_title),
+                stringResource(R.string.app_setup_overlay_why),
+                stringResource(R.string.app_setup_allow),
             ) { context.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))) }
         }
         if (!micGranted) {
             SetupCard(
-                "マイクを許可してください",
-                "音声入力に使います。声は端末の中で文字にし、外へは送りません。",
-                if (micAsked) "アプリの設定で許可する" else "許可する",
+                stringResource(R.string.app_setup_mic_title),
+                stringResource(R.string.app_setup_mic_why),
+                stringResource(if (micAsked) R.string.app_setup_mic_allow_in_settings else R.string.app_setup_allow),
             ) {
                 if (micAsked) {
                     // 2回断られると、もうダイアログが出ないので、アプリの設定を開く
@@ -280,10 +282,10 @@ private fun DetailPane(category: Category, onBack: (() -> Unit)?, modifier: Modi
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text(category.title) },
+                title = { Text(stringResource(category.title)) },
                 navigationIcon = {
                     if (onBack != null) {
-                        IconButton(onClick = onBack) { Icon(painterResource(R.drawable.sym_arrow_back), contentDescription = "戻る") }
+                        IconButton(onClick = onBack) { Icon(painterResource(R.drawable.sym_arrow_back), contentDescription = stringResource(R.string.app_back)) }
                     }
                 },
             )
@@ -304,6 +306,7 @@ private fun DetailPane(category: Category, onBack: (() -> Unit)?, modifier: Modi
                     Category.VOICE -> VoiceScreen()
                     Category.DICTIONARY -> PairEditorScreen(PairKind.DICTIONARY)
                     Category.SNIPPETS -> PairEditorScreen(PairKind.SNIPPETS)
+                    Category.LANGUAGE -> LanguageScreen()
                     Category.BACKUP -> BackupScreen()
                     Category.TOOLS -> ToolsScreen()
                     Category.USAGE -> UsageScreen()

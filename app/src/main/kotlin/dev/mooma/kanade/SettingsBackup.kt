@@ -52,7 +52,7 @@ object SettingsBackup {
             .put("exportedAt", System.currentTimeMillis())
             .put("prefs", prefs)
             .put("files", files)
-        val out = context.contentResolver.openOutputStream(uri, "wt") ?: error("ファイルを開けませんでした")
+        val out = context.contentResolver.openOutputStream(uri, "wt") ?: error(context.getString(R.string.app_backup_error_open_file))
         out.use { it.write(root.toString(2).toByteArray()) }
     }
 
@@ -61,10 +61,10 @@ object SettingsBackup {
 
     fun import(context: Context, uri: Uri): Result {
         val text = context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
-            ?: error("ファイルを開けませんでした")
-        val root = runCatching { JSONObject(text) }.getOrElse { error("Kanade の設定のファイルではありません") }
-        if (root.optString("format") != FORMAT) error("Kanade の設定のファイルではありません")
-        if (root.optInt("version") > VERSION) error("新しい Kanade で書き出したファイルです。Kanade を新しくしてから読み込んでください")
+            ?: error(context.getString(R.string.app_backup_error_open_file))
+        val root = runCatching { JSONObject(text) }.getOrElse { error(context.getString(R.string.app_backup_error_not_kanade)) }
+        if (root.optString("format") != FORMAT) error(context.getString(R.string.app_backup_error_not_kanade))
+        if (root.optInt("version") > VERSION) error(context.getString(R.string.app_backup_error_newer_version))
 
         // 先にすべて読んでから書く（途中で壊れたファイルだったときに、半分だけ置き換わらないように）
         val prefs = root.optJSONObject("prefs") ?: JSONObject()

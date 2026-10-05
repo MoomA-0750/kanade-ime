@@ -26,12 +26,15 @@ val prepareKanadeAssets by tasks.registering(JavaExec::class) {
     outputs.dir(out)
     inputs.property("dictool", dictool.file("src/main/kotlin/dev/mooma/kanade/dictool/Main.kt").readText().hashCode())
     inputs.file(rootProject.file("docs/USAGE.md"))
+    inputs.file(rootProject.file("docs/USAGE.en.md"))
     inputs.file(rootProject.file("eval/daily.tsv"))
     inputs.file(rootProject.file("eval/daily2.tsv"))
     doLast {
         rootProject.file("eval/daily.tsv").copyTo(File(out, "eval-daily.tsv"), overwrite = true)
         rootProject.file("eval/daily2.tsv").copyTo(File(out, "eval-daily2.tsv"), overwrite = true)
         rootProject.file("docs/USAGE.md").copyTo(File(out, "usage.md"), overwrite = true)
+        // 英語で表示しているときの使い方
+        rootProject.file("docs/USAGE.en.md").copyTo(File(out, "usage.en.md"), overwrite = true)
         // 音声認識の速さを端末で測るための見本（to-fu の Windows の音声合成で作った 8.8 秒の日本語）
         rootProject.file("eval/voice-sample-ja.wav").copyTo(File(out, "voice-sample-ja.wav"), overwrite = true)
         // 辞書と接続行列はよく縮む（37MB→16MB、14MB→2MB）ので gzip で入れ、初回にアプリ内へ展開して mmap する。

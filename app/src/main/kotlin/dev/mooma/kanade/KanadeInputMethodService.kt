@@ -277,13 +277,13 @@ class KanadeInputMethodService : InputMethodService() {
         if (!committed) {
             ignoreNextClip = true
             clipboardManager.setPrimaryClip(android.content.ClipData.newUri(contentResolver, "Kanade", uri))
-            clipboardPanel?.showMessage("この入力欄は画像を直接受け付けないので、クリップボードに入れました。入力欄を長押しして貼り付けてください。")
+            clipboardPanel?.showMessage(getString(R.string.ime_clipboard_image_not_accepted))
         }
     }
 
     private fun showClipboard() {
         apply(engine.commitAll())
-        clipboardPanel?.showMessage(if (settings.clipboardHistory) null else "クリップボードの履歴は、設定でオフになっています。")
+        clipboardPanel?.showMessage(if (settings.clipboardHistory) null else getString(R.string.ime_clipboard_history_off))
         clipboardPanel?.refresh()
         host?.show(InputViewHost.Mode.CLIPBOARD)
     }
@@ -341,7 +341,7 @@ class KanadeInputMethodService : InputMethodService() {
         val japanese = engine.japanese
         val decoder = (if (japanese) glideJapanese else glideEnglish) ?: run {
             loadGlide()
-            showIndicatorText("グライドの準備をしています。少し待ってからもう一度なぞってください", 2000)
+            showIndicatorText(getString(R.string.ime_glide_preparing), 2000)
             return
         }
         // 日本語は、入力中の読みのあとにつなげたときの自然さで並べ直す（読みの終わりの方だけを使う）
@@ -1046,7 +1046,7 @@ class KanadeInputMethodService : InputMethodService() {
                     }
                 }
                 if (!endpointer.inSpeech && now - lastSpeechAt > CONTINUOUS_IDLE_MS) {
-                    stopContinuous("🎤 終わりました（1分話さなかったため）")
+                    stopContinuous(getString(R.string.ime_voice_stopped_idle))
                     return
                 }
             }
@@ -1059,7 +1059,7 @@ class KanadeInputMethodService : InputMethodService() {
         val now = android.os.SystemClock.uptimeMillis()
         if (down) {
             if (continuous) {
-                stopContinuous("🎤 終わりました")
+                stopContinuous(getString(R.string.ime_voice_stopped))
                 voiceKeyStopped = true
                 return
             }
@@ -1087,7 +1087,7 @@ class KanadeInputMethodService : InputMethodService() {
         voiceSegments.clear()
         keyboardView?.voiceActive = true
         flickView?.voiceActive = true
-        showIndicatorText("🎤 聞いています（もう一度押すと終わります）", 1500)
+        showIndicatorText(getString(R.string.ime_voice_listening), 1500)
         main.postDelayed(continuousTick, VAD_INTERVAL_MS)
     }
 
@@ -1116,9 +1116,9 @@ class KanadeInputMethodService : InputMethodService() {
         if (VoiceInput.isRecording) return
         val streamingReady = settings.voiceStreaming && SherpaRecognizer.reazon.isReady(this)
         val message = when {
-            !VoiceInput.hasPermission(this) -> "マイクが許可されていません（設定画面で許可してください）"
-            VoiceCatalog.finalModel(this, settings) == null -> "音声認識のモデルがありません（設定画面でダウンロードしてください）"
-            !VoiceInput.start(this) -> "録音を始められませんでした"
+            !VoiceInput.hasPermission(this) -> getString(R.string.ime_voice_no_permission)
+            VoiceCatalog.finalModel(this, settings) == null -> getString(R.string.ime_voice_no_model)
+            !VoiceInput.start(this) -> getString(R.string.ime_voice_record_failed)
             else -> null
         }
         if (message != null) {

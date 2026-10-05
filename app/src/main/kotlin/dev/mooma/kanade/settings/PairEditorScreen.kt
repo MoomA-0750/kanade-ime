@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import dev.mooma.kanade.R
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
@@ -37,24 +38,26 @@ import dev.mooma.kanade.core.dict.UserDictionary
 
 /** ユーザー辞書とスニペット。どちらも1行に「キー 値」のテキストファイル */
 enum class PairKind(
-    val keyLabel: String,
-    val valueLabel: String,
-    val description: String,
-    val textHelp: String,
+    val titleRes: Int,
+    val keyLabelRes: Int,
+    val valueLabelRes: Int,
+    val descriptionRes: Int,
+    val textHelpRes: Int,
     val prefKey: String,
     val store: (Context) -> TextStore,
 ) {
     DICTIONARY(
-        "よみ（ひらがな）", "語",
-        "読みと語を登録します。登録した語は変換で優先され、候補の先頭に「ユーザー辞書」と付いて出ます（macOS のユーザ辞書と同じです）。文の途中でも、その読みの部分に使われやすくなります。",
-        "1行に「よみ 語」と書きます（最初の空白で区切ります）。# で始まる行は無視します",
+        R.string.input_dictionary_title,
+        R.string.input_dictionary_key_label, R.string.input_dictionary_value_label,
+        R.string.input_dictionary_description,
+        R.string.input_dictionary_text_help,
         "user_dictionary_text_mode", { TextStore.userDictionary(it) },
     ),
     SNIPPETS(
-        "キー（打つ文字）", "出力",
-        "キーを打ち終わった瞬間に、出力へ置き換えます（例: @@ → メールアドレス、-> → →）。日本語入力中も直接入力中も使えます。" +
-            "キーは打つ文字そのものです（かなや全角になる前の文字で見ます）。英字だけのキーはローマ字にも反応するので、記号を含むキーがおすすめです。長いキーが優先されます。",
-        "1行に「キー 出力」と書きます（最初の空白で区切ります）。出力の中の \\n は改行です。# で始まる行は無視します",
+        R.string.input_snippets_title,
+        R.string.input_snippets_key_label, R.string.input_snippets_value_label,
+        R.string.input_snippets_description,
+        R.string.input_snippets_text_help,
         "snippets_text_mode", { TextStore.snippets(it) },
     ),
 }
@@ -94,16 +97,16 @@ fun ColumnScope.PairEditorScreen(kind: PairKind) {
         version++
     }
 
-    Section(if (kind == PairKind.DICTIONARY) "ユーザー辞書" else "スニペット", kind.description) {
-        ConnectedChoices(listOf(false to "一覧", true to "テキスト"), textMode, {
+    Section(stringResource(kind.titleRes), stringResource(kind.descriptionRes)) {
+        ConnectedChoices(listOf(false to stringResource(R.string.input_mode_list), true to stringResource(R.string.input_mode_text)), textMode, {
             textMode = it
             prefs.edit().putBoolean(kind.prefKey, it).apply()
         })
-        Note("${list.size} 件")
+        Note(stringResource(R.string.input_entry_count, list.size))
     }
 
     if (!textMode) {
-        Section("登録したもの") {
+        Section(stringResource(R.string.input_registered_title)) {
             // 列の見出し（登録したものと見分けられるよう、地の色を付けて小さく薄い字にする）
             Row(
                 Modifier
@@ -112,8 +115,8 @@ fun ColumnScope.PairEditorScreen(kind: PairKind) {
                     .padding(horizontal = 12.dp, vertical = 6.dp),
             ) {
                 val header = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.onSecondaryContainer)
-                Text(kind.keyLabel, Modifier.width(128.dp), style = header)
-                Text(kind.valueLabel, style = header)
+                Text(stringResource(kind.keyLabelRes), Modifier.width(128.dp), style = header)
+                Text(stringResource(kind.valueLabelRes), style = header)
             }
             for (e in list) {
                 Row(
@@ -136,11 +139,14 @@ fun ColumnScope.PairEditorScreen(kind: PairKind) {
             }
             Button(onClick = { adding = true }) {
                 Icon(painterResource(R.drawable.sym_add), contentDescription = null)
-                Text("追加", Modifier.padding(start = 8.dp))
+                Text(stringResource(R.string.input_add), Modifier.padding(start = 8.dp))
             }
         }
     } else {
-        Section("テキストで編集", kind.textHelp + "。エディターでまとめて書いたり、ここをコピーして書き出したりできます。") {
+        Section(
+            stringResource(R.string.input_edit_as_text_title),
+            stringResource(R.string.input_edit_as_text_description, stringResource(kind.textHelpRes)),
+        ) {
             var draft by remember(text) { mutableStateOf(text) }
             OutlinedTextField(
                 draft, { draft = it },
@@ -150,7 +156,7 @@ fun ColumnScope.PairEditorScreen(kind: PairKind) {
             Button(onClick = {
                 store.write(draft)
                 version++
-            }, enabled = draft != text) { Text("保存") }
+            }, enabled = draft != text) { Text(stringResource(R.string.input_save)) }
         }
     }
 
@@ -177,18 +183,18 @@ private fun EntryDialog(kind: PairKind, entry: Entry?, onSave: (String, String) 
     val valid = key.isNotBlank() && key.none { it == ' ' || it == '\t' } && value.isNotBlank()
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (entry == null) "追加" else "編集") },
+        title = { Text(stringResource(if (entry == null) R.string.input_add else R.string.input_edit)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(key, { key = it.trim() }, label = { Text(kind.keyLabel) }, singleLine = true)
-                OutlinedTextField(value, { value = it }, label = { Text(kind.valueLabel) })
+                OutlinedTextField(key, { key = it.trim() }, label = { Text(stringResource(kind.keyLabelRes)) }, singleLine = true)
+                OutlinedTextField(value, { value = it }, label = { Text(stringResource(kind.valueLabelRes)) })
             }
         },
-        confirmButton = { TextButton(onClick = { onSave(key, value) }, enabled = valid) { Text("保存") } },
+        confirmButton = { TextButton(onClick = { onSave(key, value) }, enabled = valid) { Text(stringResource(R.string.input_save)) } },
         dismissButton = {
             Row {
-                if (entry != null) TextButton(onClick = onDelete) { Text("削除", color = MaterialTheme.colorScheme.error) }
-                TextButton(onClick = onDismiss) { Text("キャンセル") }
+                if (entry != null) TextButton(onClick = onDelete) { Text(stringResource(R.string.input_delete), color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.input_cancel)) }
             }
         },
     )

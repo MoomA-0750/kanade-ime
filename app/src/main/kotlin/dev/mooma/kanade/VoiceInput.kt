@@ -8,6 +8,7 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.net.Uri
+import androidx.annotation.StringRes
 import dev.mooma.kanade.whisper.WhisperModel
 import java.io.File
 
@@ -15,17 +16,17 @@ import java.io.File
  * 音声認識のモデル。APK には入れない。設定画面の「ダウンロード」で落とす（[ModelDownloader]）か、
  * 手元のファイルを選んでアプリ内へ写す
  */
-enum class VoiceModel(val label: String, val file: String, val url: String, val bytes: Long) {
+enum class VoiceModel(@StringRes val labelRes: Int, val file: String, val url: String, val bytes: Long) {
     SMALL(
-        "whisper small（190MB、速い・精度はほどほど）", "ggml-small-q5_1.bin",
+        R.string.voice_model_label_whisper_small, "ggml-small-q5_1.bin",
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin", 190_085_487L,
     ),
     KOTOBA(
-        "kotoba-whisper v2.0（538MB、日本語向け・高精度・重い）", "ggml-kotoba-whisper-v2.0-q5_0.bin",
+        R.string.voice_model_label_kotoba_whisper, "ggml-kotoba-whisper-v2.0-q5_0.bin",
         "https://huggingface.co/kotoba-tech/kotoba-whisper-v2.0-ggml/resolve/main/ggml-kotoba-whisper-v2.0-q5_0.bin", 537_819_875L,
     ),
     TURBO(
-        "whisper large-v3-turbo（574MB、多言語・高精度・重い）", "ggml-large-v3-turbo-q5_0.bin",
+        R.string.voice_model_label_whisper_turbo, "ggml-large-v3-turbo-q5_0.bin",
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin", 574_041_195L,
     );
 

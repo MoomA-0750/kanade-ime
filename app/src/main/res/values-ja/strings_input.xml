@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 入力と変換・画面キーボード・入力中の文字を帯に出すアプリ・ユーザー辞書／スニペットの画面（日本語） -->
+<resources>
+    <!-- 日本語オン/オフのキー（ToggleTrigger） -->
+    <string name="input_trigger_right_alt_tap">右 Alt の単押し</string>
+    <string name="input_trigger_ctrl_space">Ctrl+Space</string>
+    <string name="input_trigger_f13">F13（QMK などから送る専用キー）</string>
+
+    <!-- 入力と変換 -->
+    <string name="input_toggle_keys_title">日本語オン/オフのキー</string>
+    <string name="input_toggle_keys_description">US 配列で使うキーを選びます。JIS 配列の変換（オン）・無変換（オフ）・かな（オン）・半角/全角（切り替え）は、いつでも使えます。</string>
+    <string name="input_switch_input_method">入力方法を切り替える</string>
+    <string name="input_characters_title">文字</string>
+    <string name="input_full_width_symbols_title">数字・記号を全角で入力する</string>
+    <string name="input_full_width_symbols_summary">オフにすると半角で入力します（変換の候補には両方出ます）。</string>
+    <string name="input_pair_brackets_title">括弧を対で入れる</string>
+    <string name="input_pair_brackets_summary">「（ などを打つと閉じ括弧も入れ、カーソルを中に置きます。空の括弧で Space を押すと、「」『』【】などに替わります。</string>
+    <string name="input_punctuation_label">句読点（, と . で入るもの）</string>
+    <string name="input_conversion_title">変換</string>
+    <string name="input_live_conversion_title">ライブ変換</string>
+    <string name="input_live_conversion_summary">打つたびに変換した結果を出します。</string>
+    <string name="input_learning_title">学習する</string>
+    <string name="input_learning_summary">前に選んだ候補を、次から上に出します。</string>
+    <string name="input_clear_learning">学習を消す</string>
+    <string name="input_clear_learning_message">覚えた候補をすべて消します（ユーザー辞書は消えません）。</string>
+    <string name="input_clear">消す</string>
+    <string name="input_cancel">キャンセル</string>
+
+    <!-- 画面キーボード -->
+    <string name="input_show_keyboard_title">出すとき</string>
+    <string name="input_show_keyboard_description">物理キーボードがつながっていないときに使う画面キーボードです。</string>
+    <string name="input_show_keyboard_auto">自動</string>
+    <string name="input_show_keyboard_always">いつも</string>
+    <string name="input_show_keyboard_never">出さない</string>
+    <string name="input_show_keyboard_auto_note">物理キーボードがないときだけ出します。</string>
+    <string name="input_show_keyboard_always_note">物理キーボードがあっても出します。</string>
+    <string name="input_show_keyboard_never_note">出しません（物理キーボード専用）。</string>
+    <string name="input_layouts_title">配列</string>
+    <string name="input_layouts_description">キーボードの左下のキー（グライドは ?123、フルキーは Ctrl、テンキーは「あa1」）を上に払うと、使う配列の中で次の配列に切り替わります。</string>
+    <string name="input_layout_glide">グライド</string>
+    <string name="input_layout_qwerty">フルキー</string>
+    <string name="input_layout_flick">テンキー</string>
+    <string name="input_layouts_enabled_note">使う配列（左下のキーで切り替えるときは、この中だけを回ります）</string>
+    <string name="input_layout_glide_description">QWERTY の文字のキーの上を指でなぞると、語を入れます（日本語はローマ字でなぞると、かなになります）。数字・記号は ?123 のページにあります。</string>
+    <string name="input_layout_qwerty_description">キーを払うと数字・記号が出ます。Ctrl・Alt・Fn・Esc・Tab もあり、物理キーボードと同じように使えます。</string>
+    <string name="input_layout_flick_description">12 のキーをフリック（トグル入力も選べます）で打ちます。</string>
+    <string name="input_glide_zenz_title">グライドの候補を zenz で並べ直す</string>
+    <string name="input_glide_zenz_summary">日本語のグライドで、前の文とのつながりを zenz（変換の並べ替えに使う言語モデル）に見てもらいます。辞書の1位を先に入れ、zenz が別の語を選んだら少し遅れて入れ替えます。</string>
+    <string name="input_flick_toggle_title">トグル入力</string>
+    <string name="input_flick_toggle_summary">同じキーを続けて押すと、次の文字になります（あ→い→う）。オフにするとフリックだけで入力します。</string>
+    <string name="input_clipboard_title">クリップボード</string>
+    <string name="input_clipboard_description">あ/A のキーを下に払う（フリックでは ☺ を左に払う）と、コピーした文字や画像の履歴が出ます。押すと貼り付け、長押しでピン留め・切り抜き・削除ができます。パスワードなど機密の印が付いたコピーは残しません。</string>
+    <string name="input_clipboard_history">コピーの履歴を残す</string>
+    <string name="input_size_title">大きさ</string>
+    <string name="input_height">高さ</string>
+    <string name="input_bottom_margin">下の余白</string>
+    <string name="input_size_note">ナビゲーションバーに重なるときは、下の余白を増やしてください。次にキーボードを出したときから変わります。</string>
+    <string name="input_gestures_title">操作</string>
+    <string name="input_gesture_swipe_keys">・キーを隅や上下左右へ払うと、小さく書いてある文字（数字・記号）が出ます。</string>
+    <string name="input_gesture_modifiers">・Shift・Ctrl・Alt・Fn は次の1打だけ効き、2回続けて押すと固定します。押したまま別のキーを押す同時押しもできます。</string>
+    <string name="input_gesture_modifier_events">・修飾キーの押す・離すも送るので、Shift＋矢印の選択やアプリのショートカットが物理キーボードと同じように使えます。</string>
+    <string name="input_gesture_meta_fn">・Alt を上に払うと Meta（⌘）です。Fn＋数字で F1〜F10、Fn＋- = で F11・F12 を入力します。</string>
+    <string name="input_gesture_arrows">・Space を左右に払うと矢印です。Tab のキーは上下左右に払うと矢印、四隅に払うと Home・End・PgUp・PgDn です。Backspace を右に払うと Delete です。</string>
+    <string name="input_gesture_mic">・マイクのキーは、押している間だけ録音します。短く押すと聞き続けます。</string>
+
+    <!-- 入力中の文字を帯に出すアプリ -->
+    <string name="input_preview_apps_title">入力中の文字を帯に出すアプリ</string>
+    <string name="input_preview_apps_description">入力中の文字をうまく出せないアプリ（Termux などの端末アプリ）では、入力中の文字を帯に出します。</string>
+    <string name="input_preview_apps_header">アプリ</string>
+    <string name="input_none_yet">まだありません。</string>
+    <string name="input_add">追加</string>
+    <string name="input_preview_apps_remove_message">このアプリでは、入力中の文字を帯に出さなくなります。</string>
+    <string name="input_remove">外す</string>
+    <string name="input_add_app_title">アプリを追加</string>
+    <string name="input_add_app_search">名前かパッケージ名で探す</string>
+    <string name="input_add_app_package">「%1$s」を追加</string>
+
+    <!-- ユーザー辞書・スニペット -->
+    <string name="input_dictionary_title">ユーザー辞書</string>
+    <string name="input_dictionary_key_label">よみ（ひらがな）</string>
+    <string name="input_dictionary_value_label">語</string>
+    <string name="input_dictionary_description">読みと語を登録します。登録した語は変換で優先され、候補の先頭に「ユーザー辞書」と付いて出ます（macOS のユーザ辞書と同じです）。文の途中でも、その読みの部分に使われやすくなります。</string>
+    <string name="input_dictionary_text_help">1行に「よみ 語」と書きます（最初の空白で区切ります）。# で始まる行は無視します</string>
+    <string name="input_snippets_title">スニペット</string>
+    <string name="input_snippets_key_label">キー（打つ文字）</string>
+    <string name="input_snippets_value_label">出力</string>
+    <string name="input_snippets_description">キーを打ち終わった瞬間に、出力へ置き換えます（例: @@ → メールアドレス、-&gt; → →）。日本語入力中も直接入力中も使えます。キーは打つ文字そのものです（かなや全角になる前の文字で見ます）。英字だけのキーはローマ字にも反応するので、記号を含むキーがおすすめです。長いキーが優先されます。</string>
+    <string name="input_snippets_text_help">1行に「キー 出力」と書きます（最初の空白で区切ります）。出力の中の \\n は改行です。# で始まる行は無視します</string>
+    <string name="input_mode_list">一覧</string>
+    <string name="input_mode_text">テキスト</string>
+    <string name="input_entry_count">%1$d 件</string>
+    <string name="input_registered_title">登録したもの</string>
+    <string name="input_edit_as_text_title">テキストで編集</string>
+    <string name="input_edit_as_text_description">%1$s。エディターでまとめて書いたり、ここをコピーして書き出したりできます。</string>
+    <string name="input_save">保存</string>
+    <string name="input_edit">編集</string>
+    <string name="input_delete">削除</string>
+</resources>

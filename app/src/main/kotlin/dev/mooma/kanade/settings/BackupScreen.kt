@@ -20,7 +20,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import dev.mooma.kanade.R
 import dev.mooma.kanade.SettingsBackup
 
 /** 終わったときの知らせ（読み込んだ後に画面を作り直しても残るよう、画面の外に置く） */
@@ -37,26 +39,26 @@ fun ColumnScope.BackupScreen() {
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         BackupUi.message = runCatching { SettingsBackup.export(context, uri) }
-            .fold({ "書き出しました。" }, { "書き出せませんでした（${it.message}）。" })
+            .fold({ context.getString(R.string.app_backup_exported) }, { context.getString(R.string.app_backup_export_failed, it.message) })
     }
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) pending = uri
     }
 
     Section(
-        "書き出す",
-        "設定と、ユーザー辞書・スニペットを1つのファイルに書き出します。別の端末に移すときや、控えを取っておくときに使います。",
+        stringResource(R.string.app_backup_export_title),
+        stringResource(R.string.app_backup_export_description),
     ) {
-        Note("学習した変換・クリップボードの履歴・キー記録・音声モデルは入りません。")
+        Note(stringResource(R.string.app_backup_export_note))
         Button(onClick = { exporter.launch(SettingsBackup.suggestedName()) }, modifier = Modifier.padding(top = 8.dp)) {
-            Text("ファイルに書き出す")
+            Text(stringResource(R.string.app_backup_export_button))
         }
     }
 
-    Section("読み込む", "書き出したファイルを読み込みます。今の設定・ユーザー辞書・スニペットは、ファイルの中身に置き換わります。") {
+    Section(stringResource(R.string.app_backup_import_title), stringResource(R.string.app_backup_import_description)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
             OutlinedButton(onClick = { importer.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) }) {
-                Text("ファイルから読み込む")
+                Text(stringResource(R.string.app_backup_import_button))
             }
         }
     }
@@ -66,21 +68,21 @@ fun ColumnScope.BackupScreen() {
     pending?.let { uri ->
         AlertDialog(
             onDismissRequest = { pending = null },
-            title = { Text("設定を読み込みますか") },
-            text = { Text("今の設定・ユーザー辞書・スニペットは、ファイルの中身に置き換わります。元に戻すには、先に今の設定を書き出しておいてください。") },
+            title = { Text(stringResource(R.string.app_backup_import_confirm_title)) },
+            text = { Text(stringResource(R.string.app_backup_import_confirm_text)) },
             confirmButton = {
                 TextButton(onClick = {
                     pending = null
                     runCatching { SettingsBackup.import(context, uri) }
                         .onSuccess {
-                            BackupUi.message = "読み込みました（設定 ${it.prefs} 項目、ファイル ${it.files} 個）。"
+                            BackupUi.message = context.getString(R.string.app_backup_imported, it.prefs, it.files)
                             // 画面に出している値を読み直す
                             (context as? Activity)?.recreate()
                         }
-                        .onFailure { BackupUi.message = "読み込めませんでした（${it.message}）。" }
-                }) { Text("読み込む") }
+                        .onFailure { BackupUi.message = context.getString(R.string.app_backup_import_failed, it.message) }
+                }) { Text(stringResource(R.string.app_backup_import_confirm)) }
             },
-            dismissButton = { TextButton(onClick = { pending = null }) { Text("やめる") } },
+            dismissButton = { TextButton(onClick = { pending = null }) { Text(stringResource(R.string.app_backup_cancel)) } },
         )
     }
 }

@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.mooma.kanade.R
@@ -89,23 +90,23 @@ fun ColumnScope.PreviewAppsSection() {
         settings.previewInBarPackages = packages.toSet()
     }
 
-    Section("入力中の文字を帯に出すアプリ", "入力中の文字をうまく出せないアプリ（Termux などの端末アプリ）では、入力中の文字を帯に出します。") {
+    Section(stringResource(R.string.input_preview_apps_title), stringResource(R.string.input_preview_apps_description)) {
         Row(
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.shapes.small)
                 .padding(horizontal = 12.dp, vertical = 6.dp),
         ) {
-            Text("アプリ", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
+            Text(stringResource(R.string.input_preview_apps_header), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
         }
-        if (apps.isEmpty()) Note("まだありません。")
+        if (apps.isEmpty()) Note(stringResource(R.string.input_none_yet))
         for (app in apps) {
             AppRow(app, Modifier.clickable { removing = app })
             HorizontalDivider()
         }
         Button(onClick = { adding = true }) {
             Icon(painterResource(R.drawable.sym_add), contentDescription = null)
-            Text("追加", Modifier.padding(start = 8.dp))
+            Text(stringResource(R.string.input_add), Modifier.padding(start = 8.dp))
         }
     }
 
@@ -123,14 +124,14 @@ fun ColumnScope.PreviewAppsSection() {
         AlertDialog(
             onDismissRequest = { removing = null },
             title = { Text(app.label) },
-            text = { Text("このアプリでは、入力中の文字を帯に出さなくなります。") },
+            text = { Text(stringResource(R.string.input_preview_apps_remove_message)) },
             confirmButton = {
                 TextButton(onClick = {
                     save(packages - app.packageName)
                     removing = null
-                }) { Text("外す", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.input_remove), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { removing = null }) { Text("キャンセル") } },
+            dismissButton = { TextButton(onClick = { removing = null }) { Text(stringResource(R.string.input_cancel)) } },
         )
     }
 }
@@ -168,15 +169,15 @@ private fun AddAppDialog(exclude: Set<String>, onAdd: (String) -> Unit, onDismis
     val typedPackage = query.trim().takeIf { Regex("[A-Za-z][\\w]*(\\.[A-Za-z_][\\w]*)+").matches(it) && it !in exclude }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("アプリを追加") },
+        title = { Text(stringResource(R.string.input_add_app_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("名前かパッケージ名で探す") })
+                OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text(stringResource(R.string.input_add_app_search)) })
                 LazyColumn(Modifier.height(360.dp)) {
                     if (typedPackage != null && shown.none { it.packageName == typedPackage }) {
                         item {
                             Text(
-                                "「$typedPackage」を追加",
+                                stringResource(R.string.input_add_app_package, typedPackage),
                                 Modifier.fillMaxWidth().clickable { onAdd(typedPackage) }.padding(12.dp),
                                 color = MaterialTheme.colorScheme.primary,
                             )
@@ -189,6 +190,6 @@ private fun AddAppDialog(exclude: Set<String>, onAdd: (String) -> Unit, onDismis
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("キャンセル") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.input_cancel)) } },
     )
 }

@@ -50,13 +50,13 @@ class ClipboardPanelView(
         val header = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            addView(icon(R.drawable.sym_arrow_back, "キーボードに戻る") { onClose() }, LinearLayout.LayoutParams(dp(48), dp(48)))
+            addView(icon(R.drawable.sym_arrow_back, context.getString(R.string.ime_clipboard_back_to_keyboard)) { onClose() }, LinearLayout.LayoutParams(dp(48), dp(48)))
             addView(TextView(context).apply {
-                text = "クリップボード"
+                text = context.getString(R.string.ime_clipboard_title)
                 setTextColor(palette.text)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-            addView(icon(R.drawable.sym_delete_sweep, "ピン留めしていないものを消す") {
+            addView(icon(R.drawable.sym_delete_sweep, context.getString(R.string.ime_clipboard_clear_unpinned)) {
                 history.clearRecent()
                 refresh()
             }, LinearLayout.LayoutParams(dp(48), dp(48)))
@@ -82,12 +82,12 @@ class ClipboardPanelView(
         list.removeAllViews()
         // パスワード管理アプリ（1Password など）のコピーは機密の印が付いていて履歴に残さないので、いまクリップボードにある間だけ伏せて出す
         currentSensitive()?.let { secret ->
-            section("いまのコピー（機密）", listOf(ClipboardHistory.Item(SENSITIVE_ID, secret, null, null, false, 0L)))
+            section(context.getString(R.string.ime_clipboard_section_sensitive), listOf(ClipboardHistory.Item(SENSITIVE_ID, secret, null, null, false, 0L)))
         }
         val items = history.all()
         if (items.isEmpty()) {
             list.addView(TextView(context).apply {
-                text = "コピーした文字や画像が、ここに出ます。押すと貼り付け、長押しでピン留め・切り抜き・削除ができます。"
+                text = context.getString(R.string.ime_clipboard_empty)
                 setTextColor(palette.dim)
                 setPadding(dp(16), dp(16), dp(16), dp(16))
             })
@@ -95,8 +95,8 @@ class ClipboardPanelView(
         }
         val pinned = items.filter { it.pinned }
         val recent = items.filter { !it.pinned }
-        if (pinned.isNotEmpty()) section("ピン留め", pinned)
-        if (recent.isNotEmpty()) section("最近", recent)
+        if (pinned.isNotEmpty()) section(context.getString(R.string.ime_clipboard_section_pinned), pinned)
+        if (recent.isNotEmpty()) section(context.getString(R.string.ime_clipboard_section_recent), recent)
     }
 
     private fun section(title: String, items: List<ClipboardHistory.Item>) {
@@ -138,7 +138,7 @@ class ClipboardPanelView(
         } else {
             TextView(context).apply {
                 // 機密のコピーは中身を出さない
-                text = if (item.id == SENSITIVE_ID) "••••••••\n（${item.text?.length ?: 0} 文字。押すと貼り付けます）" else item.text
+                text = if (item.id == SENSITIVE_ID) "••••••••\n" + context.getString(R.string.ime_clipboard_sensitive_hint, item.text?.length ?: 0) else item.text
                 setTextColor(palette.text)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
                 maxLines = 4
@@ -169,9 +169,9 @@ class ClipboardPanelView(
 
     private fun menu(anchor: View, item: ClipboardHistory.Item) {
         PopupMenu(context, anchor).apply {
-            menu.add(0, 1, 0, if (item.pinned) "ピン留めを外す" else "ピン留めする")
-            if (item.image != null) menu.add(0, 2, 1, "切り抜く")
-            menu.add(0, 3, 2, "削除")
+            menu.add(0, 1, 0, context.getString(if (item.pinned) R.string.ime_clipboard_unpin else R.string.ime_clipboard_pin))
+            if (item.image != null) menu.add(0, 2, 1, context.getString(R.string.ime_clipboard_crop))
+            menu.add(0, 3, 2, context.getString(R.string.ime_clipboard_delete))
             setOnMenuItemClickListener {
                 when (it.itemId) {
                     1 -> history.setPinned(item.id, !item.pinned)
@@ -199,8 +199,8 @@ class ClipboardPanelView(
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL or Gravity.END
             // apply の中の removeView はこの行（LinearLayout）を指すので、パネルを明示する
-            addView(textButton("やめる") { this@ClipboardPanelView.removeView(overlay) })
-            addView(textButton("保存") {
+            addView(textButton(context.getString(R.string.ime_clipboard_cancel)) { this@ClipboardPanelView.removeView(overlay) })
+            addView(textButton(context.getString(R.string.ime_clipboard_save)) {
                 history.addBitmap(cropView.cropped())
                 this@ClipboardPanelView.removeView(overlay)
                 refresh()

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- KanadeInputMethodService -->
+    <string name="ime_clipboard_image_not_accepted">この入力欄は画像を直接受け付けないので、クリップボードに入れました。入力欄を長押しして貼り付けてください。</string>
+    <string name="ime_clipboard_history_off">クリップボードの履歴は、設定でオフになっています。</string>
+    <string name="ime_glide_preparing">グライドの準備をしています。少し待ってからもう一度なぞってください</string>
+    <string name="ime_voice_stopped_idle">🎤 終わりました（1分話さなかったため）</string>
+    <string name="ime_voice_stopped">🎤 終わりました</string>
+    <string name="ime_voice_listening">🎤 聞いています（もう一度押すと終わります）</string>
+    <string name="ime_voice_no_permission">マイクが許可されていません（設定画面で許可してください）</string>
+    <string name="ime_voice_no_model">音声認識のモデルがありません（設定画面でダウンロードしてください）</string>
+    <string name="ime_voice_record_failed">録音を始められませんでした</string>
+
+    <!-- ClipboardPanelView -->
+    <string name="ime_clipboard_back_to_keyboard">キーボードに戻る</string>
+    <string name="ime_clipboard_title">クリップボード</string>
+    <string name="ime_clipboard_clear_unpinned">ピン留めしていないものを消す</string>
+    <string name="ime_clipboard_section_sensitive">いまのコピー（機密）</string>
+    <string name="ime_clipboard_empty">コピーした文字や画像が、ここに出ます。押すと貼り付け、長押しでピン留め・切り抜き・削除ができます。</string>
+    <string name="ime_clipboard_section_pinned">ピン留め</string>
+    <string name="ime_clipboard_section_recent">最近</string>
+    <string name="ime_clipboard_sensitive_hint">（%1$d 文字。押すと貼り付けます）</string>
+    <string name="ime_clipboard_unpin">ピン留めを外す</string>
+    <string name="ime_clipboard_pin">ピン留めする</string>
+    <string name="ime_clipboard_crop">切り抜く</string>
+    <string name="ime_clipboard_delete">削除</string>
+    <string name="ime_clipboard_cancel">やめる</string>
+    <string name="ime_clipboard_save">保存</string>
+
+    <!-- EmojiPanelView -->
+    <string name="ime_emoji_search">絵文字を検索</string>
+    <string name="ime_emoji_search_hint">ローマ字・かな・英語で検索</string>
+    <string name="ime_emoji_search_query_with_kana">%1$s（%2$s）</string>
+    <string name="ime_emoji_not_found">見つかりません</string>
+    <string name="ime_emoji_recent">最近使った絵文字</string>
+
+    <!-- CandidateBar: 候補の説明 -->
+    <string name="ime_candidate_label_user_dictionary">ユーザー辞書</string>
+    <string name="ime_candidate_label_hiragana">ひらがな</string>
+    <string name="ime_candidate_label_katakana">カタカナ</string>
+    <string name="ime_candidate_label_time">時刻</string>
+    <string name="ime_candidate_label_date">日付</string>
+    <string name="ime_candidate_label_emoji">絵文字</string>
+    <string name="ime_candidate_label_english">英語</string>
+    <string name="ime_candidate_label_symbol_half_width">記号・半角</string>
+    <string name="ime_candidate_label_symbol_full_width">記号・全角</string>
+    <string name="ime_candidate_label_symbol">記号</string>
+    <string name="ime_candidate_label_full_width">全角</string>
+    <string name="ime_candidate_label_half_width">半角</string>
+</resources>

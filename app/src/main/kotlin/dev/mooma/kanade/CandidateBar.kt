@@ -86,7 +86,7 @@ class CandidateBar(context: Context, private val onSelect: (Int) -> Unit = {}) :
             texts[i].text = "$number  ${candidates[i]}"
             texts[i].setTypeface(null, if (i == selected) Typeface.BOLD else Typeface.NORMAL)
             val label = labels.getOrNull(i)
-            labelViews[i].text = label.orEmpty()
+            labelViews[i].text = label?.let(::localizeLabel).orEmpty()
             labelViews[i].visibility = if (label == null) View.GONE else View.VISIBLE
             row.setBackgroundColor(if (i == selected) selectedBg else Color.TRANSPARENT)
         }
@@ -161,6 +161,10 @@ class CandidateBar(context: Context, private val onSelect: (Int) -> Unit = {}) :
         }
     }
 
+    /** エンジン（core）が返す日本語の説明を、端末の言語の文字に置き換える。知らない説明はそのまま出す */
+    private fun localizeLabel(label: String): String =
+        LABEL_RESOURCES[label]?.let { context.getString(it) } ?: label
+
     private fun rowHeight() = dp(36)
 
     private fun dp(v: Int) = (v * density).toInt()
@@ -171,5 +175,21 @@ class CandidateBar(context: Context, private val onSelect: (Int) -> Unit = {}) :
         const val VISIBLE_ROWS = 9
         const val PREVIEW_MAX_LINES = 6
         const val PREVIEW_MAX_CHARS = 300
+
+        /** core の DictionaryCandidateSource.labelFor が返す説明と、その文字の資源 */
+        private val LABEL_RESOURCES = mapOf(
+            "ユーザー辞書" to R.string.ime_candidate_label_user_dictionary,
+            "ひらがな" to R.string.ime_candidate_label_hiragana,
+            "カタカナ" to R.string.ime_candidate_label_katakana,
+            "時刻" to R.string.ime_candidate_label_time,
+            "日付" to R.string.ime_candidate_label_date,
+            "絵文字" to R.string.ime_candidate_label_emoji,
+            "英語" to R.string.ime_candidate_label_english,
+            "記号・半角" to R.string.ime_candidate_label_symbol_half_width,
+            "記号・全角" to R.string.ime_candidate_label_symbol_full_width,
+            "記号" to R.string.ime_candidate_label_symbol,
+            "全角" to R.string.ime_candidate_label_full_width,
+            "半角" to R.string.ime_candidate_label_half_width,
+        )
     }
 }

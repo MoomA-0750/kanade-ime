@@ -53,6 +53,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.mooma.kanade.CustomModelType
 import dev.mooma.kanade.ModelDownloader
@@ -83,11 +84,11 @@ object DownloadUi {
         done = 0
         message = null
         ModelDownloader.start(
-            items,
+            context, items,
             progress = { i, got, _ -> main.execute { done = items.take(i).sumOf { it.bytes } + got } },
             done = { error ->
                 main.execute {
-                    message = "${model.name}: ${error ?: "ダウンロードしました"}"
+                    message = context.getString(R.string.voice_download_result, model.name, error ?: context.getString(R.string.voice_download_done))
                     id = null
                     finished++
                 }
@@ -113,36 +114,38 @@ fun ColumnScope.VoiceScreen() {
     val tick = DownloadUi.finished + refresh
 
     Section(
-        "録音キー",
-        "録音キーを押している間だけ録音し、離すと端末の中で文字にして入れます（音声は外へ送りません）。" +
-            "短く押すと聞き続けるモードになり、話し終わるたびに入れます（もう一度押すか、1分話さないと終わります）。",
+        stringResource(R.string.voice_key_section_title),
+        stringResource(R.string.voice_key_section_description),
     ) {
         var keyDialog by remember { mutableStateOf(false) }
         var voiceKey by rememberPref({ settings.voiceKey }, { settings.voiceKey = it })
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("録音キー", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(R.string.voice_key_label), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             FilledTonalButton(onClick = { keyDialog = true }) { Text(keyName(voiceKey)) }
         }
-        Note("画面キーボードでは マイクのキーを使います。")
+        Note(stringResource(R.string.voice_key_note_soft_keyboard))
         if (keyDialog) VoiceKeyDialog(voiceKey, onPick = { voiceKey = it; keyDialog = false }, onDismiss = { keyDialog = false })
     }
 
     ModelsSection(tick, onChanged = { refresh++ })
 
-    Section("話し方") {
+    Section(stringResource(R.string.voice_speaking_section_title)) {
         var streaming by rememberPref({ settings.voiceStreaming }, { settings.voiceStreaming = it })
-        SwitchRow("話しながら文字を出す", streaming, { streaming = it }, "ReazonSpeech で、話している途中の文字を出します。")
+        SwitchRow(
+            stringResource(R.string.voice_streaming_title), streaming, { streaming = it },
+            stringResource(R.string.voice_streaming_summary),
+        )
         var spoken by rememberPref({ settings.spokenPunctuation }, { settings.spokenPunctuation = it })
         SwitchRow(
-            "話して句読点を入れる", spoken, { spoken = it },
-            "くてん→。 とうてん→、 かいぎょう→改行 はてなマーク→？ びっくりマーク→！ かぎかっこ／かぎかっことじ→「」 かっこ／かっことじ→（） なかぐろ→・",
+            stringResource(R.string.voice_spoken_punctuation_title), spoken, { spoken = it },
+            stringResource(R.string.voice_spoken_punctuation_summary),
         )
-        Text("認識に使うスレッド数", style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.voice_threads_label), style = MaterialTheme.typography.labelLarge)
         var threads by rememberPref({ settings.voiceThreads }, { settings.voiceThreads = it })
         ConnectedChoices(listOf(2, 4, 6, 8).map { it to "$it" }, threads, { threads = it })
     }
 
-    Section("見本の音声で測る", "8.8 秒の日本語（音声合成）を、ダウンロード済みのモデルすべてにかけて、時間と結果を見ます。") {
+    Section(stringResource(R.string.voice_bench_section_title), stringResource(R.string.voice_bench_section_description)) {
         SampleBench(settings.voiceThreads, tick)
     }
 }
@@ -166,13 +169,13 @@ private fun ModelsSection(tick: Int, onChanged: () -> Unit) {
 
     val inUse = remember(tick, applied) { VoiceCatalog.finalModel(context, settings) }
     Section(
-        "モデル",
-        "入力欄に入る文字を作るモデルを「適用」で選びます。話している途中の文字は、いつも ReazonSpeech で出します。",
+        stringResource(R.string.voice_models_section_title),
+        stringResource(R.string.voice_models_section_description),
     ) {
         if (inUse != null && inUse.id != applied) {
-            Note("適用したモデルがダウンロードされていないので、${inUse.name} を使っています。")
+            Note(stringResource(R.string.voice_models_fallback_note, inUse.name))
         }
-        if (inUse == null) Note("モデルがまだありません。どれかをダウンロードしてください。")
+        if (inUse == null) Note(stringResource(R.string.voice_models_none_note))
         DownloadUi.message?.let { Note(it) }
     }
     for (model in models) {
@@ -187,37 +190,37 @@ private fun ModelsSection(tick: Int, onChanged: () -> Unit) {
     }
     OutlinedButton(onClick = { pick.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) {
         Icon(painterResource(R.drawable.sym_upload_file), contentDescription = null, modifier = Modifier.size(20.dp))
-        Text("リストにないモデルを取り込む", Modifier.padding(start = 8.dp))
+        Text(stringResource(R.string.voice_import_button), Modifier.padding(start = 8.dp))
     }
 
     confirmDownload?.let { model ->
         val mb = Math.round((model.download?.invoke(context)?.sumOf { it.bytes } ?: 0L) / 1e6)
         AlertDialog(
             onDismissRequest = { confirmDownload = null },
-            title = { Text("Wi-Fi につながっていません") },
-            text = { Text("モバイルデータで ${model.name}（約 ${mb}MB）をダウンロードしますか？") },
+            title = { Text(stringResource(R.string.voice_metered_dialog_title)) },
+            text = { Text(stringResource(R.string.voice_metered_dialog_text, model.name, mb)) },
             confirmButton = {
                 TextButton(onClick = {
                     DownloadUi.start(context, model)
                     confirmDownload = null
-                }) { Text("ダウンロードする") }
+                }) { Text(stringResource(R.string.voice_metered_dialog_confirm)) }
             },
-            dismissButton = { TextButton(onClick = { confirmDownload = null }) { Text("やめる") } },
+            dismissButton = { TextButton(onClick = { confirmDownload = null }) { Text(stringResource(R.string.voice_cancel)) } },
         )
     }
     confirmDelete?.let { model ->
         AlertDialog(
             onDismissRequest = { confirmDelete = null },
-            title = { Text("${model.name} を削除しますか？") },
-            text = { Text(if (model.custom) "取り込んだファイルを消し、一覧から外します。" else "ダウンロードしたファイルを消します。もう一度ダウンロードすれば使えます。") },
+            title = { Text(stringResource(R.string.voice_delete_dialog_title, model.name)) },
+            text = { Text(stringResource(if (model.custom) R.string.voice_delete_dialog_text_custom else R.string.voice_delete_dialog_text_downloaded)) },
             confirmButton = {
                 TextButton(onClick = {
                     model.delete(context)
                     confirmDelete = null
                     onChanged()
-                }) { Text("削除する", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.voice_delete_dialog_confirm), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("やめる") } },
+            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text(stringResource(R.string.voice_cancel)) } },
         )
     }
     picked?.let { uris ->
@@ -247,13 +250,13 @@ private fun ModelCard(model: VoiceModelSpec, ready: Boolean, applied: Boolean, o
                 Text(model.name, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
                 if (applied && ready) {
                     Icon(painterResource(R.drawable.sym_check_circle), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                    Text("使用中", Modifier.padding(start = 4.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.voice_model_in_use), Modifier.padding(start = 4.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                 }
             }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (tag in model.tags.sortedBy { it.kind.ordinal }) Tag(tag)
             }
-            model.note?.let { Note(it) }
+            model.noteRes?.let { Note(stringResource(it)) }
             if (downloading) {
                 Text("${DownloadUi.done / 1_000_000}MB / ${DownloadUi.total / 1_000_000}MB", style = MaterialTheme.typography.bodyMedium)
                 LinearWavyProgressIndicator(
@@ -263,15 +266,15 @@ private fun ModelCard(model: VoiceModelSpec, ready: Boolean, applied: Boolean, o
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 when {
-                    downloading -> OutlinedButton(onClick = onDownload) { Text("やめる") }
+                    downloading -> OutlinedButton(onClick = onDownload) { Text(stringResource(R.string.voice_cancel)) }
                     !ready -> Button(onClick = onDownload, enabled = DownloadUi.id == null) {
                         Icon(painterResource(R.drawable.sym_download), contentDescription = null, modifier = Modifier.size(18.dp))
-                        Text("ダウンロード", Modifier.padding(start = 6.dp))
+                        Text(stringResource(R.string.voice_download_button), Modifier.padding(start = 6.dp))
                     }
-                    !applied -> Button(onClick = onApply) { Text("適用") }
+                    !applied -> Button(onClick = onApply) { Text(stringResource(R.string.voice_apply_button)) }
                 }
                 if (ready && !downloading) {
-                    TextButton(onClick = onDelete) { Text("削除") }
+                    TextButton(onClick = onDelete) { Text(stringResource(R.string.voice_delete_button)) }
                 }
             }
         }
@@ -296,7 +299,7 @@ private fun Tag(tag: VoiceTag) {
         color = bg,
         border = if (tag.kind == VoiceTag.Kind.SIZE) androidx.compose.foundation.BorderStroke(1.dp, scheme.outlineVariant) else null,
     ) {
-        Text(tag.text, Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, color = fg)
+        Text(tag.textRes?.let { stringResource(it) } ?: tag.literal.orEmpty(), Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, color = fg)
     }
 }
 
@@ -306,23 +309,25 @@ private fun ImportDialog(uris: List<Uri>, onDone: (String?) -> Unit) {
     val context = LocalContext.current
     val names = remember(uris) { uris.mapNotNull { VoiceCatalog.displayName(context, it) } }
     // 名前は、tokens.txt 以外の（モデルの）ファイルの名前から
+    val defaultName = stringResource(R.string.voice_import_default_name)
     var name by remember {
-        mutableStateOf(names.firstOrNull { !it.lowercase().startsWith("tokens") }?.substringBeforeLast('.') ?: "取り込んだモデル")
+        mutableStateOf(names.firstOrNull { !it.lowercase().startsWith("tokens") }?.substringBeforeLast('.') ?: defaultName)
     }
     var type by remember { mutableStateOf(VoiceCatalog.guessType(names)) }
     var copying by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val missing = VoiceCatalog.missing(type, names)
+    val separator = stringResource(R.string.voice_list_separator)
     AlertDialog(
         onDismissRequest = { if (!copying) onDone(null) },
-        title = { Text("モデルを取り込む") },
+        title = { Text(stringResource(R.string.voice_import_dialog_title)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Note("選んだファイル: ${names.joinToString("、")}")
-                OutlinedTextField(name, { name = it }, label = { Text("名前") }, singleLine = true)
-                Text("形式", style = MaterialTheme.typography.labelLarge)
-                RadioRows(CustomModelType.entries.map { it to "${it.label}\n${it.help}" }, type, { type = it })
-                if (missing.isNotEmpty()) Note("足りないファイル: ${missing.joinToString("、")}（ファイル名に encoder・decoder・joiner・tokens などが入っているもので見分けます）")
+                Note(stringResource(R.string.voice_import_selected_files, names.joinToString(separator)))
+                OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.voice_import_name_label)) }, singleLine = true)
+                Text(stringResource(R.string.voice_import_format_label), style = MaterialTheme.typography.labelLarge)
+                RadioRows(CustomModelType.entries.map { it to stringResource(it.labelRes) + "\n" + stringResource(it.helpRes) }, type, { type = it })
+                if (missing.isNotEmpty()) Note(stringResource(R.string.voice_import_missing_files, missing.joinToString(separator)))
                 error?.let { Note(it) }
             }
         },
@@ -336,13 +341,13 @@ private fun ImportDialog(uris: List<Uri>, onDone: (String?) -> Unit) {
                         val result = runCatching { VoiceCatalog.importCustom(context, uris, name.trim(), type) }
                         main.execute {
                             copying = false
-                            result.onSuccess { onDone(it) }.onFailure { error = "取り込めませんでした: ${it.message}" }
+                            result.onSuccess { onDone(it) }.onFailure { error = context.getString(R.string.voice_import_failed, "${it.message}") }
                         }
                     }.start()
                 },
-            ) { Text(if (copying) "取り込んでいます…" else "取り込む") }
+            ) { Text(stringResource(if (copying) R.string.voice_import_copying else R.string.voice_import_confirm)) }
         },
-        dismissButton = { TextButton(onClick = { onDone(null) }, enabled = !copying) { Text("やめる") } },
+        dismissButton = { TextButton(onClick = { onDone(null) }, enabled = !copying) { Text(stringResource(R.string.voice_cancel)) } },
     )
 }
 
@@ -357,11 +362,11 @@ private fun SampleBench(threads: Int, tick: Int) {
         Button(onClick = {
             val models = VoiceCatalog.all(context).filter { it.isReady(context) }
             if (models.isEmpty()) {
-                lines = listOf("ダウンロード済みのモデルがありません。")
+                lines = listOf(context.getString(R.string.voice_bench_no_models))
                 return@Button
             }
             running = true
-            lines = listOf("$threads スレッド（初回は読み込みの時間を含みます）")
+            lines = listOf(context.getString(R.string.voice_bench_threads, threads))
             val main = context.mainExecutor
             val pcm = readSampleWav(context)
             fun run(i: Int) {
@@ -374,13 +379,13 @@ private fun SampleBench(threads: Int, tick: Int) {
                 m.recognize(context, pcm, threads) { text ->
                     val ms = (System.nanoTime() - started) / 1_000_000
                     main.execute {
-                        lines = lines + "${m.name}: ${ms}ms\n${text ?: "（認識できませんでした）"}"
+                        lines = lines + context.getString(R.string.voice_bench_result, m.name, ms, text ?: context.getString(R.string.voice_bench_not_recognized))
                         run(i + 1)
                     }
                 }
             }
             run(0)
-        }, enabled = !running) { Text("測る") }
+        }, enabled = !running) { Text(stringResource(R.string.voice_bench_button)) }
         if (running) LoadingIndicator(Modifier.size(40.dp))
     }
     for (line in lines) Text(line, style = MaterialTheme.typography.bodyMedium)
@@ -412,7 +417,7 @@ private fun VoiceKeyDialog(current: Int, onPick: (Int) -> Unit, onDismiss: () ->
     val focus = remember { FocusRequester() }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("録音キー（今: ${keyName(current)}）") },
+        title = { Text(stringResource(R.string.voice_key_dialog_title, keyName(current))) },
         text = {
             Column(
                 Modifier
@@ -426,11 +431,11 @@ private fun VoiceKeyDialog(current: Int, onPick: (Int) -> Unit, onDismiss: () ->
                     .focusable()
                     .verticalScroll(rememberScrollState()),
             ) {
-                Note("物理キーボードのキーを押すと、そのキーにします。一覧からも選べます。")
+                Note(stringResource(R.string.voice_key_dialog_note))
                 RadioRows(choices.map { it to keyName(it) }, current, onPick)
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("閉じる") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.voice_close)) } },
     )
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
 }

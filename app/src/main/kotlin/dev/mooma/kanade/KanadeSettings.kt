@@ -4,10 +4,10 @@ import android.content.Context
 import dev.mooma.kanade.core.EngineSettings
 
 /** US 配列で日本語オン/オフを切り替えるキー。JIS の変換・無変換・かなキーは常に有効 */
-enum class ToggleTrigger(val label: String) {
-    RIGHT_ALT_TAP("右 Alt の単押し"),
-    CTRL_SPACE("Ctrl+Space"),
-    F13("F13（QMK などから送る専用キー）"),
+enum class ToggleTrigger(val labelRes: Int) {
+    RIGHT_ALT_TAP(R.string.input_trigger_right_alt_tap),
+    CTRL_SPACE(R.string.input_trigger_ctrl_space),
+    F13(R.string.input_trigger_f13),
 }
 
 /** 画面キーボードの配列（切り替える順） */

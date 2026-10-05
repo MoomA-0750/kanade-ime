@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Keyboard (IME) screens: default (English). Japanese is in values-ja/strings_ime.xml -->
+<resources>
+    <!-- KanadeInputMethodService -->
+    <string name="ime_clipboard_image_not_accepted">This field doesn\'t accept images directly, so the image was copied to the clipboard. Long-press the field to paste it.</string>
+    <string name="ime_clipboard_history_off">Clipboard history is turned off in Settings.</string>
+    <string name="ime_glide_preparing">Preparing glide typing. Wait a moment, then swipe again.</string>
+    <string name="ime_voice_stopped_idle">🎤 Stopped (no speech for 1 minute)</string>
+    <string name="ime_voice_stopped">🎤 Stopped</string>
+    <string name="ime_voice_listening">🎤 Listening (press again to stop)</string>
+    <string name="ime_voice_no_permission">Microphone not allowed (allow it in Settings)</string>
+    <string name="ime_voice_no_model">No speech recognition model (download one in Settings)</string>
+    <string name="ime_voice_record_failed">Couldn\'t start recording</string>
+
+    <!-- ClipboardPanelView -->
+    <string name="ime_clipboard_back_to_keyboard">Back to keyboard</string>
+    <string name="ime_clipboard_title">Clipboard</string>
+    <string name="ime_clipboard_clear_unpinned">Delete unpinned items</string>
+    <string name="ime_clipboard_section_sensitive">Current copy (sensitive)</string>
+    <string name="ime_clipboard_empty">Copied text and images appear here. Tap to paste; long-press to pin, crop, or delete.</string>
+    <string name="ime_clipboard_section_pinned">Pinned</string>
+    <string name="ime_clipboard_section_recent">Recent</string>
+    <string name="ime_clipboard_sensitive_hint">(%1$d characters. Tap to paste)</string>
+    <string name="ime_clipboard_unpin">Unpin</string>
+    <string name="ime_clipboard_pin">Pin</string>
+    <string name="ime_clipboard_crop">Crop</string>
+    <string name="ime_clipboard_delete">Delete</string>
+    <string name="ime_clipboard_cancel">Cancel</string>
+    <string name="ime_clipboard_save">Save</string>
+
+    <!-- EmojiPanelView -->
+    <string name="ime_emoji_search">Search emoji</string>
+    <string name="ime_emoji_search_hint">Search in romaji, kana, or English</string>
+    <string name="ime_emoji_search_query_with_kana">%1$s (%2$s)</string>
+    <string name="ime_emoji_not_found">No results</string>
+    <string name="ime_emoji_recent">Recently used emoji</string>
+
+    <!-- CandidateBar: labels shown next to conversion candidates -->
+    <string name="ime_candidate_label_user_dictionary">User dictionary</string>
+    <string name="ime_candidate_label_hiragana">Hiragana</string>
+    <string name="ime_candidate_label_katakana">Katakana</string>
+    <string name="ime_candidate_label_time">Time</string>
+    <string name="ime_candidate_label_date">Date</string>
+    <string name="ime_candidate_label_emoji">Emoji</string>
+    <string name="ime_candidate_label_english">English</string>
+    <string name="ime_candidate_label_symbol_half_width">Symbol (half-width)</string>
+    <string name="ime_candidate_label_symbol_full_width">Symbol (full-width)</string>
+    <string name="ime_candidate_label_symbol">Symbol</string>
+    <string name="ime_candidate_label_full_width">Full-width</string>
+    <string name="ime_candidate_label_half_width">Half-width</string>
+</resources>

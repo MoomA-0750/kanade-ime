@@ -3,6 +3,7 @@ package dev.mooma.kanade
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
+import androidx.annotation.StringRes
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineNemoEncDecCtcModelConfig
 import com.k2fsa.sherpa.onnx.OfflineSenseVoiceModelConfig
@@ -10,9 +11,14 @@ import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
 import org.json.JSONObject
 import java.io.File
 
-/** モデルの特徴を表す札（一覧で並べて比べる）。[kind] ごとに並べる順と色を決める */
-data class VoiceTag(val kind: Kind, val text: String) {
+/**
+ * モデルの特徴を表す札（一覧で並べて比べる）。[kind] ごとに並べる順と色を決める。
+ * 文字は [textRes]（文字列リソース）か、訳さない [literal]（大きさなど）のどちらか
+ */
+data class VoiceTag(val kind: Kind, @StringRes val textRes: Int? = null, val literal: String? = null) {
     enum class Kind { LANGUAGE, FORMAT, ACCURACY, SPEED, PUNCTUATION, ROLE, SIZE }
+
+    fun text(context: Context): String = textRes?.let { context.getString(it) } ?: literal.orEmpty()
 }
 
 /**
@@ -23,8 +29,8 @@ class VoiceModelSpec(
     val id: String,
     val name: String,
     val tags: List<VoiceTag>,
-    /** 札で言い切れない一言（なければ null） */
-    val note: String?,
+    /** 札で言い切れない一言の文字列リソース（なければ null） */
+    @StringRes val noteRes: Int?,
     val custom: Boolean,
     private val ready: (Context) -> Boolean,
     /** 落とすファイル（取り込んだものは null） */
@@ -41,21 +47,24 @@ class VoiceModelSpec(
     fun delete(context: Context) = remove(context)
 }
 
-/** 取り込めるモデルの形式 */
-enum class CustomModelType(val label: String, val help: String) {
-    WHISPER_CPP("whisper.cpp（ggml）", "ggml-〜.bin のファイル1つ"),
-    TRANSDUCER("sherpa-onnx トランスデューサ（zipformer など）", "encoder・decoder・joiner の .onnx と tokens.txt"),
-    NEMO_CTC("sherpa-onnx NeMo CTC（parakeet など）", "model の .onnx と tokens.txt"),
-    SENSEVOICE("sherpa-onnx SenseVoice", "model の .onnx と tokens.txt"),
+/** 取り込めるモデルの形式。[shortRes] は札に出す短い名前（[labelRes] の括弧より前） */
+enum class CustomModelType(@StringRes val labelRes: Int, @StringRes val shortRes: Int, @StringRes val helpRes: Int) {
+    WHISPER_CPP(R.string.voice_format_whisper_cpp, R.string.voice_format_whisper_cpp_short, R.string.voice_format_whisper_cpp_help),
+    TRANSDUCER(R.string.voice_format_transducer, R.string.voice_format_transducer_short, R.string.voice_format_transducer_help),
+    NEMO_CTC(R.string.voice_format_nemo_ctc, R.string.voice_format_nemo_ctc_short, R.string.voice_format_model_onnx_help),
+    SENSEVOICE(R.string.voice_format_sensevoice, R.string.voice_format_sensevoice_short, R.string.voice_format_model_onnx_help),
 }
 
 /**
  * 音声認識のモデルの一覧。設定画面の「モデル」と、IME が確定の文を作るときに使う
  */
 object VoiceCatalog {
-    private fun tags(vararg t: Pair<VoiceTag.Kind, String>) = t.map { VoiceTag(it.first, it.second) }
+    /** 札。Int は文字列リソース、String は訳さない文字（大きさ） */
+    private fun tags(vararg t: Pair<VoiceTag.Kind, Any>) = t.map { (kind, v) ->
+        if (v is Int) VoiceTag(kind, textRes = v) else VoiceTag(kind, literal = v.toString())
+    }
 
-    private fun sherpa(r: SherpaRecognizer, id: String, tags: List<VoiceTag>, note: String?) = VoiceModelSpec(
+    private fun sherpa(r: SherpaRecognizer, id: String, tags: List<VoiceTag>, note: Int?) = VoiceModelSpec(
         id, r.label, tags, note, custom = false,
         ready = { r.isReady(it) },
         download = { r.downloadItems(it) },
@@ -63,7 +72,7 @@ object VoiceCatalog {
         remove = { c -> r.dir(c).deleteRecursively() },
     )
 
-    private fun whisper(m: VoiceModel, id: String, name: String, tags: List<VoiceTag>, note: String?) = VoiceModelSpec(
+    private fun whisper(m: VoiceModel, id: String, name: String, tags: List<VoiceTag>, note: Int?) = VoiceModelSpec(
         id, name, tags, note, custom = false,
         ready = { m.isReady(it) },
         download = { listOf(ModelDownloader.Item(m.url, m.path(it), m.bytes)) },
@@ -75,35 +84,37 @@ object VoiceCatalog {
     private val A = VoiceTag.Kind.ACCURACY
     private val S = VoiceTag.Kind.SPEED
     private val P = VoiceTag.Kind.PUNCTUATION
-    private val R = VoiceTag.Kind.ROLE
+    private val RL = VoiceTag.Kind.ROLE
     private val Z = VoiceTag.Kind.SIZE
 
     /** 同梱の一覧（おすすめの順）。速さはエミュレータで 8.8 秒の音声にかけた時間から、精度は公開の評価（JSUT など）から */
     val builtIn: List<VoiceModelSpec> = listOf(
         sherpa(
             SherpaRecognizer.parakeet, "parakeet",
-            tags(L to "日本語", A to "精度 高", S to "速い", P to "句読点あり", Z to "656MB"), "NVIDIA の日本語専用のモデルです",
+            tags(L to R.string.voice_tag_japanese, A to R.string.voice_tag_accuracy_high, S to R.string.voice_tag_fast, P to R.string.voice_tag_punctuation_yes, Z to "656MB"),
+            R.string.voice_note_parakeet,
         ),
         sherpa(
             SherpaRecognizer.reazon, "reazon",
-            tags(L to "日本語", A to "精度 高", S to "とても速い", P to "句読点なし", R to "途中の表示", Z to "73MB"),
-            "話している途中の文字を出すのにも使います。句読点は「くてん」のように話して入れます",
+            tags(L to R.string.voice_tag_japanese, A to R.string.voice_tag_accuracy_high, S to R.string.voice_tag_very_fast, P to R.string.voice_tag_punctuation_no, RL to R.string.voice_tag_live_preview, Z to "73MB"),
+            R.string.voice_note_reazon,
         ),
         sherpa(
             SherpaRecognizer.senseVoice, "sensevoice",
-            tags(L to "中・英・日・韓", A to "精度 中", S to "速い", P to "句読点あり", Z to "239MB"), null,
+            tags(L to R.string.voice_tag_zh_en_ja_ko, A to R.string.voice_tag_accuracy_medium, S to R.string.voice_tag_fast, P to R.string.voice_tag_punctuation_yes, Z to "239MB"), null,
         ),
         whisper(
             VoiceModel.SMALL, "whisper-small", "whisper small",
-            tags(L to "多言語", A to "精度 低", S to "遅い", P to "句読点あり", Z to "190MB"), null,
+            tags(L to R.string.voice_tag_multilingual, A to R.string.voice_tag_accuracy_low, S to R.string.voice_tag_slow, P to R.string.voice_tag_punctuation_yes, Z to "190MB"), null,
         ),
         whisper(
             VoiceModel.KOTOBA, "whisper-kotoba", "kotoba-whisper v2.0",
-            tags(L to "日本語", A to "精度 高", S to "とても遅い", P to "句読点 少", Z to "538MB"), "日本語向けの whisper です",
+            tags(L to R.string.voice_tag_japanese, A to R.string.voice_tag_accuracy_high, S to R.string.voice_tag_very_slow, P to R.string.voice_tag_punctuation_few, Z to "538MB"),
+            R.string.voice_note_kotoba,
         ),
         whisper(
             VoiceModel.TURBO, "whisper-turbo", "whisper large-v3-turbo",
-            tags(L to "多言語", A to "精度 高", S to "とても遅い", P to "句読点あり", Z to "574MB"), null,
+            tags(L to R.string.voice_tag_multilingual, A to R.string.voice_tag_accuracy_high, S to R.string.voice_tag_very_slow, P to R.string.voice_tag_punctuation_yes, Z to "574MB"), null,
         ),
     )
 
@@ -126,7 +137,7 @@ object VoiceCatalog {
         val id = "custom-${dir.name}"
         val bytes = dir.listFiles()?.filter { it.name != "meta.json" }?.sumOf { it.length() } ?: 0L
         val size = if (bytes >= 1_000_000) "${Math.round(bytes / 1e6)}MB" else "${(bytes + 999) / 1000}KB"
-        val tags = listOf(VoiceTag(VoiceTag.Kind.FORMAT, type.label.substringBefore('（')), VoiceTag(R, "取り込み"), VoiceTag(Z, size))
+        val tags = listOf(VoiceTag(VoiceTag.Kind.FORMAT, type.shortRes), VoiceTag(RL, R.string.voice_tag_imported), VoiceTag(Z, literal = size))
         if (type == CustomModelType.WHISPER_CPP) {
             val file = File(dir, "model.bin")
             return VoiceModelSpec(

@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 設定アプリの全体・試験と記録・書き出しと読み込み・表示言語（日本語。既定の英語は values/strings_app.xml） -->
+<resources>
+    <!-- 見出し -->
+    <string name="app_header_subtitle">物理キーボードのための日本語入力</string>
+    <string name="app_back">戻る</string>
+
+    <!-- 左の一覧の区画 -->
+    <string name="app_group_input">入力</string>
+    <string name="app_group_words">辞書</string>
+    <string name="app_group_other">その他</string>
+
+    <!-- 設定のまとまり -->
+    <string name="app_category_input_title">入力と変換</string>
+    <string name="app_category_input_summary">日本語オン/オフのキー・句読点・ライブ変換・学習</string>
+    <string name="app_category_keyboard_title">画面キーボード</string>
+    <string name="app_category_keyboard_summary">出すとき・高さ・操作</string>
+    <string name="app_category_voice_title">音声入力</string>
+    <string name="app_category_voice_summary">モデル・録音キー・話し方</string>
+    <string name="app_category_dictionary_title">ユーザー辞書</string>
+    <string name="app_category_dictionary_summary">読みと語を登録して、変換で優先します</string>
+    <string name="app_category_snippets_title">スニペット</string>
+    <string name="app_category_snippets_summary">打った瞬間に置き換える文字列</string>
+    <string name="app_category_language_title">表示言語</string>
+    <string name="app_category_language_summary">日本語・英語・端末の言語</string>
+    <string name="app_category_backup_title">書き出しと読み込み</string>
+    <string name="app_category_backup_summary">設定・辞書・スニペットをファイルに保存して、別の端末に移します</string>
+    <string name="app_category_tools_title">試験と記録</string>
+    <string name="app_category_tools_summary">試し打ち・変換の試験・キー記録</string>
+    <string name="app_category_usage_title">使い方</string>
+    <string name="app_category_usage_summary">Kanade の使い方</string>
+
+    <!-- 足りない権限・設定 -->
+    <string name="app_setup_enable_title">Kanade を入力方法として有効にしてください</string>
+    <string name="app_setup_enable_why">Android の「入力方法」で Kanade をオンにすると、キーボードで日本語が打てるようになります。</string>
+    <string name="app_setup_enable_action">入力方法の設定を開く</string>
+    <string name="app_setup_select_title">Kanade に切り替えてください</string>
+    <string name="app_setup_select_why">Kanade は有効になっていますが、今使っている入力方法が Kanade ではありません。</string>
+    <string name="app_setup_select_action">入力方法を選ぶ</string>
+    <string name="app_setup_overlay_title">「他のアプリの上に重ねて表示」を許可してください</string>
+    <string name="app_setup_overlay_why">変換候補と「あ」「A」の表示を、カーソルの近くに出すのに使います。許可しないと、Galaxy で物理キーボードを使っているときに候補が出ないことがあります。</string>
+    <string name="app_setup_allow">許可する</string>
+    <string name="app_setup_mic_title">マイクを許可してください</string>
+    <string name="app_setup_mic_why">音声入力に使います。声は端末の中で文字にし、外へは送りません。</string>
+    <string name="app_setup_mic_allow_in_settings">アプリの設定で許可する</string>
+
+    <!-- 表示言語 -->
+    <string name="app_language_title">表示言語</string>
+    <string name="app_language_description">Kanade の画面に出す言語を選びます。</string>
+    <string name="app_language_system">端末に合わせる</string>
+    <string name="app_language_japanese">日本語</string>
+    <string name="app_language_english">English</string>
+    <string name="app_language_requires_android13">言語を選べるのは Android 13 以降です。それより前の Android では、端末の言語に合わせます。</string>
+
+    <!-- 試験と記録 -->
+    <string name="app_tools_try_typing">試し打ち</string>
+    <string name="app_tools_try_typing_hint">ここで入力を試す</string>
+    <string name="app_tools_conversion_test">変換の試験</string>
+    <string name="app_tools_conversion_test_description">ひらがなの読みを入れて、辞書と zenz の結果と時間を見ます。評価セット（202 文）で正解率も測れます。</string>
+    <string name="app_tools_failed">失敗: %1$s</string>
+    <string name="app_tools_reading_example">例: きょうはいいてんきですね</string>
+    <string name="app_tools_convert">変換</string>
+    <string name="app_tools_run_eval">評価セットで測る</string>
+    <string name="app_tools_key_log">キー記録</string>
+    <string name="app_tools_key_log_description">IME に届いたキーを記録します。DeX が先に受け取るキーは、ここには出ません。</string>
+    <string name="app_tools_key_log_enable">記録する</string>
+    <string name="app_tools_reload">読み直す</string>
+    <string name="app_tools_clear">消す</string>
+    <string name="app_tools_key_log_empty">（まだありません）</string>
+    <string name="app_usage_not_found">（使い方が見つかりません）</string>
+
+    <!-- 変換の試験の結果 -->
+    <string name="app_bench_dictionary">辞書（%1$s）: %2$s</string>
+    <string name="app_bench_zenz_load_failed">zenz を読み込めなかった</string>
+    <string name="app_bench_zenz_generate">zenz 生成（%1$s）: %2$s</string>
+    <string name="app_bench_zenz_rerank">zenz 並べ替え 10件（%1$s）: %2$s</string>
+    <string name="app_bench_progress">計測中 %1$d/%2$d</string>
+    <string name="app_bench_percent">%1$d/%2$d（%3$s%%）</string>
+    <string name="app_bench_stat">中央値 %1$sms・95%% %2$sms</string>
+    <string name="app_bench_eval_header">評価セット %1$d件、zenz xsmall、スレッド %2$d</string>
+    <string name="app_bench_eval_dictionary_only">辞書だけ: %1$s、%2$s</string>
+    <string name="app_bench_eval_zenz_generate">zenz 生成: %1$s</string>
+    <string name="app_bench_eval_zenz_rerank">zenz 並べ替え: %1$s、%2$s</string>
+    <string name="app_bench_eval_rerank_and_generate">並べ替え＋生成: %1$s、%2$s</string>
+
+    <!-- 書き出しと読み込み -->
+    <string name="app_backup_exported">書き出しました。</string>
+    <string name="app_backup_export_failed">書き出せませんでした（%1$s）。</string>
+    <string name="app_backup_export_title">書き出す</string>
+    <string name="app_backup_export_description">設定と、ユーザー辞書・スニペットを1つのファイルに書き出します。別の端末に移すときや、控えを取っておくときに使います。</string>
+    <string name="app_backup_export_note">学習した変換・クリップボードの履歴・キー記録・音声モデルは入りません。</string>
+    <string name="app_backup_export_button">ファイルに書き出す</string>
+    <string name="app_backup_import_title">読み込む</string>
+    <string name="app_backup_import_description">書き出したファイルを読み込みます。今の設定・ユーザー辞書・スニペットは、ファイルの中身に置き換わります。</string>
+    <string name="app_backup_import_button">ファイルから読み込む</string>
+    <string name="app_backup_import_confirm_title">設定を読み込みますか</string>
+    <string name="app_backup_import_confirm_text">今の設定・ユーザー辞書・スニペットは、ファイルの中身に置き換わります。元に戻すには、先に今の設定を書き出しておいてください。</string>
+    <string name="app_backup_imported">読み込みました（設定 %1$d 項目、ファイル %2$d 個）。</string>
+    <string name="app_backup_import_failed">読み込めませんでした（%1$s）。</string>
+    <string name="app_backup_import_confirm">読み込む</string>
+    <string name="app_backup_cancel">やめる</string>
+    <string name="app_backup_error_open_file">ファイルを開けませんでした</string>
+    <string name="app_backup_error_not_kanade">Kanade の設定のファイルではありません</string>
+    <string name="app_backup_error_newer_version">新しい Kanade で書き出したファイルです。Kanade を新しくしてから読み込んでください</string>
+</resources>

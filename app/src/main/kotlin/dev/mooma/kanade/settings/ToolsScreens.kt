@@ -1,5 +1,8 @@
 package dev.mooma.kanade.settings
 
+import android.app.LocaleManager
+import android.os.Build
+import android.os.LocaleList
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -27,13 +30,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mooma.kanade.ConversionBench
 import dev.mooma.kanade.KeyLog
+import dev.mooma.kanade.R
 
 /** 試し打ち・変換の試験・キー記録 */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -42,12 +48,12 @@ fun ColumnScope.ToolsScreen() {
     val context = LocalContext.current
     val settings = rememberSettings()
 
-    Section("試し打ち") {
+    Section(stringResource(R.string.app_tools_try_typing)) {
         var text by remember { mutableStateOf("") }
-        OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth(), placeholder = { Text("ここで入力を試す") })
+        OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth(), placeholder = { Text(stringResource(R.string.app_tools_try_typing_hint)) })
     }
 
-    Section("変換の試験", "ひらがなの読みを入れて、辞書と zenz の結果と時間を見ます。評価セット（202 文）で正解率も測れます。") {
+    Section(stringResource(R.string.app_tools_conversion_test), stringResource(R.string.app_tools_conversion_test_description)) {
         var reading by remember { mutableStateOf("") }
         var result by remember { mutableStateOf("") }
         var running by remember { mutableStateOf(false) }
@@ -55,35 +61,36 @@ fun ColumnScope.ToolsScreen() {
         fun run(work: ((String) -> Unit) -> String) {
             running = true
             Thread {
-                val r = runCatching { work { msg -> main.execute { result = msg } } }.getOrElse { "失敗: $it" }
+                val r = runCatching { work { msg -> main.execute { result = msg } } }.getOrElse { context.getString(R.string.app_tools_failed, it.toString()) }
                 main.execute {
                     result = r
                     running = false
                 }
             }.start()
         }
-        OutlinedTextField(reading, { reading = it }, Modifier.fillMaxWidth(), placeholder = { Text("例: きょうはいいてんきですね") }, singleLine = true)
+        OutlinedTextField(reading, { reading = it }, Modifier.fillMaxWidth(), placeholder = { Text(stringResource(R.string.app_tools_reading_example)) }, singleLine = true)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Button(onClick = { run { ConversionBench.tryConvert(context, reading.trim()) } }, enabled = !running && reading.isNotBlank()) { Text("変換") }
-            OutlinedButton(onClick = { run { progress -> ConversionBench.runEval(context, progress) } }, enabled = !running) { Text("評価セットで測る") }
+            Button(onClick = { run { ConversionBench.tryConvert(context, reading.trim()) } }, enabled = !running && reading.isNotBlank()) { Text(stringResource(R.string.app_tools_convert)) }
+            OutlinedButton(onClick = { run { progress -> ConversionBench.runEval(context, progress) } }, enabled = !running) { Text(stringResource(R.string.app_tools_run_eval)) }
             if (running) LoadingIndicator(Modifier.size(40.dp))
         }
         if (result.isNotEmpty()) SelectionContainer { Text(result, style = MaterialTheme.typography.bodyMedium) }
     }
 
-    Section("キー記録", "IME に届いたキーを記録します。DeX が先に受け取るキーは、ここには出ません。") {
+    Section(stringResource(R.string.app_tools_key_log), stringResource(R.string.app_tools_key_log_description)) {
         val keyLog = remember { KeyLog(context) }
         var enabled by rememberPref({ settings.keyLogEnabled }, { settings.keyLogEnabled = it })
-        SwitchRow("記録する", enabled, { enabled = it })
+        SwitchRow(stringResource(R.string.app_tools_key_log_enable), enabled, { enabled = it })
         var version by remember { mutableIntStateOf(0) }
         val log = remember(version) { keyLog.read().lines().takeLast(200).joinToString("\n") }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { version++ }) { Text("読み直す") }
+            OutlinedButton(onClick = { version++ }) { Text(stringResource(R.string.app_tools_reload)) }
             OutlinedButton(onClick = {
                 keyLog.clear()
                 version++
-            }) { Text("消す") }
+            }) { Text(stringResource(R.string.app_tools_clear)) }
         }
+        val empty = stringResource(R.string.app_tools_key_log_empty)
         SelectionContainer {
             Column(
                 Modifier
@@ -91,17 +98,29 @@ fun ColumnScope.ToolsScreen() {
                     .verticalScroll(rememberScrollState())
                     .horizontalScroll(rememberScrollState()),
             ) {
-                Text(log.ifEmpty { "（まだありません）" }, fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 15.sp)
+                Text(log.ifEmpty { empty }, fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 15.sp)
             }
         }
     }
 }
 
-/** 使い方（docs/USAGE.md を assets に入れたもの）。見出し・箇条書き・表を簡単に整えて出す */
+/**
+ * 使い方（docs/USAGE.md・USAGE.en.md を assets に入れたもの）。見出し・箇条書き・表を簡単に整えて出す。
+ * 表示言語が日本語でなければ英語版（usage.en.md）を読み、無ければ日本語版にする
+ */
 @Composable
 fun ColumnScope.UsageScreen() {
     val context = LocalContext.current
-    val blocks = remember { parseUsage(runCatching { context.assets.open("usage.md").bufferedReader().readText() }.getOrDefault("（使い方が見つかりません）")) }
+    val language = LocalConfiguration.current.locales[0].language
+    val notFound = stringResource(R.string.app_usage_not_found)
+    val blocks = remember(language) {
+        val names = if (language == "ja") listOf("usage.md") else listOf("usage.en.md", "usage.md")
+        val text = names.firstNotNullOfOrNull { name -> runCatching { context.assets.open(name).bufferedReader().use { it.readText() } }.getOrNull() }
+        parseUsage(text ?: notFound)
+    }
+    // 箇条書きの印と表の区切り（英語では全角の記号を使わない）
+    val bullet = if (language == "ja") "・" else "• "
+    val cellGap = if (language == "ja") "　" else "  "
     for ((title, lines) in blocks) {
         Section(title) {
             SelectionContainer {
@@ -110,14 +129,56 @@ fun ColumnScope.UsageScreen() {
                         when {
                             line.startsWith("### ") -> Text(line.removePrefix("### "), Modifier.padding(top = 8.dp), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                             line.startsWith("- ") || line.matches(Regex("^\\d+\\. .*")) || line.startsWith("   ") ->
-                                Text("・" + line.trimStart().removePrefix("- ").replace(Regex("^\\d+\\. "), ""), style = MaterialTheme.typography.bodyMedium)
-                            line.startsWith("|") -> Text(line.trim('|').split('|').joinToString("　") { it.trim() }, style = MaterialTheme.typography.bodyMedium)
+                                Text(bullet + line.trimStart().removePrefix("- ").replace(Regex("^\\d+\\. "), ""), style = MaterialTheme.typography.bodyMedium)
+                            line.startsWith("|") -> Text(line.trim('|').split('|').joinToString(cellGap) { it.trim() }, style = MaterialTheme.typography.bodyMedium)
                             line.isBlank() -> {}
                             else -> Text(line, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+/** 表示言語の選択肢。端末に合わせる（空）・日本語・英語 */
+private enum class AppLanguage(val tags: String) { SYSTEM(""), JAPANESE("ja"), ENGLISH("en") }
+
+/**
+ * 表示言語。Android 13 以降はアプリごとの言語（LocaleManager）を切り替える。
+ * 端末の設定の「アプリの言語」と同じもので、変えると画面は自動で作り直される
+ */
+@Composable
+fun ColumnScope.LanguageScreen() {
+    val context = LocalContext.current
+    Section(stringResource(R.string.app_language_title), stringResource(R.string.app_language_description)) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val manager = context.getSystemService(LocaleManager::class.java)
+            val current = remember {
+                val locales = manager.applicationLocales
+                when {
+                    locales.isEmpty() -> AppLanguage.SYSTEM
+                    locales[0].language == "ja" -> AppLanguage.JAPANESE
+                    locales[0].language == "en" -> AppLanguage.ENGLISH
+                    else -> AppLanguage.SYSTEM
+                }
+            }
+            ConnectedChoices(
+                listOf(
+                    AppLanguage.SYSTEM to stringResource(R.string.app_language_system),
+                    AppLanguage.JAPANESE to stringResource(R.string.app_language_japanese),
+                    AppLanguage.ENGLISH to stringResource(R.string.app_language_english),
+                ),
+                current,
+                { choice ->
+                    if (choice != current) {
+                        manager.applicationLocales =
+                            if (choice == AppLanguage.SYSTEM) LocaleList.getEmptyLocaleList() else LocaleList.forLanguageTags(choice.tags)
+                    }
+                },
+            )
+        } else {
+            Note(stringResource(R.string.app_language_requires_android13))
         }
     }
 }

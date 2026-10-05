@@ -1,5 +1,6 @@
 package dev.mooma.kanade
 
+import android.content.Context
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
@@ -23,9 +24,9 @@ object ModelDownloader {
 
     /**
      * [items] を順に落とす（専用のスレッドで）。[progress] は（何個目, 落とした量, 全体の量）、[done] は失敗の理由（成功なら null）。
-     * どちらも UI スレッドではないところから呼ぶ
+     * どちらも UI スレッドではないところから呼ぶ。[context] は失敗の理由の文字を引くため
      */
-    fun start(items: List<Item>, progress: (Int, Long, Long) -> Unit, done: (String?) -> Unit): Boolean {
+    fun start(context: Context, items: List<Item>, progress: (Int, Long, Long) -> Unit, done: (String?) -> Unit): Boolean {
         if (running) return false
         running = true
         cancelled = false
@@ -33,18 +34,18 @@ object ModelDownloader {
             val error = runCatching {
                 for ((i, item) in items.withIndex()) {
                     if (item.dest.exists() && item.dest.length() == item.bytes) continue
-                    fetch(item) { got -> progress(i, got, item.bytes) }
+                    fetch(context, item) { got -> progress(i, got, item.bytes) }
                     if (cancelled) break
                 }
-                if (cancelled) "やめました（途中までの分は残り、次は続きからダウンロードします）" else null
-            }.getOrElse { "ダウンロードできませんでした: ${it.message ?: it.javaClass.simpleName}（次は続きからダウンロードします）" }
+                if (cancelled) context.getString(R.string.voice_download_cancelled) else null
+            }.getOrElse { context.getString(R.string.voice_download_failed, it.message ?: it.javaClass.simpleName) }
             running = false
             done(error)
         }, "kanade-download").start()
         return true
     }
 
-    private fun fetch(item: Item, progress: (Long) -> Unit) {
+    private fun fetch(context: Context, item: Item, progress: (Long) -> Unit) {
         item.dest.parentFile?.mkdirs()
         val part = File(item.dest.path + ".part")
         if (part.length() > item.bytes) part.delete()
@@ -82,9 +83,9 @@ object ModelDownloader {
         if (cancelled) return
         if (part.length() != item.bytes) {
             part.delete()
-            error("ファイルの大きさが合いません（${part.length()} / ${item.bytes}）")
+            error(context.getString(R.string.voice_download_size_mismatch, part.length(), item.bytes))
         }
-        if (!part.renameTo(item.dest)) error("ファイルの名前を変えられません")
+        if (!part.renameTo(item.dest)) error(context.getString(R.string.voice_download_rename_failed))
         progress(item.bytes)
     }
 }

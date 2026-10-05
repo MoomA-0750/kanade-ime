@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 設定アプリの全体・試験と記録・書き出しと読み込み・表示言語（英語。日本語は values-ja/strings_app.xml） -->
+<resources>
+    <!-- Header -->
+    <string name="app_header_subtitle">Japanese input for physical keyboards</string>
+    <string name="app_back">Back</string>
+
+    <!-- List groups -->
+    <string name="app_group_input">Input</string>
+    <string name="app_group_words">Dictionary</string>
+    <string name="app_group_other">Other</string>
+
+    <!-- Categories -->
+    <string name="app_category_input_title">Input and conversion</string>
+    <string name="app_category_input_summary">Japanese on/off keys, punctuation, live conversion, learning</string>
+    <string name="app_category_keyboard_title">On-screen keyboard</string>
+    <string name="app_category_keyboard_summary">When to show, height, controls</string>
+    <string name="app_category_voice_title">Voice input</string>
+    <string name="app_category_voice_summary">Model, record key, speaking style</string>
+    <string name="app_category_dictionary_title">User dictionary</string>
+    <string name="app_category_dictionary_summary">Register readings and words to rank them first in conversion</string>
+    <string name="app_category_snippets_title">Snippets</string>
+    <string name="app_category_snippets_summary">Text replaced the moment you type it</string>
+    <string name="app_category_language_title">Display language</string>
+    <string name="app_category_language_summary">Japanese, English, or the system language</string>
+    <string name="app_category_backup_title">Export and import</string>
+    <string name="app_category_backup_summary">Save settings, dictionary, and snippets to a file to move them to another device</string>
+    <string name="app_category_tools_title">Tests and logs</string>
+    <string name="app_category_tools_summary">Try typing, conversion test, key log</string>
+    <string name="app_category_usage_title">How to use</string>
+    <string name="app_category_usage_summary">How to use Kanade</string>
+
+    <!-- Setup cards -->
+    <string name="app_setup_enable_title">Enable Kanade as an input method</string>
+    <string name="app_setup_enable_why">Turn on Kanade under \"Input methods\" in Android settings to type Japanese with your keyboard.</string>
+    <string name="app_setup_enable_action">Open input method settings</string>
+    <string name="app_setup_select_title">Switch to Kanade</string>
+    <string name="app_setup_select_why">Kanade is enabled, but the input method you\'re using now isn\'t Kanade.</string>
+    <string name="app_setup_select_action">Choose input method</string>
+    <string name="app_setup_overlay_title">Allow \"Display over other apps\"</string>
+    <string name="app_setup_overlay_why">Used to show conversion candidates and the \"あ\"/\"A\" indicator near the cursor. Without it, candidates may not appear when you use a physical keyboard on Galaxy devices.</string>
+    <string name="app_setup_allow">Allow</string>
+    <string name="app_setup_mic_title">Allow microphone access</string>
+    <string name="app_setup_mic_why">Used for voice input. Your voice is transcribed on this device and is never sent anywhere.</string>
+    <string name="app_setup_mic_allow_in_settings">Allow in app settings</string>
+
+    <!-- Display language -->
+    <string name="app_language_title">Display language</string>
+    <string name="app_language_description">Choose the language Kanade\'s screens use.</string>
+    <string name="app_language_system">Follow system</string>
+    <string name="app_language_japanese">日本語</string>
+    <string name="app_language_english">English</string>
+    <string name="app_language_requires_android13">You can choose a language on Android 13 and later. On earlier versions, Kanade follows the system language.</string>
+
+    <!-- Tests and logs -->
+    <string name="app_tools_try_typing">Try typing</string>
+    <string name="app_tools_try_typing_hint">Try typing here</string>
+    <string name="app_tools_conversion_test">Conversion test</string>
+    <string name="app_tools_conversion_test_description">Enter a reading in hiragana to see the dictionary and zenz results and how long they take. You can also measure accuracy on the evaluation set (202 sentences).</string>
+    <string name="app_tools_failed">Failed: %1$s</string>
+    <string name="app_tools_reading_example">e.g. きょうはいいてんきですね</string>
+    <string name="app_tools_convert">Convert</string>
+    <string name="app_tools_run_eval">Measure with evaluation set</string>
+    <string name="app_tools_key_log">Key log</string>
+    <string name="app_tools_key_log_description">Records the keys that reach the IME. Keys that DeX receives first don\'t appear here.</string>
+    <string name="app_tools_key_log_enable">Record keys</string>
+    <string name="app_tools_reload">Reload</string>
+    <string name="app_tools_clear">Clear</string>
+    <string name="app_tools_key_log_empty">(Nothing yet)</string>
+    <string name="app_usage_not_found">(Usage guide not found)</string>
+
+    <!-- Conversion bench results -->
+    <string name="app_bench_dictionary">Dictionary (%1$s): %2$s</string>
+    <string name="app_bench_zenz_load_failed">Couldn\'t load zenz</string>
+    <string name="app_bench_zenz_generate">zenz generation (%1$s): %2$s</string>
+    <string name="app_bench_zenz_rerank">zenz reranking, 10 candidates (%1$s): %2$s</string>
+    <string name="app_bench_progress">Measuring %1$d/%2$d</string>
+    <string name="app_bench_percent">%1$d/%2$d (%3$s%%)</string>
+    <string name="app_bench_stat">median %1$sms, 95th percentile %2$sms</string>
+    <string name="app_bench_eval_header">Evaluation set: %1$d cases, zenz xsmall, %2$d threads</string>
+    <string name="app_bench_eval_dictionary_only">Dictionary only: %1$s, %2$s</string>
+    <string name="app_bench_eval_zenz_generate">zenz generation: %1$s</string>
+    <string name="app_bench_eval_zenz_rerank">zenz reranking: %1$s, %2$s</string>
+    <string name="app_bench_eval_rerank_and_generate">Reranking + generation: %1$s, %2$s</string>
+
+    <!-- Export and import -->
+    <string name="app_backup_exported">Exported.</string>
+    <string name="app_backup_export_failed">Couldn\'t export (%1$s).</string>
+    <string name="app_backup_export_title">Export</string>
+    <string name="app_backup_export_description">Exports your settings, user dictionary, and snippets to a single file. Use it to move to another device or to keep a backup.</string>
+    <string name="app_backup_export_note">Learned conversions, clipboard history, the key log, and voice models aren\'t included.</string>
+    <string name="app_backup_export_button">Export to file</string>
+    <string name="app_backup_import_title">Import</string>
+    <string name="app_backup_import_description">Imports an exported file. Your current settings, user dictionary, and snippets are replaced with the file\'s contents.</string>
+    <string name="app_backup_import_button">Import from file</string>
+    <string name="app_backup_import_confirm_title">Import settings?</string>
+    <string name="app_backup_import_confirm_text">Your current settings, user dictionary, and snippets will be replaced with the file\'s contents. To be able to go back, export your current settings first.</string>
+    <string name="app_backup_imported">Imported (%1$d settings, %2$d files).</string>
+    <string name="app_backup_import_failed">Couldn\'t import (%1$s).</string>
+    <string name="app_backup_import_confirm">Import</string>
+    <string name="app_backup_cancel">Cancel</string>
+    <string name="app_backup_error_open_file">Couldn\'t open the file</string>
+    <string name="app_backup_error_not_kanade">This isn\'t a Kanade settings file</string>
+    <string name="app_backup_error_newer_version">This file was exported by a newer version of Kanade. Update Kanade, then import it</string>
+</resources>

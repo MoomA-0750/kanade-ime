@@ -18,9 +18,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.mooma.kanade.LAYOUTS
 import dev.mooma.kanade.KanadeSettings
+import dev.mooma.kanade.R
 import dev.mooma.kanade.ToggleTrigger
 import java.io.File
 
@@ -36,49 +38,49 @@ fun ColumnScope.InputScreen() {
     val context = LocalContext.current
     val settings = rememberSettings()
 
-    Section("日本語オン/オフのキー", "US 配列で使うキーを選びます。JIS 配列の変換（オン）・無変換（オフ）・かな（オン）・半角/全角（切り替え）は、いつでも使えます。") {
+    Section(stringResource(R.string.input_toggle_keys_title), stringResource(R.string.input_toggle_keys_description)) {
         var triggers by rememberPref({ settings.toggleTriggers }, { settings.toggleTriggers = it })
         for (t in ToggleTrigger.entries) {
-            SwitchRow(t.label, t in triggers, { on -> triggers = if (on) triggers + t else triggers - t })
+            SwitchRow(stringResource(t.labelRes), t in triggers, { on -> triggers = if (on) triggers + t else triggers - t })
         }
         OutlinedButton(onClick = { context.getSystemService(InputMethodManager::class.java).showInputMethodPicker() }) {
-            Text("入力方法を切り替える")
+            Text(stringResource(R.string.input_switch_input_method))
         }
     }
 
-    Section("文字") {
+    Section(stringResource(R.string.input_characters_title)) {
         var fullWidth by rememberPref({ settings.fullWidthSymbols }, { settings.fullWidthSymbols = it })
-        SwitchRow("数字・記号を全角で入力する", fullWidth, { fullWidth = it }, "オフにすると半角で入力します（変換の候補には両方出ます）。")
+        SwitchRow(stringResource(R.string.input_full_width_symbols_title), fullWidth, { fullWidth = it }, stringResource(R.string.input_full_width_symbols_summary))
         var pairBrackets by rememberPref({ settings.pairBrackets }, { settings.pairBrackets = it })
         SwitchRow(
-            "括弧を対で入れる", pairBrackets, { pairBrackets = it },
-            "「（ などを打つと閉じ括弧も入れ、カーソルを中に置きます。空の括弧で Space を押すと、「」『』【】などに替わります。",
+            stringResource(R.string.input_pair_brackets_title), pairBrackets, { pairBrackets = it },
+            stringResource(R.string.input_pair_brackets_summary),
         )
-        Text("句読点（, と . で入るもの）")
+        Text(stringResource(R.string.input_punctuation_label))
         var punctuation by rememberPref({ settings.punctuation }, { settings.punctuation = it })
         ConnectedChoices(listOf("、。", "，．", "、．", "，。").map { it to it }, punctuation, { punctuation = it })
     }
 
-    Section("変換") {
+    Section(stringResource(R.string.input_conversion_title)) {
         var live by rememberPref({ settings.liveConversion }, { settings.liveConversion = it })
-        SwitchRow("ライブ変換", live, { live = it }, "打つたびに変換した結果を出します。")
+        SwitchRow(stringResource(R.string.input_live_conversion_title), live, { live = it }, stringResource(R.string.input_live_conversion_summary))
         var learning by rememberPref({ settings.learningEnabled }, { settings.learningEnabled = it })
-        SwitchRow("学習する", learning, { learning = it }, "前に選んだ候補を、次から上に出します。")
+        SwitchRow(stringResource(R.string.input_learning_title), learning, { learning = it }, stringResource(R.string.input_learning_summary))
         var confirm by remember { mutableStateOf(false) }
-        OutlinedButton(onClick = { confirm = true }) { Text("学習を消す") }
+        OutlinedButton(onClick = { confirm = true }) { Text(stringResource(R.string.input_clear_learning)) }
         if (confirm) {
             AlertDialog(
                 onDismissRequest = { confirm = false },
-                title = { Text("学習を消す") },
-                text = { Text("覚えた候補をすべて消します（ユーザー辞書は消えません）。") },
+                title = { Text(stringResource(R.string.input_clear_learning)) },
+                text = { Text(stringResource(R.string.input_clear_learning_message)) },
                 confirmButton = {
                     TextButton(onClick = {
                         File(context.filesDir, "learning.tsv").delete()
                         settings.learningResetAt = System.currentTimeMillis()
                         confirm = false
-                    }) { Text("消す") }
+                    }) { Text(stringResource(R.string.input_clear)) }
                 },
-                dismissButton = { TextButton(onClick = { confirm = false }) { Text("キャンセル") } },
+                dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.input_cancel)) } },
             )
         }
     }
@@ -91,27 +93,35 @@ fun ColumnScope.InputScreen() {
 fun ColumnScope.KeyboardScreen() {
     val settings = rememberSettings()
 
-    Section("出すとき", "物理キーボードがつながっていないときに使う画面キーボードです。") {
+    Section(stringResource(R.string.input_show_keyboard_title), stringResource(R.string.input_show_keyboard_description)) {
         var mode by rememberPref({ settings.softKeyboard }, { settings.softKeyboard = it })
-        ConnectedChoices(listOf("AUTO" to "自動", "ALWAYS" to "いつも", "NEVER" to "出さない"), mode, { mode = it })
+        ConnectedChoices(listOf(
+            "AUTO" to stringResource(R.string.input_show_keyboard_auto),
+            "ALWAYS" to stringResource(R.string.input_show_keyboard_always),
+            "NEVER" to stringResource(R.string.input_show_keyboard_never),
+        ), mode, { mode = it })
         Note(
             when (mode) {
-                "AUTO" -> "物理キーボードがないときだけ出します。"
-                "ALWAYS" -> "物理キーボードがあっても出します。"
-                else -> "出しません（物理キーボード専用）。"
+                "AUTO" -> stringResource(R.string.input_show_keyboard_auto_note)
+                "ALWAYS" -> stringResource(R.string.input_show_keyboard_always_note)
+                else -> stringResource(R.string.input_show_keyboard_never_note)
             },
         )
     }
 
-    Section("配列", "キーボードの左下のキー（グライドは ?123、フルキーは Ctrl、テンキーは「あa1」）を上に払うと、使う配列の中で次の配列に切り替わります。") {
-        val names = mapOf("GLIDE" to "グライド", "QWERTY" to "フルキー", "FLICK" to "テンキー")
+    Section(stringResource(R.string.input_layouts_title), stringResource(R.string.input_layouts_description)) {
+        val names = mapOf(
+            "GLIDE" to stringResource(R.string.input_layout_glide),
+            "QWERTY" to stringResource(R.string.input_layout_qwerty),
+            "FLICK" to stringResource(R.string.input_layout_flick),
+        )
         var enabled by rememberPref({ settings.enabledLayouts }, { settings.enabledLayouts = it })
         var layout by rememberPref({ settings.softKeyboardLayout }, { settings.softKeyboardLayout = it })
-        Note("使う配列（左下のキーで切り替えるときは、この中だけを回ります）")
+        Note(stringResource(R.string.input_layouts_enabled_note))
         val descriptions = mapOf(
-            "GLIDE" to "QWERTY の文字のキーの上を指でなぞると、語を入れます（日本語はローマ字でなぞると、かなになります）。数字・記号は ?123 のページにあります。",
-            "QWERTY" to "キーを払うと数字・記号が出ます。Ctrl・Alt・Fn・Esc・Tab もあり、物理キーボードと同じように使えます。",
-            "FLICK" to "12 のキーをフリック（トグル入力も選べます）で打ちます。",
+            "GLIDE" to stringResource(R.string.input_layout_glide_description),
+            "QWERTY" to stringResource(R.string.input_layout_qwerty_description),
+            "FLICK" to stringResource(R.string.input_layout_flick_description),
         )
         for (id in LAYOUTS) {
             SwitchRow(names.getValue(id), id in enabled, { on ->
@@ -126,37 +136,37 @@ fun ColumnScope.KeyboardScreen() {
         if ("GLIDE" in enabled) {
             var glideZenz by rememberPref({ settings.glideZenz }, { settings.glideZenz = it })
             SwitchRow(
-                "グライドの候補を zenz で並べ直す", glideZenz, { glideZenz = it },
-                "日本語のグライドで、前の文とのつながりを zenz（変換の並べ替えに使う言語モデル）に見てもらいます。辞書の1位を先に入れ、zenz が別の語を選んだら少し遅れて入れ替えます。",
+                stringResource(R.string.input_glide_zenz_title), glideZenz, { glideZenz = it },
+                stringResource(R.string.input_glide_zenz_summary),
             )
         }
         if ("FLICK" in enabled) {
             var toggle by rememberPref({ settings.flickToggle }, { settings.flickToggle = it })
-            SwitchRow("トグル入力", toggle, { toggle = it }, "同じキーを続けて押すと、次の文字になります（あ→い→う）。オフにするとフリックだけで入力します。")
+            SwitchRow(stringResource(R.string.input_flick_toggle_title), toggle, { toggle = it }, stringResource(R.string.input_flick_toggle_summary))
         }
     }
 
-    Section("クリップボード", "あ/A のキーを下に払う（フリックでは ☺ を左に払う）と、コピーした文字や画像の履歴が出ます。押すと貼り付け、長押しでピン留め・切り抜き・削除ができます。パスワードなど機密の印が付いたコピーは残しません。") {
+    Section(stringResource(R.string.input_clipboard_title), stringResource(R.string.input_clipboard_description)) {
         var on by rememberPref({ settings.clipboardHistory }, { settings.clipboardHistory = it })
-        SwitchRow("コピーの履歴を残す", on, { on = it })
+        SwitchRow(stringResource(R.string.input_clipboard_history), on, { on = it })
     }
 
-    Section("大きさ") {
+    Section(stringResource(R.string.input_size_title)) {
         var height by rememberPref({ settings.softKeyboardHeight }, { settings.softKeyboardHeight = it })
-        SliderRow("高さ", height, 60..300, 10, { height = it }) { "$it%" }
+        SliderRow(stringResource(R.string.input_height), height, 60..300, 10, { height = it }) { "$it%" }
         var bottom by rememberPref({ settings.softKeyboardBottom }, { settings.softKeyboardBottom = it })
-        SliderRow("下の余白", bottom, 0..64, 4, { bottom = it }) { "${it}dp" }
-        Note("ナビゲーションバーに重なるときは、下の余白を増やしてください。次にキーボードを出したときから変わります。")
+        SliderRow(stringResource(R.string.input_bottom_margin), bottom, 0..64, 4, { bottom = it }) { "${it}dp" }
+        Note(stringResource(R.string.input_size_note))
     }
 
-    Section("操作") {
+    Section(stringResource(R.string.input_gestures_title)) {
         for (line in listOf(
-            "キーを隅や上下左右へ払うと、小さく書いてある文字（数字・記号）が出ます。",
-            "Shift・Ctrl・Alt・Fn は次の1打だけ効き、2回続けて押すと固定します。押したまま別のキーを押す同時押しもできます。",
-            "修飾キーの押す・離すも送るので、Shift＋矢印の選択やアプリのショートカットが物理キーボードと同じように使えます。",
-            "Alt を上に払うと Meta（⌘）です。Fn＋数字で F1〜F10、Fn＋- = で F11・F12 を入力します。",
-            "Space を左右に払うと矢印です。Tab のキーは上下左右に払うと矢印、四隅に払うと Home・End・PgUp・PgDn です。Backspace を右に払うと Delete です。",
-            "マイクのキーは、押している間だけ録音します。短く押すと聞き続けます。",
-        )) Note("・$line")
+            R.string.input_gesture_swipe_keys,
+            R.string.input_gesture_modifiers,
+            R.string.input_gesture_modifier_events,
+            R.string.input_gesture_meta_fn,
+            R.string.input_gesture_arrows,
+            R.string.input_gesture_mic,
+        )) Note(stringResource(line))
     }
 }
