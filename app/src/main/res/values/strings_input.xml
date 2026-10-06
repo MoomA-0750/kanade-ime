@@ -49,8 +49,15 @@
     <string name="input_flick_toggle_title">Toggle input</string>
     <string name="input_flick_toggle_summary">Pressing the same key repeatedly moves to the next character (あ→い→う). When off, only flicks are used.</string>
     <string name="input_clipboard_title">Clipboard</string>
-    <string name="input_clipboard_description">Swipe down on the あ/A key (on the keypad, swipe left on ☺) to see the history of copied text and images. Tap to paste; long-press to pin, crop, or delete. Copies marked as sensitive, such as passwords, are not kept.</string>
+    <string name="input_clipboard_description">Swipe down on the あ/A key (on the keypad, swipe left on ☺) to see the history of copied text and images. Tap to paste; long-press to pin, edit, crop, or delete. Each card shows the app the keyboard was connected to when you copied. Copies marked as sensitive, such as passwords, are not kept.</string>
     <string name="input_clipboard_history">Keep copy history</string>
+    <string name="input_clipboard_expiry">Keep items for</string>
+    <string name="input_clipboard_expiry_never">No limit (latest 30 items)</string>
+    <string name="input_clipboard_expiry_hour">1 hour</string>
+    <string name="input_clipboard_expiry_day">1 day</string>
+    <string name="input_clipboard_expiry_week">1 week</string>
+    <string name="input_clipboard_expiry_month">30 days</string>
+    <string name="input_clipboard_expiry_note">Items older than this are deleted automatically. Pinned items are kept.</string>
     <string name="input_size_title">Size</string>
     <string name="input_height">Height</string>
     <string name="input_bottom_margin">Bottom margin</string>

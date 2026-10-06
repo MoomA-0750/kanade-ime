@@ -152,6 +152,11 @@ class KanadeSettings(context: Context) {
         get() = prefs.getBoolean(KEY_CLIPBOARD_HISTORY, true)
         set(value) = prefs.edit().putBoolean(KEY_CLIPBOARD_HISTORY, value).apply()
 
+    /** クリップボードの履歴を残す時間（時間。0 なら期限なし）。ピン留めしたものは消さない */
+    var clipboardExpiryHours: Int
+        get() = prefs.getInt(KEY_CLIPBOARD_EXPIRY, 0)
+        set(value) = prefs.edit().putInt(KEY_CLIPBOARD_EXPIRY, value).apply()
+
     var lastJapanese: Boolean
         get() = prefs.getBoolean(KEY_LAST_MODE, false)
         set(value) = prefs.edit().putBoolean(KEY_LAST_MODE, value).apply()
@@ -212,6 +217,7 @@ class KanadeSettings(context: Context) {
         const val KEY_FLOAT_Y = "float_y"
         const val KEY_FLOAT_WIDTH = "float_width"
         const val KEY_CLIPBOARD_HISTORY = "clipboard_history"
+        const val KEY_CLIPBOARD_EXPIRY = "clipboard_expiry_hours"
         const val KEY_SPOKEN_PUNCT = "spoken_punctuation"
         const val KEY_VOICE_FINAL = "voice_final"
         const val KEY_PUNCTUATION = "punctuation"

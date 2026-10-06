@@ -17,7 +17,7 @@
     <string name="ime_clipboard_title">Clipboard</string>
     <string name="ime_clipboard_clear_unpinned">Delete unpinned items</string>
     <string name="ime_clipboard_section_sensitive">Current copy (sensitive)</string>
-    <string name="ime_clipboard_empty">Copied text and images appear here. Tap to paste; long-press to pin, crop, or delete.</string>
+    <string name="ime_clipboard_empty">Copied text and images appear here. Tap to paste; long-press to pin, edit, crop, or delete.</string>
     <string name="ime_clipboard_section_pinned">Pinned</string>
     <string name="ime_clipboard_section_recent">Recent</string>
     <string name="ime_clipboard_sensitive_hint">(%1$d characters. Tap to paste)</string>
@@ -27,6 +27,9 @@
     <string name="ime_clipboard_delete">Delete</string>
     <string name="ime_clipboard_cancel">Cancel</string>
     <string name="ime_clipboard_save">Save</string>
+    <string name="ime_clipboard_edit">Edit</string>
+    <string name="ime_clipboard_edit_title">Edit copied text</string>
+    <string name="ime_clipboard_edit_missing">This item could not be found (it expired or was deleted).</string>
 
     <!-- EmojiPanelView -->
     <string name="ime_emoji_search">Search emoji</string>

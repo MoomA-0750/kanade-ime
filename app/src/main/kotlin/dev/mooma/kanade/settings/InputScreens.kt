@@ -10,6 +10,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -151,6 +152,21 @@ fun ColumnScope.KeyboardScreen() {
     Section(stringResource(R.string.input_clipboard_title), stringResource(R.string.input_clipboard_description)) {
         var on by rememberPref({ settings.clipboardHistory }, { settings.clipboardHistory = it })
         SwitchRow(stringResource(R.string.input_clipboard_history), on, { on = it })
+        if (on) {
+            var expiry by rememberPref({ settings.clipboardExpiryHours }, { settings.clipboardExpiryHours = it })
+            Text(stringResource(R.string.input_clipboard_expiry), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
+            RadioRows(
+                listOf(
+                    0 to stringResource(R.string.input_clipboard_expiry_never),
+                    1 to stringResource(R.string.input_clipboard_expiry_hour),
+                    24 to stringResource(R.string.input_clipboard_expiry_day),
+                    24 * 7 to stringResource(R.string.input_clipboard_expiry_week),
+                    24 * 30 to stringResource(R.string.input_clipboard_expiry_month),
+                ),
+                expiry, { expiry = it },
+            )
+            Note(stringResource(R.string.input_clipboard_expiry_note))
+        }
     }
 
     Section(stringResource(R.string.input_size_title)) {

@@ -49,8 +49,15 @@
     <string name="input_flick_toggle_title">トグル入力</string>
     <string name="input_flick_toggle_summary">同じキーを続けて押すと、次の文字になります（あ→い→う）。オフにするとフリックだけで入力します。</string>
     <string name="input_clipboard_title">クリップボード</string>
-    <string name="input_clipboard_description">あ/A のキーを下に払う（フリックでは ☺ を左に払う）と、コピーした文字や画像の履歴が出ます。押すと貼り付け、長押しでピン留め・切り抜き・削除ができます。パスワードなど機密の印が付いたコピーは残しません。</string>
+    <string name="input_clipboard_description">あ/A のキーを下に払う（フリックでは ☺ を左に払う）と、コピーした文字や画像の履歴が出ます。押すと貼り付け、長押しでピン留め・編集・切り抜き・削除ができます。カードの下には、コピーしたときにキーボードがつながっていたアプリの名前が出ます。パスワードなど機密の印が付いたコピーは残しません。</string>
     <string name="input_clipboard_history">コピーの履歴を残す</string>
+    <string name="input_clipboard_expiry">残しておく期間</string>
+    <string name="input_clipboard_expiry_never">期限なし（新しい 30 件まで）</string>
+    <string name="input_clipboard_expiry_hour">1 時間</string>
+    <string name="input_clipboard_expiry_day">1 日</string>
+    <string name="input_clipboard_expiry_week">1 週間</string>
+    <string name="input_clipboard_expiry_month">30 日</string>
+    <string name="input_clipboard_expiry_note">期間を過ぎたものは自動で消えます。ピン留めしたものは消えません。</string>
     <string name="input_size_title">大きさ</string>
     <string name="input_height">高さ</string>
     <string name="input_bottom_margin">下の余白</string>

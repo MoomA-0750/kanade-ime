@@ -16,7 +16,7 @@
     <string name="ime_clipboard_title">クリップボード</string>
     <string name="ime_clipboard_clear_unpinned">ピン留めしていないものを消す</string>
     <string name="ime_clipboard_section_sensitive">いまのコピー（機密）</string>
-    <string name="ime_clipboard_empty">コピーした文字や画像が、ここに出ます。押すと貼り付け、長押しでピン留め・切り抜き・削除ができます。</string>
+    <string name="ime_clipboard_empty">コピーした文字や画像が、ここに出ます。押すと貼り付け、長押しでピン留め・編集・切り抜き・削除ができます。</string>
     <string name="ime_clipboard_section_pinned">ピン留め</string>
     <string name="ime_clipboard_section_recent">最近</string>
     <string name="ime_clipboard_sensitive_hint">（%1$d 文字。押すと貼り付けます）</string>
@@ -26,6 +26,9 @@
     <string name="ime_clipboard_delete">削除</string>
     <string name="ime_clipboard_cancel">やめる</string>
     <string name="ime_clipboard_save">保存</string>
+    <string name="ime_clipboard_edit">編集</string>
+    <string name="ime_clipboard_edit_title">コピーした文字を編集</string>
+    <string name="ime_clipboard_edit_missing">この項目は見つかりませんでした（期限で消えたか、削除されました）。</string>
 
     <!-- EmojiPanelView -->
     <string name="ime_emoji_search">絵文字を検索</string>

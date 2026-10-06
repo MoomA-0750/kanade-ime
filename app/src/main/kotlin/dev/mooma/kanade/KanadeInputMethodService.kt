@@ -81,7 +81,7 @@ class KanadeInputMethodService : InputMethodService() {
         super.onCreate()
         settings = KanadeSettings(this)
         keyLog = KeyLog(this)
-        clipboardHistory = ClipboardHistory(this)
+        clipboardHistory = ClipboardHistory(this).apply { expiryMillis = { settings.clipboardExpiryHours * 3_600_000L } }
         clipboardManager.addPrimaryClipChangedListener(clipListener)
         candidateSource = ConversionResources.candidateSource(this)
         engine.candidateSource = candidateSource
@@ -244,13 +244,18 @@ class KanadeInputMethodService : InputMethodService() {
             return@OnPrimaryClipChangedListener
         }
         if (!settings.clipboardHistory) return@OnPrimaryClipChangedListener
+        // コピー元は、そのときキーボードがつながっているアプリとみなす（Android はコピー元を教えてくれないので推測）
+        val source = currentInputEditorInfo?.packageName ?: currentInputBinding?.uid?.let { packageManager.getNameForUid(it) }
         // 画像を写すことがあるので、裏のスレッドで
-        saveThread.execute { runCatching { clipboardHistory.capture(clipboardManager) } }
+        saveThread.execute { runCatching { clipboardHistory.capture(clipboardManager, source) } }
     }
     private var clipboardPanel: ClipboardPanelView? = null
 
     private fun createClipboardView(): View =
-        ClipboardPanelView(this, clipboardHistory, onPaste = ::pasteClip, onClose = ::hideEmojiPanel, currentSensitive = ::currentSensitiveClip)
+        ClipboardPanelView(
+            this, clipboardHistory, onPaste = ::pasteClip, onClose = ::hideEmojiPanel, currentSensitive = ::currentSensitiveClip,
+            onEdit = ::editClip,
+        )
             .also { clipboardPanel = it }
 
     /** いまのコピーが機密の印つき（パスワード管理アプリなど）の文字なら、その文字（IME はいまの入力方法なので読める） */
@@ -282,6 +287,12 @@ class KanadeInputMethodService : InputMethodService() {
             clipboardManager.setPrimaryClip(android.content.ClipData.newUri(contentResolver, "Kanade", uri))
             clipboardPanel?.showMessage(getString(R.string.ime_clipboard_image_not_accepted))
         }
+    }
+
+    /** 文字の項目を編集の画面で開く（キーボードはその画面の入力欄で使う） */
+    private fun editClip(item: ClipboardHistory.Item) {
+        hideEmojiPanel()
+        startActivity(ClipboardEditActivity.intent(this, item.id))
     }
 
     private fun showClipboard() {

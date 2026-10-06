@@ -18,6 +18,8 @@ import java.io.File
  * クリップボードの履歴。コピーされた文字と画像を、アプリの中（files/clipboard/）に残す。
  * ピン留めしたものは消えず、それ以外は新しい [MAX_RECENT] 件だけ残す。パスワードなど「機密」の印が付いたコピーは残さない。
  * IME（今使っている入力方法）はコピーを読めるので、コピーされるたびに [capture] する。
+ * 設定で期限を決めると、ピン留めしていないもので期限を過ぎたものは消す（[expiryMillis]）。
+ * IME と編集の画面（[ClipboardEditActivity]）の両方から読み書きするので、同じ鍵で順に行う
  */
 class ClipboardHistory(private val context: Context) {
     data class Item(
@@ -29,26 +31,39 @@ class ClipboardHistory(private val context: Context) {
         val mime: String?,
         val pinned: Boolean,
         val time: Long,
+        /** コピー元のアプリ（パッケージ名）。コピーされたときにキーボードがつながっていたアプリで、分からなければ null */
+        val source: String? = null,
     )
 
     private val dir = File(context.filesDir, "clipboard").apply { mkdirs() }
     private val index = File(dir, "index.json")
 
-    @Synchronized
-    fun all(): List<Item> = read().sortedWith(compareByDescending<Item> { it.pinned }.thenByDescending { it.time })
+    /** 期限（ミリ秒。0 なら消さない）。設定から読む */
+    var expiryMillis: () -> Long = { 0L }
 
-    @Synchronized
-    fun addText(text: String) {
-        if (text.isBlank()) return
-        val items = read().filter { it.text != text || it.pinned }.toMutableList()
-        // ピン留めした同じ文字があれば、新しく足さない
-        if (items.any { it.text == text }) return
-        items += Item(newId(), text, null, null, false, System.currentTimeMillis())
-        write(trim(items))
+    fun all(): List<Item> = synchronized(LOCK) {
+        removeExpired().sortedWith(compareByDescending<Item> { it.pinned }.thenByDescending { it.time })
     }
 
-    @Synchronized
-    fun addImage(bitmapOrBytes: ByteArray, mime: String): Item {
+    fun get(id: String): Item? = synchronized(LOCK) { read().firstOrNull { it.id == id } }
+
+    fun addText(text: String, source: String? = null) {
+        if (text.isBlank()) return
+        synchronized(LOCK) {
+            val items = read().filter { it.text != text || it.pinned }.toMutableList()
+            // ピン留めした同じ文字があれば、新しく足さない
+            if (items.any { it.text == text }) return
+            items += Item(newId(), text, null, null, false, System.currentTimeMillis(), source)
+            write(trim(items))
+        }
+    }
+
+    /** 文字を書き換える（ピン留め・コピー元・時刻はそのまま） */
+    fun editText(id: String, text: String) = synchronized(LOCK) {
+        write(read().map { if (it.id == id && it.text != null) it.copy(text = text) else it })
+    }
+
+    fun addImage(bitmapOrBytes: ByteArray, mime: String, source: String? = null): Item = synchronized(LOCK) {
         val id = newId()
         val ext = when (mime) {
             "image/png" -> "png"
@@ -58,34 +73,47 @@ class ClipboardHistory(private val context: Context) {
         }
         val name = "$id.$ext"
         File(dir, name).writeBytes(bitmapOrBytes)
-        val item = Item(id, null, name, mime, false, System.currentTimeMillis())
+        val item = Item(id, null, name, mime, false, System.currentTimeMillis(), source)
         write(trim(read() + item))
         return item
     }
 
-    /** 切り抜いた画像を、新しい項目として足す */
-    fun addBitmap(bitmap: Bitmap): Item {
+    /** 切り抜いた画像を、新しい項目として足す（コピー元は元の画像のものを引き継ぐ） */
+    fun addBitmap(bitmap: Bitmap, source: String? = null): Item {
         val out = java.io.ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-        return addImage(out.toByteArray(), "image/png")
+        return addImage(out.toByteArray(), "image/png", source)
     }
 
-    @Synchronized
-    fun setPinned(id: String, pinned: Boolean) = write(read().map { if (it.id == id) it.copy(pinned = pinned) else it })
+    fun setPinned(id: String, pinned: Boolean) = synchronized(LOCK) {
+        write(read().map { if (it.id == id) it.copy(pinned = pinned) else it })
+    }
 
-    @Synchronized
-    fun delete(id: String) {
+    fun delete(id: String) = synchronized(LOCK) {
         val items = read()
         items.firstOrNull { it.id == id }?.image?.let { File(dir, it).delete() }
         write(items.filter { it.id != id })
     }
 
     /** ピン留めしていないものをすべて消す */
-    @Synchronized
-    fun clearRecent() {
+    fun clearRecent() = synchronized(LOCK) {
         val items = read()
         items.filter { !it.pinned }.forEach { i -> i.image?.let { File(dir, it).delete() } }
         write(items.filter { it.pinned })
+    }
+
+    /** 期限を過ぎた（ピン留めしていない）ものを消し、残りを返す */
+    private fun removeExpired(): List<Item> {
+        val items = read()
+        val expiry = expiryMillis()
+        if (expiry <= 0) return items
+        val limit = System.currentTimeMillis() - expiry
+        val old = items.filter { !it.pinned && it.time < limit }
+        if (old.isEmpty()) return items
+        old.forEach { i -> i.image?.let { File(dir, it).delete() } }
+        val kept = items - old.toSet()
+        write(kept)
+        return kept
     }
 
     fun imageFile(item: Item): File? = item.image?.let { File(dir, it) }
@@ -96,7 +124,7 @@ class ClipboardHistory(private val context: Context) {
     /**
      * いまのコピーを履歴に足す（コピーされたときに呼ぶ）。機密の印のあるもの・画像を読めないものは足さない
      */
-    fun capture(cm: ClipboardManager) {
+    fun capture(cm: ClipboardManager, source: String? = null) {
         val clip = runCatching { cm.primaryClip }.getOrNull() ?: return
         val desc = clip.description
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -109,12 +137,13 @@ class ClipboardHistory(private val context: Context) {
             val mime = runCatching { context.contentResolver.getType(uri) }.getOrNull() ?: desc.getMimeType(0)
             if (mime != null && mime.startsWith("image/")) {
                 val bytes = runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
-                if (bytes != null && bytes.size < MAX_IMAGE_BYTES) addImage(bytes, mime)
+                if (bytes != null && bytes.size < MAX_IMAGE_BYTES) addImage(bytes, mime, source)
                 return
             }
         }
         val text = item.text?.toString() ?: runCatching { item.coerceToText(context)?.toString() }.getOrNull()
-        if (text != null) addText(text)
+        if (text != null) addText(text, source)
+        synchronized(LOCK) { removeExpired() }
     }
 
     private fun trim(items: List<Item>): List<Item> {
@@ -136,6 +165,7 @@ class ClipboardHistory(private val context: Context) {
                 Item(
                     o.getString("id"), o.optString("text").takeIf { o.has("text") }, o.optString("image").takeIf { o.has("image") },
                     o.optString("mime").takeIf { o.has("mime") }, o.optBoolean("pinned"), o.optLong("time"),
+                    o.optString("source").takeIf { o.has("source") },
                 )
             }
         }.getOrDefault(emptyList())
@@ -151,6 +181,7 @@ class ClipboardHistory(private val context: Context) {
                 i.mime?.let { put("mime", it) }
                 put("pinned", i.pinned)
                 put("time", i.time)
+                i.source?.let { put("source", it) }
             })
         }
         val tmp = File(dir, "index.json.tmp")
@@ -161,6 +192,8 @@ class ClipboardHistory(private val context: Context) {
     companion object {
         const val MAX_RECENT = 30
         const val MAX_IMAGE_BYTES = 20 * 1024 * 1024
+        /** IME と編集の画面で同じファイルを読み書きするための鍵（同じプロセスで動く） */
+        private val LOCK = Any()
     }
 }
 

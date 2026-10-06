@@ -179,9 +179,11 @@ Tap "Search emoji" to bring up a keyboard below, and search in romaji, kana, or 
 
 ### Clipboard
 
-A history of text and images you've copied. Tap an item to paste it; long-press to pin it, crop it (for images), or delete it.
+A history of text and images you've copied. Tap an item to paste it; long-press to pin it, edit it (for text), crop it (for images), or delete it.
 
-- Up to the 30 newest unpinned items are kept
+- The bottom-left corner of each card shows the app it was copied from. Android doesn't tell keyboards where a copy came from, so this is the app the keyboard was connected to when you copied. If you copy in an app where you never opened the keyboard, it may show the previous app instead
+- "Edit" opens an editing screen where you can type normally. "Save" updates the item and returns you to the app you were in
+- Up to the 30 newest unpinned items are kept. Items older than "Keep items for" in settings (no limit, 1 hour, 1 day, 1 week, or 30 days) are deleted automatically. Pinned items are kept
 - Copies marked as sensitive, such as passwords, are not kept. You can turn history off with "Keep copy history" in settings
 - In input fields that don't accept images directly, Kanade puts the image on the clipboard and lets you know. Long-press the field to paste it
 

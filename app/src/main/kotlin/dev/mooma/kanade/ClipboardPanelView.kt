@@ -25,7 +25,8 @@ import kotlin.math.min
 
 /**
  * クリップボードのパネル。ピン留めしたものと最近コピーしたものを並べる。
- * 押すと貼り付け、長押しでメニュー（ピン留め・外す、画像なら切り抜き、削除）。切り抜きはパネルの中で行い、新しい項目として足す。
+ * 押すと貼り付け、長押しでメニュー（ピン留め・外す、文字なら編集、画像なら切り抜き、削除）。切り抜きはパネルの中で行い、新しい項目として足す。
+ * 文字の編集は、キーボードで打てるよう別の画面（[ClipboardEditActivity]）で行う。カードの下にはコピー元のアプリの名前を出す
  */
 @SuppressLint("ViewConstructor")
 class ClipboardPanelView(
@@ -35,7 +36,16 @@ class ClipboardPanelView(
     private val onClose: () -> Unit,
     /** いまのコピーが機密の印つき（パスワードなど）なら、その文字。履歴には残さず、伏せて出して貼り付けられるようにする */
     private val currentSensitive: () -> String? = { null },
+    private val onEdit: (ClipboardHistory.Item) -> Unit = {},
 ) : FrameLayout(context) {
+    /** パッケージ名 → アプリの名前（開くたびに引き直さない） */
+    private val appLabels = HashMap<String, String?>()
+
+    private fun appLabel(packageName: String): String? = appLabels.getOrPut(packageName) {
+        val pm = context.packageManager
+        runCatching { pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString() }.getOrNull()
+    }
+
     private val palette = KeyboardPalette.of(context)
     private val density = resources.displayMetrics.density
     private val list = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
@@ -141,9 +151,9 @@ class ClipboardPanelView(
                 text = if (item.id == SENSITIVE_ID) "••••••••\n" + context.getString(R.string.ime_clipboard_sensitive_hint, item.text?.length ?: 0) else item.text
                 setTextColor(palette.text)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-                maxLines = 4
+                maxLines = if (item.source != null) 3 else 4
                 ellipsize = TextUtils.TruncateAt.END
-                setPadding(dp(12), dp(10), dp(12), dp(10))
+                setPadding(dp(12), dp(10), dp(12), if (item.source != null) dp(24) else dp(10))
             }
         }
         view.background = bg
@@ -156,20 +166,37 @@ class ClipboardPanelView(
             if (item.id != SENSITIVE_ID) menu(it, item)
             true
         }
-        if (!item.pinned) return view
-        // ピン留めの印
+        val source = item.source?.let { appLabel(it) ?: it }
+        if (!item.pinned && source == null) return view
         return FrameLayout(context).apply {
             addView(view, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-            addView(ImageView(context).apply {
+            // ピン留めの印
+            if (item.pinned) addView(ImageView(context).apply {
                 setImageResource(R.drawable.sym_push_pin_fill)
                 setColorFilter(palette.accent)
             }, LayoutParams(dp(16), dp(16), Gravity.TOP or Gravity.END).apply { setMargins(0, dp(6), dp(6), 0) })
+            // コピー元のアプリ（画像の上でも読めるよう、カードの色の下地を付ける）
+            if (source != null) addView(TextView(context).apply {
+                text = source
+                setTextColor(palette.dim)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+                setPadding(dp(6), dp(1), dp(6), dp(1))
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(8).toFloat()
+                    setColor(palette.key)
+                }
+            }, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.START).apply {
+                setMargins(dp(6), 0, dp(6), dp(6))
+            })
         }
     }
 
     private fun menu(anchor: View, item: ClipboardHistory.Item) {
         PopupMenu(context, anchor).apply {
             menu.add(0, 1, 0, context.getString(if (item.pinned) R.string.ime_clipboard_unpin else R.string.ime_clipboard_pin))
+            if (item.text != null) menu.add(0, 4, 1, context.getString(R.string.ime_clipboard_edit))
             if (item.image != null) menu.add(0, 2, 1, context.getString(R.string.ime_clipboard_crop))
             menu.add(0, 3, 2, context.getString(R.string.ime_clipboard_delete))
             setOnMenuItemClickListener {
@@ -177,6 +204,10 @@ class ClipboardPanelView(
                     1 -> history.setPinned(item.id, !item.pinned)
                     2 -> crop(item)
                     3 -> history.delete(item.id)
+                    4 -> {
+                        onEdit(item)
+                        return@setOnMenuItemClickListener true
+                    }
                 }
                 refresh()
                 true
@@ -201,7 +232,7 @@ class ClipboardPanelView(
             // apply の中の removeView はこの行（LinearLayout）を指すので、パネルを明示する
             addView(textButton(context.getString(R.string.ime_clipboard_cancel)) { this@ClipboardPanelView.removeView(overlay) })
             addView(textButton(context.getString(R.string.ime_clipboard_save)) {
-                history.addBitmap(cropView.cropped())
+                history.addBitmap(cropView.cropped(), item.source)
                 this@ClipboardPanelView.removeView(overlay)
                 refresh()
             })
