@@ -134,7 +134,7 @@ class SoftKeyboardView(
     private fun syncLatchedPills() {
         for (key in rows.flatten()) {
             val keyMods = (listOfNotNull(key.center) + key.corners.values).mapNotNull { (it as? Action.Modifier)?.mod }
-            if (keyMods.isEmpty() || touches.values.any { it.key === key }) continue
+            if (keyMods.isEmpty() || touches.values.any { it.shown === key }) continue
             animatePill(key, pressed = keyMods.any { mods.containsKey(it) || held.containsKey(it) })
         }
     }
@@ -214,6 +214,9 @@ class SoftKeyboardView(
         var xs: ArrayList<Float>? = null
         var ys: ArrayList<Float>? = null
         var gliding = false
+        /** タップの補いで、押した形を見せるキー（触ったキーと違うことがある。null なら触ったキー） */
+        var visual: Key? = null
+        val shown: Key get() = visual ?: key
     }
 
     /** なぞった軌跡の表示（離したあと薄れて消える） */
@@ -348,6 +351,9 @@ class SoftKeyboardView(
     /** グライドの ?123 を押した。IME がほかの配列へ移したら true（記号のページを出さない） */
     var onSymbolsPage: (() -> Boolean)? = null
 
+    /** その文字のキー */
+    private fun letterKey(c: Char): Key? = keyRects.keys.firstOrNull { (it.center as? Action.Text)?.char == c }
+
     /** 文字のキー（a〜z）の中心 */
     private fun letterCenters(): Map<Char, Pair<Float, Float>> = buildMap {
         for ((key, rect) in keyRects) {
@@ -358,7 +364,7 @@ class SoftKeyboardView(
 
     private fun drawKey(canvas: Canvas, key: Key, rect: RectF) {
         // なぞっている指は、押し始めたキーを押した色にしない
-        val pressed = touches.values.any { it.key === key && !it.gliding }
+        val pressed = touches.values.any { it.shown === key && !it.gliding }
         val center = key.center!!
         val keyMods = (listOf(center) + key.corners.values).mapNotNull { (it as? Action.Modifier)?.mod }
         // 地と文字の色（Material 3 の役割: 文字のキー・機能のキー・強調（Enter・固定した修飾）・1打だけの修飾）
@@ -498,7 +504,6 @@ class SoftKeyboardView(
                 val (key, rect) = keyRects.entries.firstOrNull { it.value.contains(x, y) }?.toPair() ?: return true
                 val t = Touch(key, rect, x, y)
                 touches[id] = t
-                animatePill(key, pressed = true)
                 (key.center as? Action.Modifier)?.let {
                     t.heldMod = it.mod
                     held[it.mod] = false
@@ -509,7 +514,10 @@ class SoftKeyboardView(
                 if (glideLayout && (key.center as? Action.Text)?.char?.let { it in 'a'..'z' } == true) {
                     t.xs = arrayListOf(x)
                     t.ys = arrayListOf(y)
+                    // タップの補いで別のキーになりそうなら、押した形はそのキーに出す（離したときに決め直す）
+                    correctTap(t)?.let { c -> t.visual = letterKey(c) }
                 }
+                animatePill(t.shown, pressed = true)
                 scheduleRepeat(id, t)
                 // あ/A の長押しで「配列×言語」の一覧（払ったら取りやめ）
                 if (longPressToggle) handler.postAtTime({
@@ -538,7 +546,7 @@ class SoftKeyboardView(
                             // なぞり始めた: 長押しの繰り返しをやめ、キーを離した形に戻して、軌跡を出す
                             t.gliding = true
                             handler.removeCallbacksAndMessages(event.getPointerId(p))
-                            animatePill(t.key, pressed = false)
+                            animatePill(t.shown, pressed = false)
                             trailAnimator?.cancel()
                             trail = t
                             trailAlpha = 1f
@@ -576,7 +584,7 @@ class SoftKeyboardView(
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
                 val t = touches.remove(id) ?: return true
                 handler.removeCallbacksAndMessages(id)
-                if (touches.values.none { it.key === t.key }) animatePill(t.key, pressed = false)
+                if (touches.values.none { it.shown === t.shown }) animatePill(t.shown, pressed = false)
                 if (t.gliding) {
                     val xs = t.xs!!
                     val ys = t.ys!!
@@ -604,6 +612,12 @@ class SoftKeyboardView(
                     fire(arrow(if (t.dir == Dir.W) -1 else 1))
                 } else {
                     val corrected = correctTap(t)
+                    // 離したときに決めたキーが、押した形を見せていたキーと違えば、入れたキーに押した形を短く出す
+                    val typedKey = corrected?.let { letterKey(it) } ?: t.key
+                    if (typedKey != null && typedKey !== t.shown && touches.values.none { it.shown === typedKey }) {
+                        animatePill(typedKey, pressed = true)
+                        handler.postDelayed({ if (touches.values.none { it.shown === typedKey }) animatePill(typedKey, pressed = false) }, PILL_IN_MS)
+                    }
                     if (corrected != null) fire(Action.Text(corrected)) else actionOf(t)?.let { fire(it) }
                 }
                 syncLatchedPills()
@@ -611,7 +625,7 @@ class SoftKeyboardView(
             }
             MotionEvent.ACTION_CANCEL -> {
                 touches.keys.forEach { handler.removeCallbacksAndMessages(it) }
-                touches.values.forEach { animatePill(it.key, pressed = false) }
+                touches.values.forEach { animatePill(it.shown, pressed = false) }
                 if (touches.values.any { it.key.center == Action.Voice }) onVoice(false)
                 touches.clear()
                 held.clear()
@@ -686,7 +700,7 @@ class SoftKeyboardView(
             override fun run() {
                 if (touches[id] !== t) return
                 // 繰り返している間は1打だけの修飾を残す（Shift を1回押して ← を長押しで、続けて選択できるように）。離したときに外す
-                actionOf(t)?.let { fire(it, consume = false) }
+                (t.visual?.center ?: actionOf(t))?.let { fire(it, consume = false) }
                 t.repeated = true
                 handler.postAtTime(this, id, android.os.SystemClock.uptimeMillis() + REPEAT_MS)
             }

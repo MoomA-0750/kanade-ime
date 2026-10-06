@@ -109,7 +109,8 @@ Keys you press are handled just like a physical keyboard. Japanese input, conver
 Under "Layouts" in settings, choose which languages each layout is used for (Japanese, English, Numbers & symbols) — for example, 12-key for Japanese only and Glide for English and numbers/symbols.
 
 - Tapping あ/A (“あa1” on 12-key) moves to the next language on that layout. If the layout has only one language, it moves to the next layout instead (in the example above, “あa1” on 12-key goes to Glide in English, and あ/A on Glide goes to 12-key in Japanese)
-- Long-press あ/A or “あa1” to see a list such as "Glide・English" and "12-key・Japanese", and pick one (like long-pressing the globe key on iPhone)
+- Long-press あ/A or “あa1” to see a list grouped by layout (for example, Japanese, English, and Numbers & symbols under "12-key"), and pick one (like long-pressing the globe key on iPhone)
+- When you switch layouts by swiping up on the bottom-left key, the language also changes to one that layout uses
 - If Glide isn't set to use numbers & symbols, ?123 switches to a 12-key layout that is
 - When you switch Japanese on or off with a physical keyboard, Kanade also moves to a layout that uses that language
 

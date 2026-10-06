@@ -146,6 +146,9 @@ class FlickKeyboardView(
         /** 最後の指の位置（斜めに払ったときの向きの紛らわしさを見る） */
         var lastX = x0
         var lastY = y0
+        /** タップの補いで、押した形を見せるキー（null なら触ったキー） */
+        var visual: Cell? = null
+        val shown: Cell get() = visual ?: cell
         var repeated = false
         var voiceStarted = false
     }
@@ -224,7 +227,7 @@ class FlickKeyboardView(
     }
 
     private fun drawCell(canvas: Canvas, cell: Cell) {
-        val touch = touches.values.firstOrNull { it.cell === cell }
+        val touch = touches.values.firstOrNull { it.shown === cell }
         val slot = cell.slot
         val fn = (slot as? Slot.Fn)?.id
         val (fill, ink) = when {
@@ -326,7 +329,12 @@ class FlickKeyboardView(
                 val cell = cells.firstOrNull { it.rect.contains(event.getX(i), event.getY(i)) } ?: return true
                 val t = Touch(cell, event.getX(i), event.getY(i))
                 touches[id] = t
-                animatePill(cell, pressed = true)
+                // タップの補いで別のキーになりそうなら、押した形はそのキーに出す（離したときに決め直す）
+                (cell.slot as? Slot.Chars)?.let { slot ->
+                    val (index, _) = correct(t, slot.index)
+                    if (index != slot.index) t.visual = cells.firstOrNull { (it.slot as? Slot.Chars)?.index == index }
+                }
+                animatePill(t.shown, pressed = true)
                 performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
                 scheduleRepeat(id, t)
                 // 「あa1」の長押しで「配列×言語」の一覧
@@ -358,7 +366,7 @@ class FlickKeyboardView(
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
                 val t = touches.remove(id) ?: return true
                 handler.removeCallbacksAndMessages(id)
-                if (touches.values.none { it.cell === t.cell }) animatePill(t.cell, pressed = false)
+                if (touches.values.none { it.shown === t.shown }) animatePill(t.shown, pressed = false)
                 t.dir = direction(t, event.getX(i), event.getY(i))
                 t.lastX = event.getX(i)
                 t.lastY = event.getY(i)
@@ -368,7 +376,7 @@ class FlickKeyboardView(
             MotionEvent.ACTION_CANCEL -> {
                 touches.keys.forEach { handler.removeCallbacksAndMessages(it) }
                 if (touches.values.any { it.voiceStarted }) actions.voice(false)
-                touches.values.forEach { animatePill(it.cell, pressed = false) }
+                touches.values.forEach { animatePill(it.shown, pressed = false) }
                 touches.clear()
                 invalidate()
             }
@@ -426,7 +434,15 @@ class FlickKeyboardView(
                     }
                 }
             }
-            is Slot.Chars -> correct(t, slot.index).let { (index, dir) -> typeKey(index, dir) }
+            is Slot.Chars -> correct(t, slot.index).let { (index, dir) ->
+                // 離したときに決めたキーが、押した形を見せていたキーと違えば、入れたキーに押した形を短く出す
+                val typed = cells.firstOrNull { (it.slot as? Slot.Chars)?.index == index }
+                if (typed != null && typed !== t.shown && touches.values.none { it.shown === typed }) {
+                    animatePill(typed, pressed = true)
+                    handler.postDelayed({ if (touches.values.none { it.shown === typed }) animatePill(typed, pressed = false) }, 90L)
+                }
+                typeKey(index, dir)
+            }
         }
     }
 

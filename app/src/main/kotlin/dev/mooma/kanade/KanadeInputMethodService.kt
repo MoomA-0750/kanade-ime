@@ -350,23 +350,32 @@ class KanadeInputMethodService : InputMethodService() {
             elevation = dp(6).toFloat()
         }
         val popup = android.widget.PopupWindow(list, dp(240), android.view.ViewGroup.LayoutParams.WRAP_CONTENT, true)
-        for (source in KeyboardSources.all(settings)) {
-            val selected = source == current
+        // 配列ごとにまとめる（見出しに配列の名前、その下に言語）
+        for ((layout, sources) in KeyboardSources.all(settings).groupBy { it.layout }) {
             list.addView(android.widget.TextView(this).apply {
-                text = getString(layoutName.getValue(source.layout)) + "・" + getString(modeName.getValue(source.mode))
-                setTextColor(if (selected) palette.onAccent else palette.text)
-                textSize = 16f
-                gravity = android.view.Gravity.CENTER_VERTICAL
-                setPadding(dp(16), 0, dp(16), 0)
-                background = android.graphics.drawable.GradientDrawable().apply {
-                    cornerRadius = dp(12).toFloat()
-                    setColor(if (selected) palette.accent else android.graphics.Color.TRANSPARENT)
-                }
-                setOnClickListener {
-                    popup.dismiss()
-                    applySource(source)
-                }
-            }, android.widget.LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, dp(48)))
+                text = getString(layoutName.getValue(layout))
+                setTextColor(palette.dim)
+                textSize = 13f
+                setPadding(dp(14), dp(if (list.childCount == 0) 4 else 10), dp(14), dp(2))
+            })
+            for (source in sources) {
+                val selected = source == current
+                list.addView(android.widget.TextView(this).apply {
+                    text = getString(modeName.getValue(source.mode))
+                    setTextColor(if (selected) palette.onAccent else palette.text)
+                    textSize = 16f
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                    setPadding(dp(24), 0, dp(16), 0)
+                    background = android.graphics.drawable.GradientDrawable().apply {
+                        cornerRadius = dp(12).toFloat()
+                        setColor(if (selected) palette.accent else android.graphics.Color.TRANSPARENT)
+                    }
+                    setOnClickListener {
+                        popup.dismiss()
+                        applySource(source)
+                    }
+                }, android.widget.LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, dp(44)))
+            }
         }
         popup.setOnDismissListener { if (sourceMenu === popup) sourceMenu = null }
         sourceMenu = popup
@@ -387,8 +396,18 @@ class KanadeInputMethodService : InputMethodService() {
         // 使う配列の中だけを、グライド → フルキー → テンキーの順に回る
         val enabled = LAYOUTS.filter { it in settings.enabledLayouts }
         val now = settings.softKeyboardLayout
-        settings.softKeyboardLayout = enabled[(enabled.indexOf(now) + 1) % enabled.size]
-        applyKeyboardSettings()
+        val next = enabled[(enabled.indexOf(now) + 1) % enabled.size]
+        // 言語は、移った先の配列で使うものに合わせる（いまの言語を使うならそのまま、使わないならその配列の最初の言語）
+        val modes = KeyboardSources.cycleModes(settings, next)
+        val mode = currentSource().mode.takeIf { it in modes } ?: modes.firstOrNull() ?: "JA"
+        applySource(KeyboardSource(next, mode))
+    }
+
+    /** いまの配列でいまの言語を使わない設定なら、その配列の最初の言語にする（キーボードを出したとき・設定を変えたあと） */
+    private fun ensureModeAllowed() {
+        val current = currentSource()
+        val modes = KeyboardSources.cycleModes(settings, current.layout)
+        if (modes.isNotEmpty() && current.mode !in modes) applySource(KeyboardSource(current.layout, modes.first()))
     }
 
     /**
@@ -867,6 +886,7 @@ class KanadeInputMethodService : InputMethodService() {
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         applyKeyboardSettings()
+        ensureModeAllowed()
         hideEmojiPanel()
         log("start-input-view pkg=${info?.packageName} restarting=$restarting")
     }
