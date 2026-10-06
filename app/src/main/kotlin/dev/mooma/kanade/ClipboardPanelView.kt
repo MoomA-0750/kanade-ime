@@ -17,7 +17,6 @@ import android.widget.FrameLayout
 import android.widget.GridLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.PopupMenu
 import android.widget.ScrollView
 import android.widget.TextView
 import kotlin.math.max
@@ -163,7 +162,7 @@ class ClipboardPanelView(
             onPaste(item)
         }
         view.setOnLongClickListener {
-            if (item.id != SENSITIVE_ID) menu(it, item)
+            if (item.id != SENSITIVE_ID) menu(item)
             true
         }
         val source = item.source?.let { appLabel(it) ?: it }
@@ -193,27 +192,46 @@ class ClipboardPanelView(
         }
     }
 
-    private fun menu(anchor: View, item: ClipboardHistory.Item) {
-        PopupMenu(context, anchor).apply {
-            menu.add(0, 1, 0, context.getString(if (item.pinned) R.string.ime_clipboard_unpin else R.string.ime_clipboard_pin))
-            if (item.text != null) menu.add(0, 4, 1, context.getString(R.string.ime_clipboard_edit))
-            if (item.image != null) menu.add(0, 2, 1, context.getString(R.string.ime_clipboard_crop))
-            menu.add(0, 3, 2, context.getString(R.string.ime_clipboard_delete))
-            setOnMenuItemClickListener {
-                when (it.itemId) {
-                    1 -> history.setPinned(item.id, !item.pinned)
-                    2 -> crop(item)
-                    3 -> history.delete(item.id)
-                    4 -> {
-                        onEdit(item)
-                        return@setOnMenuItemClickListener true
-                    }
-                }
-                refresh()
-                true
-            }
-            show()
+    /**
+     * 長押しのメニュー。パネルの上に重ねて出す（PopupMenu はフォーカスを取るので、Android 12 などでは入力欄の側がフォーカスを失い、キーボードごと閉じてしまう）
+     */
+    private fun menu(item: ClipboardHistory.Item) {
+        val actions = buildList {
+            add(context.getString(if (item.pinned) R.string.ime_clipboard_unpin else R.string.ime_clipboard_pin) to { history.setPinned(item.id, !item.pinned); refresh() })
+            if (item.text != null) add(context.getString(R.string.ime_clipboard_edit) to { onEdit(item) })
+            if (item.image != null) add(context.getString(R.string.ime_clipboard_crop) to { crop(item) })
+            add(context.getString(R.string.ime_clipboard_delete) to { history.delete(item.id); refresh() })
         }
+        val overlay = FrameLayout(context).apply {
+            setBackgroundColor(0x66000000)
+            isClickable = true
+        }
+        overlay.setOnClickListener { removeView(overlay) }
+        val sheet = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable().apply {
+                cornerRadius = dp(16).toFloat()
+                setColor(palette.key)
+            }
+            setPadding(0, dp(8), 0, dp(8))
+            isClickable = true
+        }
+        for ((label, action) in actions) {
+            sheet.addView(TextView(context).apply {
+                text = label
+                setTextColor(palette.text)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(20), 0, dp(20), 0)
+                background = android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(palette.pressed), null, null)
+                setOnClickListener {
+                    this@ClipboardPanelView.removeView(overlay)
+                    action()
+                }
+            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(48)))
+        }
+        overlay.addView(sheet, LayoutParams(dp(240), LayoutParams.WRAP_CONTENT, Gravity.CENTER))
+        addView(overlay, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
     }
 
     /** 画像を切り抜く。四隅をつまんで範囲を決め、「保存」で新しい項目として足す */

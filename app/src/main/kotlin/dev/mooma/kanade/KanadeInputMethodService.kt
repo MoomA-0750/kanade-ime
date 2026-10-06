@@ -360,7 +360,10 @@ class KanadeInputMethodService : InputMethodService() {
             }
             elevation = dp(6).toFloat()
         }
-        val popup = android.widget.PopupWindow(list, dp(240), android.view.ViewGroup.LayoutParams.WRAP_CONTENT, true)
+        // フォーカスを取らない（取ると Android 12 などでは入力欄の側がフォーカスを失い、キーボードごと閉じる）。外を触ったら閉じる
+        val popup = android.widget.PopupWindow(list, dp(240), android.view.ViewGroup.LayoutParams.WRAP_CONTENT, false).apply {
+            isOutsideTouchable = true
+        }
         // 配列ごとにまとめる（見出しに配列の名前、その下に言語）
         for ((layout, sources) in KeyboardSources.all(settings).groupBy { it.layout }) {
             list.addView(android.widget.TextView(this).apply {
