@@ -694,10 +694,11 @@ class KanadeInputMethodService : InputMethodService() {
             "start-input pkg=${attribute?.packageName} restarting=$restarting type=0x${Integer.toHexString(attribute?.inputType ?: 0)} " +
                 "ime=0x${Integer.toHexString(attribute?.imeOptions ?: 0)} sel=${attribute?.initialSelStart},${attribute?.initialSelEnd}",
         )
-        if (!restarting) {
-            engine.reset()
-            hideBar()
-        }
+        // 入力欄が替わったら、入力中の状態を必ず捨てる。ブラウザ（WebView）などは欄を移っても onFinishInput を呼ばず
+        // restarting=true で始め直すことがあり、前の欄の入力中の文字が残って新しい欄に入り、括弧の中のカーソルの位置もずれていた
+        engine.reset()
+        lastGlide = null
+        hideBar()
         updateStatusIcon()
     }
 
@@ -856,7 +857,7 @@ class KanadeInputMethodService : InputMethodService() {
                         ic?.finishComposingText()
                     } else {
                         ic?.setComposingText(styled(command), 1)
-                        if (command.cursor >= 0 && ic != null) placeCursorInComposing(ic, command.text.length, command.cursor)
+                        if (command.cursor >= 0 && ic != null) placeCursorInComposing(ic, command.text, command.cursor)
                     }
                 is ImeCommand.Commit -> {
                     ic?.commitText(command.text, 1)
@@ -917,7 +918,10 @@ class KanadeInputMethodService : InputMethodService() {
      * 未確定文字列の途中にカーソルを置く。setComposingText はカーソルを未確定文字列の外にしか置けないので、
      * 未確定文字列の先頭の位置を知って setSelection する（先頭が分からなければ、アプリの文字列から求める）
      */
-    private fun placeCursorInComposing(ic: android.view.inputmethod.InputConnection, length: Int, cursor: Int) {
+    private fun placeCursorInComposing(ic: android.view.inputmethod.InputConnection, text: String, cursor: Int) {
+        val length = text.length
+        // アプリの欄でカーソルの前が、いま入れた未確定文字列でなければ（アプリの処理が遅れている・状態がずれている）、動かさない
+        if (ic.getTextBeforeCursor(length, 0)?.toString() != text) return
         // 未確定文字列の先頭は、いま入れた直後のカーソル（未確定文字列の末尾）から求める。
         // アプリから届く位置（onUpdateSelection）は遅れて届くので、確定してすぐ次を打つと前の未確定文字列の位置のままで、
         // カーソルが前に打った文字の中へ飛び、前の文字が未確定文字列に混ざっていた（括弧を打ったときに起きていた）
