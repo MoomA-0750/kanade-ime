@@ -342,6 +342,12 @@ class SoftKeyboardView(
         return chosen.char.takeIf { it != touched }
     }
 
+    /** あ/A を長押しした（「配列×言語」の一覧を出す） */
+    var onSourceMenu: (() -> Unit)? = null
+
+    /** グライドの ?123 を押した。IME がほかの配列へ移したら true（記号のページを出さない） */
+    var onSymbolsPage: (() -> Boolean)? = null
+
     /** 文字のキー（a〜z）の中心 */
     private fun letterCenters(): Map<Char, Pair<Float, Float>> = buildMap {
         for ((key, rect) in keyRects) {
@@ -498,12 +504,21 @@ class SoftKeyboardView(
                     held[it.mod] = false
                 }
                 if (key.center == Action.Voice) onVoice(true)
+                val longPressToggle = key.center == Action.ToggleJapanese
                 // グライドの配列の文字のキーなら、軌跡を取り始める（なぞったらグライド、動かさず離したらその文字）
                 if (glideLayout && (key.center as? Action.Text)?.char?.let { it in 'a'..'z' } == true) {
                     t.xs = arrayListOf(x)
                     t.ys = arrayListOf(y)
                 }
                 scheduleRepeat(id, t)
+                // あ/A の長押しで「配列×言語」の一覧（払ったら取りやめ）
+                if (longPressToggle) handler.postAtTime({
+                    if (touches[id] === t && t.dir == null) {
+                        t.repeated = true
+                        performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                        onSourceMenu?.invoke()
+                    }
+                }, id, android.os.SystemClock.uptimeMillis() + LONG_PRESS_MS)
                 performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
                 invalidate()
             }
@@ -689,6 +704,8 @@ class SoftKeyboardView(
             Action.SwitchLayout -> onSwitchLayout()
             Action.Float -> onFloat()
             is Action.ToPage -> {
+                // 数字/記号を使わない設定のグライドでは、?123 で数字/記号を使える別の配列へ（IME が引き受けたら true）
+                if (page == Page.LETTERS && action.page == Page.SYMBOLS && onSymbolsPage?.invoke() == true) return
                 page = action.page
                 rows = buildRows()
                 pill.clear()
@@ -764,6 +781,7 @@ class SoftKeyboardView(
         private const val PILL_OUT_MS = 280L
         private const val REPEAT_MS = 50L
         private const val DOUBLE_TAP_MS = 350L
+        private const val LONG_PRESS_MS = 450L
         /** タップの補いで候補にする近くのキー（中心までの距離。キーの大きさを 1 として） */
         private const val NEIGHBOR_RADIUS = 1.1f
         /** 払いと見なす距離の既定（キーの幅の 45%）と、最低の距離 */

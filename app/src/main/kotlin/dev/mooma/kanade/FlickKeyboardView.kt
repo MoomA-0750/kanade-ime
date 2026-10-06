@@ -38,6 +38,10 @@ class FlickKeyboardView(
         fun key(keyCode: Int)
         /** 日本語入力のオン・オフ（かなはオン、英字・数字はオフ） */
         fun setJapanese(on: Boolean)
+        /** 「あa1」を押した: 次の「配列×言語」へ（テンキーの中のかな・英字・数字も、ほかの配列もこれで回る） */
+        fun nextSource()
+        /** 「あa1」を長押しした: 「配列×言語」の一覧を出す */
+        fun sourceMenu()
         fun emoji()
         fun clipboard()
         fun voice(down: Boolean)
@@ -325,6 +329,14 @@ class FlickKeyboardView(
                 animatePill(cell, pressed = true)
                 performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
                 scheduleRepeat(id, t)
+                // 「あa1」の長押しで「配列×言語」の一覧
+                if ((cell.slot as? Slot.Fn)?.id == "mode") handler.postAtTime({
+                    if (touches[id] === t && t.dir == FlickTables.Dir.TAP) {
+                        t.repeated = true
+                        performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                        actions.sourceMenu()
+                    }
+                }, id, android.os.SystemClock.uptimeMillis() + 450L)
                 invalidate()
             }
             MotionEvent.ACTION_MOVE -> {
@@ -410,7 +422,7 @@ class FlickKeyboardView(
                     "mode" -> when (t.dir) {
                         FlickTables.Dir.UP -> actions.switchToQwerty()
                         FlickTables.Dir.DOWN -> actions.toggleFloat()
-                        else -> nextLayout()
+                        else -> actions.nextSource()
                     }
                 }
             }
@@ -463,9 +475,20 @@ class FlickKeyboardView(
         return options.getOrNull(corrector(options.map { it.second }))?.first ?: keep
     }
 
-    private fun nextLayout() {
-        layout = Layout.entries[(layout.ordinal + 1) % Layout.entries.size]
-        actions.setJapanese(layout == Layout.KANA)
+    /** 言語（JA・EN・NUM）に合わせて、かな・英字・数字の配列にする */
+    fun showMode(mode: String) {
+        layout = when (mode) {
+            "JA" -> Layout.KANA
+            "EN" -> Layout.ALPHABET
+            else -> Layout.NUMBER
+        }
+    }
+
+    /** いまの配列の言語（JA・EN・NUM） */
+    val mode: String get() = when (layout) {
+        Layout.KANA -> "JA"
+        Layout.ALPHABET -> "EN"
+        Layout.NUMBER -> "NUM"
     }
 
     /** かなの配列にそろえる（IME が日本語入力をオンにしたとき） */

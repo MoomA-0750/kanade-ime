@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.OutlinedButton
@@ -132,6 +133,7 @@ fun ColumnScope.KeyboardScreen() {
                     if (layout !in next) layout = LAYOUTS.first { it in next }
                 }
             }, descriptions.getValue(id))
+            if (id in enabled) LayoutModesRow(settings, id)
         }
         if ("GLIDE" in enabled) {
             var glideZenz by rememberPref({ settings.glideZenz }, { settings.glideZenz = it })
@@ -173,5 +175,34 @@ fun ColumnScope.KeyboardScreen() {
             R.string.input_gesture_arrows,
             R.string.input_gesture_mic,
         )) Note(stringResource(line))
+    }
+}
+
+/** 配列ごとに使う言語（日本語・英語・数字/記号）を選ぶチップ。1つは残す */
+@Composable
+private fun LayoutModesRow(settings: dev.mooma.kanade.KanadeSettings, layout: String) {
+    var modes by remember(layout) { mutableStateOf(settings.layoutModes(layout)) }
+    val names = mapOf(
+        "JA" to stringResource(R.string.ime_mode_ja),
+        "EN" to stringResource(R.string.ime_mode_en),
+        "NUM" to stringResource(R.string.ime_mode_num),
+    )
+    androidx.compose.foundation.layout.FlowRow(
+        Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        for (mode in dev.mooma.kanade.KeyboardSources.choosableModes(layout)) {
+            androidx.compose.material3.FilterChip(
+                selected = mode in modes,
+                onClick = {
+                    val next = if (mode in modes) modes - mode else modes + mode
+                    if (next.isNotEmpty()) {
+                        modes = next
+                        settings.setLayoutModes(layout, next)
+                    }
+                },
+                label = { Text(names.getValue(mode)) },
+            )
+        }
     }
 }

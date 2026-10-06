@@ -131,11 +131,13 @@ class KanadeInputMethodService : InputMethodService() {
 
     override fun onCreateInputView(): View {
         val keyboard = SoftKeyboardView(
-            this, ::softKey, { handle(KeyInput.ToggleJapanese) }, ::softVoice, ::showEmojiPanel,
+            this, ::softKey, ::nextSource, ::softVoice, ::showEmojiPanel,
             onClipboard = ::showClipboard, onSwitchLayout = ::switchLayout, onFloat = ::toggleFloat,
             onGlide = ::onGlide, onText = { flickActions.text(it) },
         )
         keyboard.tapCorrector = ::correctLetterTap
+        keyboard.onSymbolsPage = ::symbolsElsewhere
+        keyboard.onSourceMenu = ::showSourceMenu
         keyboardView = keyboard
         val panel = EmojiPanelView(
             this,
@@ -222,6 +224,8 @@ class KanadeInputMethodService : InputMethodService() {
         override fun setJapanese(on: Boolean) {
             handle(KeyInput.SetJapanese(on))
         }
+        override fun nextSource() = this@KanadeInputMethodService.nextSource()
+        override fun sourceMenu() = showSourceMenu()
         override fun emoji() = showEmojiPanel()
         override fun clipboard() = showClipboard()
         override fun voice(down: Boolean) = softVoice(down)
@@ -288,6 +292,96 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     /** ツールバーの配列の切り替え（QWERTY ⇄ フリック）。次から使う配列として覚える */
+    /** いまの「配列×言語」 */
+    private fun currentSource(): KeyboardSource {
+        val layout = settings.softKeyboardLayout
+        val mode = if (layout == "FLICK") flickView?.mode ?: "JA" else if (engine.japanese) "JA" else "EN"
+        return KeyboardSource(layout, mode)
+    }
+
+    /** 「配列×言語」にする（配列を替え、日本語のオン/オフとテンキーのかな・英字・数字を合わせる） */
+    private fun applySource(source: KeyboardSource) {
+        if (settings.softKeyboardLayout != source.layout) {
+            settings.softKeyboardLayout = source.layout
+            applyKeyboardSettings()
+        }
+        val japanese = source.mode == "JA"
+        if (engine.japanese != japanese) handle(KeyInput.SetJapanese(japanese))
+        if (source.layout == "FLICK") flickView?.showMode(source.mode)
+    }
+
+    /** あ/A（テンキーは「あa1」）: 次の「配列×言語」へ */
+    private fun nextSource() {
+        applySource(KeyboardSources.next(settings, currentSource()))
+    }
+
+    /**
+     * 日本語のオン/オフが（物理キーボードなどで）替わったとき、いまの配列でその言語を使わない設定なら、使える配列へ移す
+     */
+    private fun ensureSourceFor(japanese: Boolean) {
+        if (!isInputViewShown) return
+        val mode = if (japanese) "JA" else "EN"
+        val current = settings.softKeyboardLayout
+        if (mode in KeyboardSources.cycleModes(settings, current)) return
+        KeyboardSources.forMode(settings, current, mode)?.let { applySource(it) }
+    }
+
+    private var sourceMenu: android.widget.PopupWindow? = null
+
+    /** 「配列×言語」の一覧（iOS の地球儀のキーの長押しと同じ）。キーボードの左下の上に出し、押したものにする */
+    private fun showSourceMenu() {
+        val anchor = host ?: return
+        sourceMenu?.dismiss()
+        val palette = KeyboardPalette.of(this)
+        val density = resources.displayMetrics.density
+        fun dp(v: Int) = (v * density).toInt()
+        val current = currentSource()
+        val layoutName = mapOf(
+            "GLIDE" to R.string.input_layout_glide, "QWERTY" to R.string.input_layout_qwerty, "FLICK" to R.string.input_layout_flick,
+        )
+        val modeName = mapOf("JA" to R.string.ime_mode_ja, "EN" to R.string.ime_mode_en, "NUM" to R.string.ime_mode_num)
+        val list = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(dp(6), dp(6), dp(6), dp(6))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = dp(18).toFloat()
+                setColor(palette.functionKey)
+            }
+            elevation = dp(6).toFloat()
+        }
+        val popup = android.widget.PopupWindow(list, dp(240), android.view.ViewGroup.LayoutParams.WRAP_CONTENT, true)
+        for (source in KeyboardSources.all(settings)) {
+            val selected = source == current
+            list.addView(android.widget.TextView(this).apply {
+                text = getString(layoutName.getValue(source.layout)) + "・" + getString(modeName.getValue(source.mode))
+                setTextColor(if (selected) palette.onAccent else palette.text)
+                textSize = 16f
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(dp(16), 0, dp(16), 0)
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    cornerRadius = dp(12).toFloat()
+                    setColor(if (selected) palette.accent else android.graphics.Color.TRANSPARENT)
+                }
+                setOnClickListener {
+                    popup.dismiss()
+                    applySource(source)
+                }
+            }, android.widget.LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, dp(48)))
+        }
+        popup.setOnDismissListener { if (sourceMenu === popup) sourceMenu = null }
+        sourceMenu = popup
+        // キーボードの左下（切り替えのキー）の上あたり
+        runCatching { popup.showAtLocation(anchor, android.view.Gravity.BOTTOM or android.view.Gravity.START, dp(8), dp(72)) }
+    }
+
+    /** グライドで数字/記号を使わない設定なら、数字/記号を使えるテンキーへ移す（移したら true） */
+    private fun symbolsElsewhere(): Boolean {
+        if ("NUM" in settings.layoutModes("GLIDE")) return false
+        val target = KeyboardSources.all(settings).firstOrNull { it.mode == "NUM" } ?: return false
+        applySource(target)
+        return true
+    }
+
     /** 配列を順に替える（使う配列の中で、グライド → フルキー → テンキー → グライド） */
     private fun switchLayout() {
         // 使う配列の中だけを、グライド → フルキー → テンキーの順に回る
@@ -918,6 +1012,7 @@ class KanadeInputMethodService : InputMethodService() {
                     settings.lastJapanese = command.japanese
                     updateStatusIcon()
                     showModeIndicator(command.japanese)
+                    ensureSourceFor(command.japanese)
                 }
                 is ImeCommand.ShowCandidates -> showBar(command.anchorOffset) {
                     it.showCandidates(command.candidates, command.selected, if (previewInBar) engine.composingText else null, command.labels)

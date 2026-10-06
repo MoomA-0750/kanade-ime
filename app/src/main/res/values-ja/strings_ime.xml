@@ -47,4 +47,7 @@
     <string name="ime_candidate_label_symbol">記号</string>
     <string name="ime_candidate_label_full_width">全角</string>
     <string name="ime_candidate_label_half_width">半角</string>
+    <string name="ime_mode_ja">日本語</string>
+    <string name="ime_mode_en">英語</string>
+    <string name="ime_mode_num">数字・記号</string>
 </resources>

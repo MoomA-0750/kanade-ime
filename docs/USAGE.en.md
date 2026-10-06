@@ -104,6 +104,15 @@ The keyboard appears at the bottom of the screen only when no physical keyboard 
 
 Keys you press are handled just like a physical keyboard. Japanese input, conversion, F6–F10, and Ctrl+U/I/O/P/T all work, and keys the IME doesn't use (Ctrl+C, Ctrl+Z, Ctrl+D in terminal apps, etc.) are passed straight to the app. You can change the height (up to 300%) and the bottom padding under "On-screen keyboard" in settings (increase the bottom padding on devices where the keyboard overlaps the navigation bar).
 
+### Languages per layout and the layout list
+
+Under "Layouts" in settings, choose which languages each layout is used for (Japanese, English, Numbers & symbols) — for example, 12-key for Japanese only and Glide for English and numbers/symbols.
+
+- Tapping あ/A (“あa1” on 12-key) moves to the next language on that layout. If the layout has only one language, it moves to the next layout instead (in the example above, “あa1” on 12-key goes to Glide in English, and あ/A on Glide goes to 12-key in Japanese)
+- Long-press あ/A or “あa1” to see a list such as "Glide・English" and "12-key・Japanese", and pick one (like long-pressing the globe key on iPhone)
+- If Glide isn't set to use numbers & symbols, ?123 switches to a 12-key layout that is
+- When you switch Japanese on or off with a physical keyboard, Kanade also moves to a layout that uses that language
+
 ### Floating
 
 You can detach the keyboard from the bottom of the screen and float it anywhere, at any width (swipe down on the bottom-left key: ?123, Ctrl, or "あa1"). While it floats, the app's screen doesn't shrink, and touching outside the keyboard lets you use the app underneath.
