@@ -1022,6 +1022,8 @@ class KanadeInputMethodService : InputMethodService() {
             return
         }
         val ic = currentInputConnection
+        // 未確定文字列の途中に置くカーソル。まとめて送る区切りを閉じてから置く（下の placeCursorInComposing）
+        var placeAfter: ImeCommand.SetComposing? = null
         ic?.beginBatchEdit()
         for (command in commands) {
             when (command) {
@@ -1033,12 +1035,14 @@ class KanadeInputMethodService : InputMethodService() {
                     } else if (command.text.isEmpty()) {
                         ic?.setComposingText("", 1)
                         ic?.finishComposingText()
+                        placeAfter = null
                     } else {
                         ic?.setComposingText(styled(command), 1)
-                        if (command.cursor >= 0 && ic != null) placeCursorInComposing(ic, command.text, command.cursor)
+                        placeAfter = if (command.cursor >= 0) command else null
                     }
                 is ImeCommand.Commit -> {
                     ic?.commitText(command.text, 1)
+                    placeAfter = null
                     lastCommitAt = android.os.SystemClock.uptimeMillis()
                     if (previewInBar) hideBar()
                 }
@@ -1070,6 +1074,9 @@ class KanadeInputMethodService : InputMethodService() {
             }
         }
         ic?.endBatchEdit()
+        // Compose で作られた欄（連絡先など）は、区切りの中で送った文字を区切りを閉じるまで反映せず、
+        // 区切りの中で問い合わせると前の中身が返る。そのため区切りの外で、反映された中身から位置を求める
+        placeAfter?.let { if (ic != null) placeCursorInComposing(ic, it.text, it.cursor) }
         // 聞き続けるモードで、入力中の文字の確定を待っていた音声の文を入れ、途中の文字を出し直す
         if (continuous || voiceSegments.isNotEmpty() || pendingVoice.isNotEmpty()) {
             if (!engine.isComposing) {
