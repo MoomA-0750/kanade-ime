@@ -135,6 +135,7 @@ class KanadeInputMethodService : InputMethodService() {
             onClipboard = ::showClipboard, onSwitchLayout = ::switchLayout, onFloat = ::toggleFloat,
             onGlide = ::onGlide, onText = { flickActions.text(it) },
         )
+        keyboard.tapCorrector = ::correctLetterTap
         keyboardView = keyboard
         val panel = EmojiPanelView(
             this,
@@ -147,6 +148,7 @@ class KanadeInputMethodService : InputMethodService() {
         )
         emojiPanel = panel
         val flick = FlickKeyboardView(this, flickActions)
+        flick.tapCorrector = ::correctKanaTap
         flickView = flick
         val h = InputViewHost(this, keyboard, flick, panel, createClipboardView())
         host = h
@@ -294,6 +296,53 @@ class KanadeInputMethodService : InputMethodService() {
         settings.softKeyboardLayout = enabled[(enabled.indexOf(now) + 1) % enabled.size]
         applyKeyboardSettings()
     }
+
+    /**
+     * タップの位置の補いに使う「次に来やすい文字」（グライドの語の一覧から作る。画面キーボードを初めて出したときに裏で読む）。
+     * 日本語はローマ字・テンキーのかな、英語は英単語
+     */
+    @Volatile private var tapJapaneseRomaji: dev.mooma.kanade.core.touch.NextCharModel? = null
+    @Volatile private var tapJapaneseKana: dev.mooma.kanade.core.touch.NextCharModel? = null
+    @Volatile private var tapEnglish: dev.mooma.kanade.core.touch.NextCharModel? = null
+    private var tapModelsLoading = false
+
+    private fun loadTapModels() {
+        if (tapModelsLoading) return
+        tapModelsLoading = true
+        glideThread.execute {
+            runCatching {
+                val ja = assets.open("glide-ja.tsv").bufferedReader().readLines()
+                tapJapaneseRomaji = dev.mooma.kanade.core.touch.TapModels.japaneseRomaji(ja.asSequence())
+                tapJapaneseKana = dev.mooma.kanade.core.touch.TapModels.japaneseKana(ja.asSequence())
+                tapEnglish = assets.open("glide-en.txt").bufferedReader().useLines { dev.mooma.kanade.core.touch.TapModels.english(it) }
+            }.onFailure { log("tap models failed: $it") }
+        }
+    }
+
+    /** グライドの配列の文字のタップ: 入力中の語から、境目を触ったときにどちらのキーかを選ぶ */
+    private fun correctLetterTap(options: List<dev.mooma.kanade.core.touch.TapCorrection.Option>): Int {
+        if (!settings.tapCorrection) return 0
+        val model = (if (engine.japanese) tapJapaneseRomaji else tapEnglish) ?: return 0
+        val context = if (engine.japanese) {
+            if (engine.isComposing && !engine.isConverting) engine.composingRomaji.lowercase().takeLast(6) else ""
+        } else {
+            // 英語: カーソルの前の語（英字が続くところ）
+            currentInputConnection?.getTextBeforeCursor(16, 0)?.toString().orEmpty().takeLastWhile { it.isLetter() }.lowercase()
+        }
+        return dev.mooma.kanade.core.touch.TapCorrection.choose(options, prefixed(context), model)
+    }
+
+    /** テンキーのかなのタップ・払い: 入力中の読みのあとに来やすいかなを選ぶ */
+    private fun correctKanaTap(options: List<dev.mooma.kanade.core.touch.TapCorrection.Option>): Int {
+        if (!settings.tapCorrection || !engine.japanese) return 0
+        val model = tapJapaneseKana ?: return 0
+        val context = if (engine.isComposing && !engine.isConverting) engine.composingReading.takeLast(2) else ""
+        return dev.mooma.kanade.core.touch.TapCorrection.choose(options, prefixed(context, 2), model)
+    }
+
+    /** 語の始まりの印を付ける（前の文字が少ないときは、語の頭であることも手がかりにする） */
+    private fun prefixed(context: String, order: Int = 3) =
+        if (context.length < order) dev.mooma.kanade.core.touch.NextCharModel.START + context else context
 
     /** グライドの読み取り（語の一覧は、グライドの配列を初めて出したときに裏で読む） */
     private val glideThread = Executors.newSingleThreadExecutor { Thread(it, "kanade-glide") }
@@ -582,6 +631,7 @@ class KanadeInputMethodService : InputMethodService() {
         keyboardView?.let { k ->
             k.glideLayout = settings.softKeyboardLayout == "GLIDE"
             if (k.glideLayout) loadGlide()
+            if (settings.tapCorrection && settings.softKeyboardLayout != "QWERTY") loadTapModels()
             k.japanese = engine.japanese
             k.heightPercent = settings.softKeyboardHeight
             k.swipePercent = settings.softKeyboardSwipe

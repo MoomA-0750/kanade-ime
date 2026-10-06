@@ -317,6 +317,31 @@ class SoftKeyboardView(
         }
     }
 
+    /**
+     * タップの位置の補い（グライドの配列の文字のキー）。触ったキーと、近くの文字のキーを候補にして [tapCorrector] に選んでもらう。
+     * 選ばれたのが触ったキーなら null
+     */
+    var tapCorrector: ((List<dev.mooma.kanade.core.touch.TapCorrection.Option>) -> Int)? = null
+
+    private fun correctTap(t: Touch): Char? {
+        val corrector = tapCorrector ?: return null
+        if (!glideLayout || t.dir != null) return null
+        val touched = (t.key.center as? Action.Text)?.char?.takeIf { it in 'a'..'z' } ?: return null
+        val kw = (width - gap) / 10f
+        val kh = rowHeight
+        fun distance(rect: RectF) = hypot((t.x0 - rect.centerX()) / kw, (t.y0 - rect.centerY()) / kh)
+        val options = ArrayList<dev.mooma.kanade.core.touch.TapCorrection.Option>()
+        options += dev.mooma.kanade.core.touch.TapCorrection.Option(touched, distance(t.rect))
+        for ((key, rect) in keyRects) {
+            val c = (key.center as? Action.Text)?.char ?: continue
+            if (c !in 'a'..'z' || c == touched) continue
+            val d = distance(rect)
+            if (d <= NEIGHBOR_RADIUS) options += dev.mooma.kanade.core.touch.TapCorrection.Option(c, d)
+        }
+        val chosen = options.getOrNull(corrector(options)) ?: return null
+        return chosen.char.takeIf { it != touched }
+    }
+
     /** 文字のキー（a〜z）の中心 */
     private fun letterCenters(): Map<Char, Pair<Float, Float>> = buildMap {
         for ((key, rect) in keyRects) {
@@ -563,7 +588,8 @@ class SoftKeyboardView(
                     // 短く払った（フリック）なら、その向きに1文字だけ動かす
                     fire(arrow(if (t.dir == Dir.W) -1 else 1))
                 } else {
-                    actionOf(t)?.let { fire(it) }
+                    val corrected = correctTap(t)
+                    if (corrected != null) fire(Action.Text(corrected)) else actionOf(t)?.let { fire(it) }
                 }
                 syncLatchedPills()
                 invalidate()
@@ -738,6 +764,8 @@ class SoftKeyboardView(
         private const val PILL_OUT_MS = 280L
         private const val REPEAT_MS = 50L
         private const val DOUBLE_TAP_MS = 350L
+        /** タップの補いで候補にする近くのキー（中心までの距離。キーの大きさを 1 として） */
+        private const val NEIGHBOR_RADIUS = 1.1f
         /** 払いと見なす距離の既定（キーの幅の 45%）と、最低の距離 */
         const val DEFAULT_SWIPE_PERCENT = 45
         private const val MIN_SWIPE_DP = 18f

@@ -130,6 +130,10 @@ Slide your finger across the QWERTY letter keys without lifting it to enter a wo
 - ?123 at the bottom left switches to the numbers and symbols page, and =\< there switches to a page of more symbols (「」, €, etc.). ABC brings you back to letters
 - Swipe ?123 up to switch layouts, or down to float the keyboard. Swipes on あ/A, Space, and Backspace work the same as on the full keyboard
 
+### Tap correction
+
+On the Glide and 12-key layouts, when you tap near the edge between keys, Kanade picks the key whose character is more likely to come next in the word you're typing (like the iPhone keyboard: after "th", a tap between e and w becomes e). On the 12-key layout it does the same when a diagonal flick makes the direction unclear. Taps near the middle of a key are never changed. You can turn this off under "On-screen keyboard" → controls in settings.
+
 ### Full keyboard (QWERTY)
 
 Works the same way as Unexpected Keyboard, and shortcuts work as-is.

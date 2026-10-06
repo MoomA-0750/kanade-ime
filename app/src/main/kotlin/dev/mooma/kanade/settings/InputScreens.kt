@@ -160,6 +160,8 @@ fun ColumnScope.KeyboardScreen() {
     }
 
     Section(stringResource(R.string.input_gestures_title)) {
+        var tapCorrection by rememberPref({ settings.tapCorrection }, { settings.tapCorrection = it })
+        SwitchRow(stringResource(R.string.input_tap_correction), tapCorrection, { tapCorrection = it }, stringResource(R.string.input_tap_correction_note))
         var swipe by rememberPref({ settings.softKeyboardSwipe }, { settings.softKeyboardSwipe = it })
         SliderRow(stringResource(R.string.input_swipe_distance), swipe, 25..80, 5, { swipe = it }) { "$it%" }
         Note(stringResource(R.string.input_swipe_distance_note))

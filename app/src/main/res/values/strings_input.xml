@@ -97,4 +97,6 @@
     <string name="input_delete">Delete</string>
     <string name="input_swipe_distance">Swipe distance</string>
     <string name="input_swipe_distance_note">How far you must move your finger (as a share of the key width) before a touch counts as a swipe for numbers and symbols. Raise it if you often get symbols when you meant to type letters.</string>
+    <string name="input_tap_correction">Correct off-target taps</string>
+    <string name="input_tap_correction_note">On the Glide and 12-key layouts, when you tap near the edge between keys, Kanade picks the key whose character is more likely to come next in the word you\'re typing. Taps near the middle of a key are never changed.</string>
 </resources>

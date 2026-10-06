@@ -76,6 +76,7 @@ fun main(args: Array<String>) {
         "whisper" -> whisperTry(File(args[1]), File(args[2]), args.drop(3).map(::File))
         "eval-glide" -> evaluateGlide(File(args[1]), args.getOrNull(2)?.toFloat() ?: 0.25f)
         "tune-glide" -> tuneGlide(File(args[1]), args.getOrNull(2)?.toFloat() ?: 0.25f)
+        "eval-tap" -> evaluateTap(File(args[1]), args.getOrNull(2)?.toFloat() ?: 0.3f)
         "eval-glide-zenz" -> evaluateGlideZenz(File(args[1]), File(args[2]), File(args[3]), File(args[4]), args.getOrNull(5)?.toFloat() ?: 0.25f)
         "eval-zenz" -> evaluateZenz(File(args[1]), File(args[2]), File(args[3]), File(args[4]), args.getOrNull(5)?.toInt() ?: 10, args.getOrNull(6)?.toFloat() ?: 1.0f)
         else -> {
@@ -90,6 +91,7 @@ fun main(args: Array<String>) {
                   convert <outDir> <かな...>     変換を試す
                   eval-glide <assetsDir> [ずれ]  グライドの読み取りを、人の指に近い軌跡で測る（ずれは狙いのずれ。キーの幅に対する割合）
                   tune-glide <assetsDir> [ずれ]  グライドの重みを探す
+                  eval-tap <assetsDir> [ずれ]      タップの補いで、打ち間違えの文字がどれだけ減るかを測る（ずれはキーの大きさに対する割合）
                   eval-glide-zenz <assetsDir> <builtDir> <gguf> <libkanade_zenz.so> [ずれ]  日本語のグライドを zenz で並べ直したときを測る
                   zenz <outDir> <gguf> <libkanade_zenz.so> <かな...>        zenz の並べ替えと生成を試す
                   eval-zenz <outDir> <tsv> <gguf> <libkanade_zenz.so> [topK] zenz ありで評価する
@@ -901,4 +903,48 @@ fun englishTable(cacheDir: File): String {
         }
     }
     return dev.mooma.kanade.core.dict.SymbolTable(map).write()
+}
+
+/**
+ * タップの補いを測る。よく使う語を、キーの中心から正規分布でずれた位置を触って1文字ずつ打ち、
+ * いちばん近いキーにしたとき（補いなし）と補ったときの、打ち間違えた文字の割合を比べる。キーは QWERTY（横1・縦1）
+ */
+fun evaluateTap(assets: File, aim: Float) {
+    val keys = buildMap {
+        listOf("qwertyuiop" to 0f, "asdfghjkl" to 0.5f, "zxcvbnm" to 1.5f).forEachIndexed { row, (letters, offset) ->
+            letters.forEachIndexed { i, c -> put(c, (offset + i + 0.5f) to (row + 0.5f)) }
+        }
+    }
+    val r = java.util.Random(3)
+    val jaLines = File(assets, "glide-ja.tsv").readLines()
+    val enLines = File(assets, "glide-en.txt").readLines()
+    val ja = dev.mooma.kanade.core.touch.TapModels.japaneseRomaji(jaLines.asSequence())
+    val en = dev.mooma.kanade.core.touch.TapModels.english(enLines.asSequence())
+    val jaWords = zipfSample(jaLines.map { it.substringBefore('\t') }, 600, 8000, r)
+        .mapNotNull { dev.mooma.kanade.core.glide.KanaSpelling.typingSpellings(it).firstOrNull()?.filter { c -> c in 'a'..'z' } }
+    val enWords = zipfSample(enLines.map { it.substringBefore(' ') }, 600, 8000, r).map { w -> w.filter { it in 'a'..'z' } }
+    for ((name, model, words) in listOf(Triple("日本語（ローマ字）", ja, jaWords), Triple("英語", en, enWords))) {
+        for (weight in listOf(0f, 0.5f, 0.7f, 1f)) {
+            val rr = java.util.Random(9)
+            var total = 0
+            var errors = 0
+            for (w in words) {
+                val typed = StringBuilder()
+                for (c in w) {
+                    val (cx, cy) = keys[c] ?: continue
+                    val x = cx + rr.nextGaussian().toFloat() * aim
+                    val y = cy + rr.nextGaussian().toFloat() * aim
+                    val byDistance = keys.entries.map { (k, p) -> k to kotlin.math.hypot(x - p.first, y - p.second) }.sortedBy { it.second }
+                    val options = (listOf(byDistance[0]) + byDistance.drop(1).filter { it.second <= 1.1f }).map { dev.mooma.kanade.core.touch.TapCorrection.Option(it.first, it.second) }
+                    val context = typed.toString().takeLast(6).let { if (it.length < 3) "^$it" else it }
+                    val chosen = if (weight == 0f) options[0].char
+                    else options[dev.mooma.kanade.core.touch.TapCorrection.choose(options, context, model, weight = weight)].char
+                    typed.append(c)
+                    total++
+                    if (chosen != c) errors++
+                }
+            }
+            println("$name ずれ $aim・重み $weight: 打ち間違え ${"%.1f".format(100.0 * errors / total)}%（$total 文字）")
+        }
+    }
 }

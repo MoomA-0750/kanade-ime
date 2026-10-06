@@ -139,6 +139,9 @@ class FlickKeyboardView(
 
     private class Touch(val cell: Cell, val x0: Float, val y0: Float) {
         var dir = FlickTables.Dir.TAP
+        /** 最後の指の位置（斜めに払ったときの向きの紛らわしさを見る） */
+        var lastX = x0
+        var lastY = y0
         var repeated = false
         var voiceStarted = false
     }
@@ -345,6 +348,8 @@ class FlickKeyboardView(
                 handler.removeCallbacksAndMessages(id)
                 if (touches.values.none { it.cell === t.cell }) animatePill(t.cell, pressed = false)
                 t.dir = direction(t, event.getX(i), event.getY(i))
+                t.lastX = event.getX(i)
+                t.lastY = event.getY(i)
                 if (t.voiceStarted) actions.voice(false) else if (!t.repeated) fire(t)
                 invalidate()
             }
@@ -409,8 +414,53 @@ class FlickKeyboardView(
                     }
                 }
             }
-            is Slot.Chars -> typeKey(slot.index, t.dir)
+            is Slot.Chars -> correct(t, slot.index).let { (index, dir) -> typeKey(index, dir) }
         }
+    }
+
+    /**
+     * タップの位置の補い（かなの配列）: 隣のキーとの境目を触った・斜めに払って向きがはっきりしないときに、
+     * 入力中の読みのあとに来やすいかなを [tapCorrector] に選んでもらう。キーと向きを返す
+     */
+    var tapCorrector: ((List<dev.mooma.kanade.core.touch.TapCorrection.Option>) -> Int)? = null
+
+    private fun correct(t: Touch, index: Int): Pair<Int, FlickTables.Dir> {
+        val keep = index to t.dir
+        val corrector = tapCorrector ?: return keep
+        if (layout != Layout.KANA) return keep
+        // トグル入力で同じキーを続けて押しているところは補わない
+        if (toggleInput && t.dir == FlickTables.Dir.TAP && toggleKey == index) return keep
+        val key = layout.table[index]
+        val base = key.char(t.dir)?.singleOrNull() ?: return keep
+        val options = ArrayList<Pair<Pair<Int, FlickTables.Dir>, dev.mooma.kanade.core.touch.TapCorrection.Option>>()
+        val rect = t.cell.rect
+        fun distance(r: RectF) = hypot((t.x0 - r.centerX()) / r.width(), (t.y0 - r.centerY()) / r.height())
+        if (t.dir == FlickTables.Dir.TAP) {
+            options += keep to dev.mooma.kanade.core.touch.TapCorrection.Option(base, distance(rect))
+            // 近くの文字のキーの、同じ向き（タップ）の文字
+            for (cell in cells) {
+                val slot = cell.slot as? Slot.Chars ?: continue
+                if (slot.index == index) continue
+                val c = layout.table[slot.index].char(FlickTables.Dir.TAP)?.singleOrNull() ?: continue
+                if (c !in 'ぁ'..'ゖ') continue
+                val d = distance(cell.rect)
+                if (d <= NEIGHBOR_RADIUS) options += (slot.index to FlickTables.Dir.TAP) to dev.mooma.kanade.core.touch.TapCorrection.Option(c, d)
+            }
+        } else {
+            // 斜めに払ったとき: 横と縦の動きが近いほど、もう一方の向きとも紛らわしい
+            val dx = abs(t.lastX - t.x0)
+            val dy = abs(t.lastY - t.y0)
+            val m = abs(dx - dy) / maxOf(1f, dx + dy)
+            val other = when (t.dir) {
+                FlickTables.Dir.LEFT, FlickTables.Dir.RIGHT -> if (t.lastY < t.y0) FlickTables.Dir.UP else FlickTables.Dir.DOWN
+                else -> if (t.lastX < t.x0) FlickTables.Dir.LEFT else FlickTables.Dir.RIGHT
+            }
+            options += keep to dev.mooma.kanade.core.touch.TapCorrection.Option(base, 0.5f * (1 - m))
+            val alt = key.char(other)?.singleOrNull()
+            if (alt != null && alt in 'ぁ'..'ゖ') options += (index to other) to dev.mooma.kanade.core.touch.TapCorrection.Option(alt, 0.5f * (1 + m))
+        }
+        if (options.size < 2) return keep
+        return options.getOrNull(corrector(options.map { it.second }))?.first ?: keep
     }
 
     private fun nextLayout() {
@@ -468,5 +518,7 @@ class FlickKeyboardView(
 
     private companion object {
         const val TOGGLE_MS = 1000L
+        /** タップの補いで候補にする近くのキー（中心までの距離。キーの大きさを 1 として） */
+        const val NEIGHBOR_RADIUS = 1.1f
     }
 }

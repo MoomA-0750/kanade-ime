@@ -132,6 +132,40 @@ object KanaSpelling {
     }
 
     /**
+     * キーで打つときのローマ字（最大2通り）。グライドの綴りと違い、っ は次の子音を重ね（kitte）、ん は母音・や行・な行の前で nn、
+     * ー は「-」にする。語の終わりの ん は n。タップの補い（[dev.mooma.kanade.core.touch.NextCharModel]）の元にする
+     */
+    fun typingSpellings(kana: String): List<String> {
+        val parts = ArrayList<List<String>>()
+        var i = 0
+        while (i < kana.length) {
+            val two = if (i + 1 < kana.length) table[kana.substring(i, i + 2)] else null
+            val one = kana.substring(i, i + 1)
+            val options = two ?: when (one) {
+                "っ" -> listOf("\u0000")
+                "ー" -> listOf("-")
+                else -> table[one]
+            } ?: return emptyList()
+            parts += options
+            i += if (two != null) 2 else 1
+        }
+        fun build(pick: Int): String {
+            val units = parts.map { opts -> opts.getOrElse(pick) { opts[0] } }
+            val b = StringBuilder()
+            for ((k, u) in units.withIndex()) {
+                val next = units.getOrNull(k + 1).orEmpty()
+                when {
+                    u == "\u0000" -> next.firstOrNull()?.takeIf { it !in "aiueon-" }?.let { b.append(it) } ?: b.append("xtu")
+                    u == "n" && next.isNotEmpty() && next[0] in "aiueoyn" -> b.append("nn")
+                    else -> b.append(u)
+                }
+            }
+            return b.toString()
+        }
+        return listOf(build(0), build(1)).distinct()
+    }
+
+    /**
      * 綴り（最大2通り: どこも1つ目の綴り、どこも2つ目の綴り（無ければ1つ目））。表に無い文字があれば空。
      * 「っ」「ー」はなぞれないので綴りに入れない（同じ文字が続くのも1つにまとめるため、っ の重ねは表せない）
      */

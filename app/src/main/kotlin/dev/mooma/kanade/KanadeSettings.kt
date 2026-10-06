@@ -166,6 +166,11 @@ class KanadeSettings(context: Context) {
         get() = prefs.getInt(KEY_SWIPE, SoftKeyboardView.DEFAULT_SWIPE_PERCENT)
         set(value) = prefs.edit().putInt(KEY_SWIPE, value).apply()
 
+    /** グライド・テンキーで、タップの位置がずれても入力中の語から推測して文字を選ぶ */
+    var tapCorrection: Boolean
+        get() = prefs.getBoolean(KEY_TAP_CORRECTION, true)
+        set(value) = prefs.edit().putBoolean(KEY_TAP_CORRECTION, value).apply()
+
     /** 開き括弧を打ったら閉じ括弧も入れ、カーソルを中に置く */
     var pairBrackets: Boolean
         get() = prefs.getBoolean(KEY_PAIR_BRACKETS, true)
@@ -190,6 +195,7 @@ class KanadeSettings(context: Context) {
         const val KEY_GLIDE_ZENZ = "glide_zenz"
         const val KEY_PAIR_BRACKETS = "pair_brackets"
         const val KEY_SWIPE = "soft_keyboard_swipe"
+        const val KEY_TAP_CORRECTION = "tap_correction"
         const val KEY_FLOAT = "soft_keyboard_floating"
         const val KEY_FLOAT_X = "float_x"
         const val KEY_FLOAT_Y = "float_y"
