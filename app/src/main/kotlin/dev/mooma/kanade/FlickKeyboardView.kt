@@ -332,7 +332,7 @@ class FlickKeyboardView(
                 // タップの補いで別のキーになりそうなら、押した形はそのキーに出す（離したときに決め直す）
                 (cell.slot as? Slot.Chars)?.let { slot ->
                     val (index, _) = correct(t, slot.index)
-                    if (index != slot.index) t.visual = cells.firstOrNull { (it.slot as? Slot.Chars)?.index == index }
+                    if (index != slot.index) t.visual = charCell(index, near = cell)
                 }
                 animatePill(t.shown, pressed = true)
                 performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
@@ -436,7 +436,7 @@ class FlickKeyboardView(
             }
             is Slot.Chars -> correct(t, slot.index).let { (index, dir) ->
                 // 離したときに決めたキーが、押した形を見せていたキーと違えば、入れたキーに押した形を短く出す
-                val typed = cells.firstOrNull { (it.slot as? Slot.Chars)?.index == index }
+                val typed = charCell(index, near = t.cell)
                 if (typed != null && typed !== t.shown && touches.values.none { it.shown === typed }) {
                     animatePill(typed, pressed = true)
                     handler.postDelayed({ if (touches.values.none { it.shown === typed }) animatePill(typed, pressed = false) }, 90L)
@@ -445,6 +445,11 @@ class FlickKeyboardView(
             }
         }
     }
+
+    /** 文字のキー [index] の位置。広い画面では同じキーが左右にあるので、[near]（触ったキー）に近い方 */
+    private fun charCell(index: Int, near: Cell): Cell? =
+        cells.filter { (it.slot as? Slot.Chars)?.index == index }
+            .minByOrNull { hypot(it.rect.centerX() - near.rect.centerX(), it.rect.centerY() - near.rect.centerY()) }
 
     /**
      * タップの位置の補い（かなの配列）: 隣のキーとの境目を触った・斜めに払って向きがはっきりしないときに、
