@@ -245,6 +245,11 @@ class FloatingFrame(
         /** 幅を変えている間の、幅の目盛り（[RESIZE_STEP_DP] ごと）。変わるたびにカリカリと震わせる */
         private var resizeStep = 0
 
+        /** 幅を変え始めたときの指の位置・キーボードの左端と幅。動かした分を毎回ここから求める（少しずつ足すと、端で止めた分や端数がたまって指からずれていく） */
+        private var resizeStartX = 0f
+        private var resizeStartLeft = 0
+        private var resizeStartWidth = 0
+
         /** 指の速さを画面の座標で測る（つまみ自身が指と一緒に動くので、自分の座標では測れない） */
         private fun track(e: MotionEvent) {
             val copy = MotionEvent.obtain(e)
@@ -283,7 +288,12 @@ class FloatingFrame(
                     lastY = e.rawY
                     // つまみを触ったら、つかんだ手応えを返す
                     performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
-                    if (mode == 2) resizeStep = (card.width / (RESIZE_STEP_DP * density)).toInt()
+                    if (mode == 2) {
+                        resizeStep = (card.width / (RESIZE_STEP_DP * density)).toInt()
+                        resizeStartX = e.rawX
+                        resizeStartLeft = card.left
+                        resizeStartWidth = card.width
+                    }
                     if (mode == 1) {
                         stopFling()
                         velocity?.recycle()
@@ -307,9 +317,11 @@ class FloatingFrame(
                         }
                         2 -> {
                             // 左端を動かさずに右端を伸び縮みさせる
-                            val left = card.left
+                            val left = resizeStartLeft
                             val oldW = card.width
-                            val newW = (card.width + dx).coerceIn(MIN_WIDTH_DP * density, frame.width.toFloat())
+                            // 右端が指についてくる（左端は動かさない）。画面の右端より外へは伸ばさない
+                            val newW = (resizeStartWidth + e.rawX - resizeStartX)
+                                .coerceIn(MIN_WIDTH_DP * density, (frame.width - left).toFloat().coerceAtLeast(MIN_WIDTH_DP * density))
                             // 幅を広げ縮めしてテンキーが1つ⇄2つに分かれ変わるところでは鈍く「ボコン」、それ以外は目盛りごとに「カリ」
                             val step = (newW / (RESIZE_STEP_DP * density)).toInt()
                             if (ScreenWidth.isWide(context, oldW) != ScreenWidth.isWide(context, newW.toInt())) {
