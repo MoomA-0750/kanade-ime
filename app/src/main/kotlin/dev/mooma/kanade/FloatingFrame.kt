@@ -242,6 +242,9 @@ class FloatingFrame(
         private var lastY = 0f
         private var velocity: android.view.VelocityTracker? = null
 
+        /** 幅を変えている間の、幅の目盛り（[RESIZE_STEP_DP] ごと）。変わるたびにカリカリと震わせる */
+        private var resizeStep = 0
+
         /** 指の速さを画面の座標で測る（つまみ自身が指と一緒に動くので、自分の座標では測れない） */
         private fun track(e: MotionEvent) {
             val copy = MotionEvent.obtain(e)
@@ -278,6 +281,9 @@ class FloatingFrame(
                     }
                     lastX = e.rawX
                     lastY = e.rawY
+                    // つまみを触ったら、つかんだ手応えを返す
+                    performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                    if (mode == 2) resizeStep = (card.width / (RESIZE_STEP_DP * density)).toInt()
                     if (mode == 1) {
                         stopFling()
                         velocity?.recycle()
@@ -302,7 +308,16 @@ class FloatingFrame(
                         2 -> {
                             // 左端を動かさずに右端を伸び縮みさせる
                             val left = card.left
+                            val oldW = card.width
                             val newW = (card.width + dx).coerceIn(MIN_WIDTH_DP * density, frame.width.toFloat())
+                            // 幅を広げ縮めしてテンキーが1つ⇄2つに分かれ変わるところでは鈍く「ボコン」、それ以外は目盛りごとに「カリ」
+                            val step = (newW / (RESIZE_STEP_DP * density)).toInt()
+                            if (ScreenWidth.isWide(context, oldW) != ScreenWidth.isWide(context, newW.toInt())) {
+                                Haptics.thud(this)
+                            } else if (step != resizeStep) {
+                                performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                            }
+                            resizeStep = step
                             widthFraction = newW / frame.width
                             val free = frame.width - newW
                             posX = if (free > 0) (left / free).coerceIn(0f, 1f) else 0.5f
@@ -343,6 +358,9 @@ class FloatingFrame(
     private companion object {
         const val HANDLE_DP = 28
         const val MIN_WIDTH_DP = 260
+
+        /** 幅を変えるとき、これだけ変わるごとに震わせる（dp。スペースキーでカーソルを動かすのと同じ） */
+        const val RESIZE_STEP_DP = 12f
 
         /** 投げたときの減速（1/秒。大きいほど早く止まる。滑る距離はおよそ 速さ/この値） */
         const val FRICTION = 5f

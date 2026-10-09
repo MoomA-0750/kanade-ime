@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- モデルを落とす前に Wi-Fi かを確かめる -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- フロートのつまみで幅を変え、テンキーが1つ⇄2つに変わるときの鈍い震え（Haptics.thud） -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- 「入力中の文字を帯に出すアプリ」を選ぶとき、ホーム画面に出るアプリの一覧を見る -->
     <queries>
