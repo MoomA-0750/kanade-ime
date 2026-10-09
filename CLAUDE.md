@@ -6,3 +6,9 @@
 - 試験はエミュレータや Pixel 3 で。DeX 固有の確認と実速度の計測だけ Fold 7 実機が要る（導入は本人へ依頼）
 - ファイルを消す・内容が失われる上書きをする前に `.trash/` へ退避する
 - commit メッセージは `git commit -F <file>` で渡す
+
+## 画面は Material 3 Expressive
+
+- Android の画面（`app/` の Compose）は Material 3 Expressive で作る。無印の Material 3 の部品や書き方へ戻さない（`desktop/` の Swing と `third_party/` は対象外）
+- 置き換え表は `android-m3-expressive` スキル。書いたら `scripts/check_m3e.sh app` が「問題なし」になること（CC では編集のたびにフックが自動で調べる）
+- どうしても無印を使う行には、同じ行の末尾に `// m3e-allow: 理由` を書く
