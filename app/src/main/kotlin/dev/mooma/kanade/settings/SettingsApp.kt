@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -36,11 +35,10 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
+import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -153,35 +151,28 @@ private fun CategoryList(selected: Category?, onSelect: (Category) -> Unit) {
     }
 }
 
+/** 区画の中の一覧。Expressive の SegmentedListItem で、先頭と末尾だけ大きく丸め、押すと形が変わる */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun CategoryGroupList(items: List<Category>, selected: Category?, onSelect: (Category) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
         items.forEachIndexed { i, c ->
-            val big = 24.dp
-            val small = 6.dp
-            val shape = RoundedCornerShape(
-                topStart = if (i == 0) big else small, topEnd = if (i == 0) big else small,
-                bottomStart = if (i == items.lastIndex) big else small, bottomEnd = if (i == items.lastIndex) big else small,
-            )
-            val isSelected = c == selected
-            Surface(
+            SegmentedListItem(
+                selected = c == selected,
                 onClick = { onSelect(c) },
-                shape = shape,
-                color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+                shapes = ListItemDefaults.segmentedShapes(index = i, count = items.size),
+                colors = ListItemDefaults.segmentedColors(),
+                leadingContent = {
+                    Box(
+                        Modifier.size(40.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(painterResource(c.icon), contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    }
+                },
+                supportingContent = { Text(stringResource(c.summary)) },
             ) {
-                ListItem(
-                    headlineContent = { Text(stringResource(c.title), style = MaterialTheme.typography.titleMedium) },
-                    supportingContent = { Text(stringResource(c.summary)) },
-                    leadingContent = {
-                        Box(
-                            Modifier.size(40.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(painterResource(c.icon), contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        }
-                    },
-                    colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-                )
+                Text(stringResource(c.title), style = MaterialTheme.typography.titleMedium)
             }
         }
     }
