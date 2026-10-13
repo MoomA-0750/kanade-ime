@@ -50,6 +50,9 @@ class EngineHost(
     private val lock = Any()
     private val mapper = WinKeyMapper()
 
+    /** タスクバーの入力の表示の右クリックのメニューで選んだもの（"settings"・"user-dictionary"・"snippets"・"import-android"・"log"） */
+    @Volatile var onMenu: (String) -> Unit = {}
+
     /** エンジンのロックの中で動かす（設定の読み直しなど、キーの処理と重ならないように） */
     fun <T> locked(block: () -> T): T = synchronized(lock, block)
 
@@ -104,6 +107,7 @@ class EngineHost(
                 val on = f.getOrNull(1) == "1"
                 if (engine.japanese != on) client.send(reply(0, run(engine.handle(KeyInput.SetJapanese(on)).commands), false))
             }
+            "menu" -> f.getOrNull(1)?.let { action -> Thread({ runCatching { onMenu(action) } }, "menu").start() }
             "bye" -> disconnected(client)
         }
     }

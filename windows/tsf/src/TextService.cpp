@@ -137,6 +137,23 @@ STDMETHODIMP TextService::ActivateEx(ITfThreadMgr* threadMgr, TfClientId clientI
         if (window) PostMessageW(window, WM_KANADE_PUSH, 0, 0);
     });
     Connect();
+
+    // タスクバーの入力の表示に「あ」「A」を出す。左クリックで切り替え、右クリックのメニューはエンジンに頼む
+    langBar_ = new LangBarButton(
+        [this] {
+            if (Connect()) engine_->Send({"mode", japanese_ ? "0" : "1"});
+        },
+        [this](const std::string& action) {
+            if (!Connect()) return;
+            if (action == "mode-on" || action == "mode-off") {
+                engine_->Send({"mode", action == "mode-on" ? "1" : "0"});
+            } else {
+                engine_->Send({"menu", action});
+            }
+        });
+    langBar_->SetJapanese(japanese_);
+    ComPtr<ITfLangBarItemMgr> items;
+    if (SUCCEEDED(threadMgr_.As(&items))) items->AddItem(langBar_);
     return S_OK;
 }
 
@@ -159,6 +176,12 @@ STDMETHODIMP TextService::Deactivate() {
     if (window_) {
         DestroyWindow(window_);
         window_ = nullptr;
+    }
+    if (langBar_) {
+        ComPtr<ITfLangBarItemMgr> items;
+        if (threadMgr_ && SUCCEEDED(threadMgr_.As(&items))) items->RemoveItem(langBar_);
+        langBar_->Release();
+        langBar_ = nullptr;
     }
     ComPtr<ITfSource> source;
     if (threadMgr_ && SUCCEEDED(threadMgr_.As(&source))) {
@@ -497,6 +520,7 @@ void TextService::OnPushMessage() {
 
 void TextService::SetMode(bool japanese) {
     japanese_ = japanese;
+    if (langBar_) langBar_->SetJapanese(japanese);
     if (!threadMgr_) return;
     ComPtr<ITfCompartmentMgr> compartments;
     if (FAILED(threadMgr_.As(&compartments))) return;
@@ -535,6 +559,7 @@ STDMETHODIMP TextService::OnChange(REFGUID guid) {
     bool on = v.lVal != 0;
     if (on != japanese_) {
         japanese_ = on;
+        if (langBar_) langBar_->SetJapanese(on);
         if (Connect()) engine_->Send({"mode", on ? "1" : "0"});
     }
     return S_OK;

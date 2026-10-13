@@ -90,6 +90,7 @@ private fun serve(data: File, socket: Path) {
     val host = built.host
     val app = DesktopApp(DesktopStore(), host, built.source, built.voice, ::log)
     app.start()
+    host.onMenu = app::handleMenu
     val started = runCatching { SocketServer(socket, host, ::log).start() }.getOrElse {
         log("待ち受けられない: $it")
         false
@@ -98,7 +99,6 @@ private fun serve(data: File, socket: Path) {
         log("別のエンジンが動いている: $socket")
         exitProcess(1)
     }
-    if (!java.awt.GraphicsEnvironment.isHeadless()) runCatching { app.installTray() }.onFailure { log("タスクトレイに出せない: $it") }
     // 移行のあいだだけ: 前の版の DLL（ソケットを %LOCALAPPDATA%\Kanade に置いていた）を読み込んだままのアプリのために、前の場所でも待つ。
     // インストーラーを作るとき（フェーズ7）に外す
     System.getenv("LOCALAPPDATA")?.let { local ->

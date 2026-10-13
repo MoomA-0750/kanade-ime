@@ -20,6 +20,7 @@ add_library(kanade_tsf SHARED
     src/Composition.cpp
     src/DisplayAttributes.cpp
     src/EngineLauncher.cpp
+    src/LangBarButton.cpp
     kanade_tsf.def)
 target_link_libraries(kanade_tsf PRIVATE ws2_32 uuid ole32 oleaut32 advapi32 user32 shell32)
 

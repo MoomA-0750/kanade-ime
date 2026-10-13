@@ -24,6 +24,7 @@ Kotlin 側は `desktop/src/main/kotlin/dev/mooma/kanade/desktop/`（`Protocol.kt
 | `focus	<1\|0>` | フォーカスを得た/失った。得たら、エンジンはこの DLL を「いまの相手」にして `mode` を返す |
 | `caret	<left>	<top>	<right>	<bottom>` | 入力中の文字の画面上の位置（GetTextExt）。候補の窓をここに出す |
 | `mode	<1\|0>` | 言語バーなど、キー以外で日本語のオン/オフが変わった |
+| `menu	<項目>` | タスクバーの入力の表示の右クリックのメニューで選んだ（`settings`・`user-dictionary`・`snippets`・`import-android`・`log`）。エンジンが画面を開く |
 | `bye` | 切る |
 
 - `vk` は仮想キー。右 Alt は DLL が VK_RMENU（0xA5）に直す。`char` は ToUnicodeEx の結果（なければ 0）。`mods` は Shift=1・Ctrl=2・Alt=4・Win=8

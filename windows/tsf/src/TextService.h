@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "EngineClient.h"
+#include "LangBarButton.h"
 
 namespace kanade {
 
@@ -129,6 +130,8 @@ private:
     ComPtr<ITfComposition> composition_;
     ComPtr<ITfContext> compositionContext_;
     std::unique_ptr<EngineClient> engine_;
+    // タスクバーの入力の表示（「あ」「A」と右クリックのメニュー）
+    LangBarButton* langBar_ = nullptr;
     HWND window_ = nullptr;
     bool japanese_ = false;
     bool settingCompartment_ = false;
