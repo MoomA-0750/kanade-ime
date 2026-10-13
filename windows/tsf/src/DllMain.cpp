@@ -2,6 +2,7 @@
 #include <windows.h>
 
 #include <new>
+#include <string>
 
 #include "Globals.h"
 #include "TextService.h"
@@ -10,6 +11,17 @@ namespace kanade {
 
 HINSTANCE g_module = nullptr;
 LONG g_refs = 0;
+
+// 関数の中の static は、初めて呼ばれたときにスレッド安全に作られる
+const wchar_t* MessageWindowClass() {
+    static const std::wstring name = L"KanadeTsfMessageWindow_" + std::to_wstring(reinterpret_cast<uintptr_t>(g_module));
+    return name.c_str();
+}
+
+const wchar_t* PopupWindowClass() {
+    static const std::wstring name = L"KanadePopup_" + std::to_wstring(reinterpret_cast<uintptr_t>(g_module));
+    return name.c_str();
+}
 
 namespace {
 class ClassFactory : public IClassFactory {
@@ -55,10 +67,14 @@ ClassFactory g_factory;
 
 using namespace kanade;
 
-BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
+BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved) {
     if (reason == DLL_PROCESS_ATTACH) {
         g_module = instance;
         DisableThreadLibraryCalls(instance);
+    } else if (reason == DLL_PROCESS_DETACH && reserved == nullptr) {
+        // DLL だけが外れるとき（プロセスの終了ではない）は、窓のクラスを外す（クラスが外れた DLL の手続きを指したまま残らないように）
+        UnregisterClassW(MessageWindowClass(), instance);
+        UnregisterClassW(PopupWindowClass(), instance);
     }
     return TRUE;
 }

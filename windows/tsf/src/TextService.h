@@ -93,6 +93,12 @@ private:
     void UpdateRect(TfEditCookie ec, ITfContext* context, ITfRange* range);
     // 候補の窓・カーソルの近くの表示（cands・hidecands・indicator・hideindicator）
     void ApplyUi(const std::vector<Command>& ui);
+
+public:
+    // 編集セッションの中で受けた窓の命令を出す（メッセージだけの窓から呼ぶ）
+    void FlushUi();
+
+private:
     void ShowIndicator(const std::wstring& text, UINT durationMs);
     void HidePopups();
     HRESULT EditSync(ITfContext* context, DWORD flags, std::function<HRESULT(TfEditCookie)> fn);
@@ -141,6 +147,7 @@ private:
     std::unique_ptr<CandidateWindow> candidates_;
     std::unique_ptr<IndicatorWindow> indicator_;
     RECT caretRect_ = {100, 100, 100, 120};
+    std::vector<Command> pendingUi_;
     HWND window_ = nullptr;
     bool japanese_ = false;
     bool settingCompartment_ = false;

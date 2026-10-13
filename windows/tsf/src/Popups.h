@@ -47,11 +47,13 @@ protected:
 
 private:
     bool Ensure();
+    bool EnsureTarget(int w, int h);
     void OnPaint();
     static LRESULT CALLBACK Proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
     ComPtr<ID2D1HwndRenderTarget> target_;
     float scale_ = 1.0f;
+    DWORD thread_ = 0;
 };
 
 // 候補の窓（9件ずつのページ。番号・候補・説明。選んでいる行に印）

@@ -207,7 +207,7 @@ STDMETHODIMP LangBarButton::OnMenuSelect(UINT id) {
 }
 
 STDMETHODIMP LangBarButton::AdviseSink(REFIID riid, IUnknown* sink, DWORD* cookie) {
-    if (!cookie) return E_INVALIDARG;
+    if (!cookie || !sink) return E_INVALIDARG;
     if (riid != IID_ITfLangBarItemSink) return CONNECT_E_CANNOTCONNECT;
     if (sink_) return CONNECT_E_ADVISELIMIT;
     if (FAILED(sink->QueryInterface(IID_PPV_ARGS(&sink_)))) {
@@ -223,6 +223,15 @@ STDMETHODIMP LangBarButton::UnadviseSink(DWORD cookie) {
     sink_->Release();
     sink_ = nullptr;
     return S_OK;
+}
+
+void LangBarButton::Detach() {
+    onToggle_ = nullptr;
+    onMenu_ = nullptr;
+    if (sink_) {
+        sink_->Release();
+        sink_ = nullptr;
+    }
 }
 
 void LangBarButton::SetJapanese(bool japanese) {

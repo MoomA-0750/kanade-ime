@@ -10,12 +10,9 @@ namespace kanade {
 namespace {
 
 constexpr UINT WM_KANADE_PUSH = WM_APP + 1;
-// 窓のクラス名は DLL ごとに分ける（開発中に別の版の DLL が同じプロセスに読み込まれたとき、外れた DLL の窓の手続きを呼ばないように）
-const wchar_t* WindowClassName() {
-    static wchar_t name[64] = {};
-    if (!name[0]) swprintf_s(name, L"KanadeTsfMessageWindow_%p", static_cast<void*>(g_module));
-    return name;
-}
+// 編集セッションの中で受けた窓の命令を、セッションの外で出す
+constexpr UINT WM_KANADE_UI = WM_APP + 2;
+
 // エンジンの返事を待つ長さ。これを過ぎたらキーを素通しにする（アプリを固めない）
 constexpr DWORD kTimeoutMs = 300;
 
@@ -54,6 +51,10 @@ private:
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (msg == WM_KANADE_PUSH) {
         if (auto* self = reinterpret_cast<TextService*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA))) self->OnPushMessage();
+        return 0;
+    }
+    if (msg == WM_KANADE_UI) {
+        if (auto* self = reinterpret_cast<TextService*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA))) self->FlushUi();
         return 0;
     }
     return DefWindowProcW(hwnd, msg, wParam, lParam);
@@ -109,9 +110,9 @@ STDMETHODIMP TextService::ActivateEx(ITfThreadMgr* threadMgr, TfClientId clientI
     WNDCLASSEXW wc = {sizeof(wc)};
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = g_module;
-    wc.lpszClassName = WindowClassName();
+    wc.lpszClassName = MessageWindowClass();
     RegisterClassExW(&wc);  // 2回目以降は失敗するが、登録済みなのでよい
-    window_ = CreateWindowExW(0, WindowClassName(), L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, g_module, nullptr);
+    window_ = CreateWindowExW(0, MessageWindowClass(), L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, g_module, nullptr);
     if (window_) SetWindowLongPtrW(window_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 
     ComPtr<ITfSource> source;
@@ -177,9 +178,12 @@ STDMETHODIMP TextService::Deactivate() {
         DestroyWindow(window_);
         window_ = nullptr;
     }
+    pendingUi_.clear();
     candidates_.reset();
     indicator_.reset();
     if (langBar_) {
+        // ボタンはシステムが参照を持ったまま残りうるので、この TextService を呼ばないよう先に切り離す
+        langBar_->Detach();
         ComPtr<ITfLangBarItemMgr> items;
         if (threadMgr_ && SUCCEEDED(threadMgr_.As(&items))) items->RemoveItem(langBar_);
         langBar_->Release();
@@ -464,6 +468,7 @@ void TextService::UpdateSelectionRect(ITfContext* context) {
 }
 
 void TextService::ShowIndicator(const std::wstring& text, UINT durationMs) {
+    if (!threadMgr_) return;
     if (!indicator_) indicator_ = std::make_unique<IndicatorWindow>();
     indicator_->Show(text, durationMs, caretRect_);
 }
@@ -474,6 +479,7 @@ void TextService::HidePopups() {
 }
 
 void TextService::ApplyUi(const std::vector<Command>& ui) {
+    if (!threadMgr_) return;  // Deactivate のあと
     for (const auto& c : ui) {
         if (c[0] == "cands" && c.size() >= 3) {
             int selected = atoi(c[1].c_str());
@@ -542,9 +548,12 @@ void TextService::ApplyCommands(ITfContext* context, std::vector<Command> comman
     ComPtr<ITfContext> ctx = context;
     ComPtr<ITfTextInputProcessorEx> self(this);  // 非同期のとき、書く前に消えないように
     // 窓は、文字を書いて入力中の文字の位置が分かってから出す
-    auto* session = new EditSession([this, self, ctx, edits, ui](TfEditCookie ec) {
+    // 窓は、文字を書いて入力中の文字の位置が分かってから出す。窓を作る・出すのは、文書をロックしている編集セッションの外で
+    auto* session = new EditSession([this, self, ctx, edits, ui, sync](TfEditCookie ec) {
+        if (!threadMgr_) return S_OK;  // Deactivate のあとに動いた（非同期のとき）
         ApplyInSession(ec, ctx.Get(), edits);
-        ApplyUi(ui);
+        pendingUi_.insert(pendingUi_.end(), ui.begin(), ui.end());
+        if (!sync && window_ && !pendingUi_.empty()) PostMessageW(window_, WM_KANADE_UI, 0, 0);
         return S_OK;
     });
     HRESULT hr = E_FAIL;
@@ -556,6 +565,15 @@ void TextService::ApplyCommands(ITfContext* context, std::vector<Command> comman
     }
     session->Release();
     if (FAILED(requested) || FAILED(hr)) Log("edit session failed %08lx %08lx", requested, hr);
+    // 同期で書けたなら、ここで窓を出す（非同期なら、書いたあとに窓へ投げる）
+    if (sync && hr == S_OK) FlushUi();
+    else if (window_ && !pendingUi_.empty()) PostMessageW(window_, WM_KANADE_UI, 0, 0);
+}
+
+void TextService::FlushUi() {
+    std::vector<Command> ui;
+    ui.swap(pendingUi_);
+    if (!ui.empty()) ApplyUi(ui);
 }
 
 void TextService::OnPushMessage() {

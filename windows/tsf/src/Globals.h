@@ -23,6 +23,10 @@ inline constexpr GUID GUID_AttrFocused = {0x03e3e0fc, 0x3e17, 0x4e19, {0xbe, 0x7
 // {0455615F-C73A-4346-B1B1-BF1D501BAB32}
 inline constexpr GUID GUID_AttrConverted = {0x0455615f, 0xc73a, 0x4346, {0xb1, 0xb1, 0xbf, 0x1d, 0x50, 0x1b, 0xab, 0x32}};
 
+// 窓のクラス名。DLL ごとに分ける（開発中に別の版の DLL が同じプロセスに読み込まれても、外れた DLL の窓の手続きを呼ばないように）
+const wchar_t* MessageWindowClass();
+const wchar_t* PopupWindowClass();
+
 inline constexpr LANGID kLangId = MAKELANGID(LANG_JAPANESE, SUBLANG_JAPANESE_JAPAN);
 inline constexpr wchar_t kDisplayName[] = L"Kanade";
 

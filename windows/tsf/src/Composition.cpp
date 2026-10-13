@@ -215,6 +215,8 @@ void TextService::UpdateRect(TfEditCookie ec, ITfContext* context, ITfRange* ran
     // 描画がまだのアプリ（ブラウザなど）では E_PENDING が返る。そのときは前の位置のまま。
     // 候補の窓はこのプロセスの中に出すので、座標はそのまま使える（拡大率に対応していないアプリでも同じ座標の世界）
     if (view->GetTextExt(ec, range, &rect, &clipped) != S_OK) return;
+    // 位置を返さない（全部 0 の）アプリもある。そのときは前の位置のまま
+    if (rect.left == 0 && rect.top == 0 && rect.right == 0 && rect.bottom == 0) return;
     caretRect_ = rect;
 }
 

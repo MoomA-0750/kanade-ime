@@ -38,6 +38,8 @@ public:
 
     // 日本語のオン/オフが変わった（表示を描き直してもらう）
     void SetJapanese(bool japanese);
+    // TextService が止まるとき。以後は TextService を呼ばない
+    void Detach();
 
 private:
     ~LangBarButton();

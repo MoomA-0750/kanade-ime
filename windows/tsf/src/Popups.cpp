@@ -2,7 +2,6 @@
 
 #include <dwmapi.h>
 #include <windowsx.h>
-#include <shellscalingapi.h>
 
 #include <algorithm>
 
@@ -46,33 +45,27 @@ D2D1_COLOR_F AccentColor(bool dark) {
     return dark ? Rgb(0x60CDFF) : Rgb(0x0067C0);
 }
 
-const wchar_t* ClassName() {
-    static wchar_t name[64] = {};
-    if (!name[0]) swprintf_s(name, L"KanadePopup_%p", static_cast<void*>(g_module));
-    return name;
-}
-
-// この窓の拡大率（拡大率に対応していないアプリでは、Windows が引き伸ばすので 1）
-float ScaleFor(const RECT& anchor) {
-    DPI_AWARENESS awareness = GetAwarenessFromDpiAwarenessContext(GetThreadDpiAwarenessContext());
-    if (awareness == DPI_AWARENESS_UNAWARE) return 1.0f;
-    UINT dpiX = 96, dpiY = 96;
-    if (FAILED(GetDpiForMonitor(MonitorFromRect(&anchor, MONITOR_DEFAULTTONEAREST), MDT_EFFECTIVE_DPI, &dpiX, &dpiY))) {
-        dpiX = GetDpiForSystem();
-    }
-    return dpiX / 96.0f;
-}
-
 }  // namespace
 
 PopupWindow::~PopupWindow() {
-    if (hwnd_) {
-        SetWindowLongPtrW(hwnd_, GWLP_USERDATA, 0);
+    if (!hwnd_) return;
+    SetWindowLongPtrW(hwnd_, GWLP_USERDATA, 0);
+    if (GetCurrentThreadId() == thread_) {
         DestroyWindow(hwnd_);
+    } else {
+        // 窓は作ったスレッドでしか壊せない（TextService の最後の Release が別のスレッドで起きたとき）
+        PostMessageW(hwnd_, WM_CLOSE, 0, 0);
     }
 }
 
 bool PopupWindow::Ensure() {
+    // 拡大率への対応はスレッドごとに切り替えられる（Office など）。窓を作ったときと違えば作り直す
+    if (hwnd_ && !AreDpiAwarenessContextsEqual(GetWindowDpiAwarenessContext(hwnd_), GetThreadDpiAwarenessContext())) {
+        SetWindowLongPtrW(hwnd_, GWLP_USERDATA, 0);
+        DestroyWindow(hwnd_);
+        hwnd_ = nullptr;
+        target_.Reset();
+    }
     if (hwnd_) return true;
     if (!d2d_ && FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, d2d_.GetAddressOf()))) return false;
     if (!dwrite_ &&
@@ -84,11 +77,12 @@ bool PopupWindow::Ensure() {
     wc.lpfnWndProc = Proc;
     wc.hInstance = g_module;
     wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
-    wc.lpszClassName = ClassName();
+    wc.lpszClassName = PopupWindowClass();
     RegisterClassExW(&wc);
-    hwnd_ = CreateWindowExW(WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW, ClassName(), L"", WS_POPUP, 0, 0, 1, 1, nullptr, nullptr,
+    hwnd_ = CreateWindowExW(WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW, PopupWindowClass(), L"", WS_POPUP, 0, 0, 1, 1, nullptr, nullptr,
                             g_module, nullptr);
     if (!hwnd_) return false;
+    thread_ = GetCurrentThreadId();
     SetWindowLongPtrW(hwnd_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
     // Windows 11 の角の丸め
     DWORD corner = 2;  // DWMWCP_ROUND
@@ -98,7 +92,11 @@ bool PopupWindow::Ensure() {
 
 void PopupWindow::ShowAt(const RECT& anchor, float alignX) {
     if (!Ensure()) return;
-    scale_ = ScaleFor(anchor);
+    // 拡大率は、この窓を出す場所のものを窓から聞く（拡大率に対応していないアプリでは 96 が返り、Windows が引き伸ばす）。
+    // 先に窓を出す場所へ動かしてから聞く
+    SetWindowPos(hwnd_, HWND_TOPMOST, anchor.left, anchor.bottom, 1, 1, SWP_NOACTIVATE | SWP_NOREDRAW);
+    scale_ = GetDpiForWindow(hwnd_) / 96.0f;
+    if (scale_ <= 0) scale_ = 1.0f;
     dark_ = AppsUseDark();
     background_ = dark_ ? Rgb(0x2C2C2C) : Rgb(0xF9F9F9);
     text_ = dark_ ? Rgb(0xFFFFFF) : Rgb(0x1A1A1A);
@@ -117,14 +115,22 @@ void PopupWindow::ShowAt(const RECT& anchor, float alignX) {
     if (y + h > work.bottom) y = anchor.top - h - gap;
     x = std::clamp<int>(x, work.left, std::max<int>(work.left, static_cast<int>(work.right) - w));
     y = std::max<int>(y, work.top);
-    SetWindowPos(hwnd_, HWND_TOPMOST, x, y, w, h, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+    // 描く準備をしてから見せる（作りかけの中身が一瞬見えないように）
+    SetWindowPos(hwnd_, HWND_TOPMOST, x, y, w, h, SWP_NOACTIVATE | SWP_NOREDRAW);
+    if (!EnsureTarget(w, h)) return;
+    SetWindowPos(hwnd_, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+    Redraw();
+}
+
+bool PopupWindow::EnsureTarget(int w, int h) {
     if (target_) {
         target_->Resize(D2D1::SizeU(w, h));
-    } else {
-        d2d_->CreateHwndRenderTarget(D2D1::RenderTargetProperties(), D2D1::HwndRenderTargetProperties(hwnd_, D2D1::SizeU(w, h)), &target_);
+    } else if (FAILED(d2d_->CreateHwndRenderTarget(D2D1::RenderTargetProperties(), D2D1::HwndRenderTargetProperties(hwnd_, D2D1::SizeU(w, h)),
+                                                   &target_))) {
+        return false;
     }
-    if (target_) target_->SetDpi(96.0f * scale_, 96.0f * scale_);
-    Redraw();
+    target_->SetDpi(96.0f * scale_, 96.0f * scale_);
+    return true;
 }
 
 void PopupWindow::Hide() {
@@ -147,6 +153,12 @@ void PopupWindow::StartTimer(UINT ms) {
 void PopupWindow::OnPaint() {
     PAINTSTRUCT ps;
     BeginPaint(hwnd_, &ps);
+    // スリープ明けなどで描画先をなくしていたら作り直す
+    if (!target_) {
+        RECT rc;
+        GetClientRect(hwnd_, &rc);
+        EnsureTarget(rc.right - rc.left, rc.bottom - rc.top);
+    }
     if (target_) {
         target_->BeginDraw();
         target_->Clear(background_);
@@ -170,7 +182,7 @@ ComPtr<IDWriteTextLayout> PopupWindow::Layout(const std::wstring& text, float si
 void PopupWindow::DrawLayout(ID2D1RenderTarget* rt, IDWriteTextLayout* layout, float x, float y, const D2D1_COLOR_F& color) {
     if (!layout) return;
     ComPtr<ID2D1SolidColorBrush> brush;
-    rt->CreateSolidColorBrush(color, &brush);
+    if (FAILED(rt->CreateSolidColorBrush(color, &brush))) return;
     // 絵文字を色付きで描く（Windows 8.1 以降）
     rt->DrawTextLayout(D2D1::Point2F(x, y), layout, brush.Get(), D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT);
 }
@@ -182,13 +194,16 @@ LRESULT CALLBACK PopupWindow::Proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
             // 押しても前面にしない（アプリの入力欄からフォーカスを奪わない）。左ボタンなら、ここで選んで、クリックのメッセージは捨てる。
             // IMM のアプリでは、クリックのメッセージを見たシステムが（この窓宛てでも）入力中の文字を確定させてしまうため
             if (self && HIWORD(lParam) == WM_LBUTTONDOWN) {
-                POINT pt;
-                GetCursorPos(&pt);
+                // 押した時点の位置（今のカーソルの位置ではなく）
+                DWORD pos = GetMessagePos();
+                POINT pt = {GET_X_LPARAM(pos), GET_Y_LPARAM(pos)};
                 ScreenToClient(hwnd, &pt);
                 self->OnClick(pt.x / self->scale_, pt.y / self->scale_);
                 return MA_NOACTIVATEANDEAT;
             }
             return MA_NOACTIVATE;
+        case WM_ERASEBKGND:
+            return 1;  // 背景は描くときに塗る（ちらつかないように）
         case WM_PAINT:
             if (self) {
                 self->OnPaint();
@@ -248,7 +263,7 @@ D2D1_SIZE_F CandidateWindow::Measure() {
 void CandidateWindow::Paint(ID2D1RenderTarget* rt) {
     D2D1_SIZE_F size = rt->GetSize();
     ComPtr<ID2D1SolidColorBrush> brush;
-    rt->CreateSolidColorBrush(selection_, &brush);
+    if (FAILED(rt->CreateSolidColorBrush(selection_, &brush))) return;
     for (int i = 0; i < pageCount(); i++) {
         int index = pageStart() + i;
         float top = kPad + i * kRow;
