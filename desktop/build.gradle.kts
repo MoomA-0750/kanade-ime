@@ -30,7 +30,7 @@ dependencies {
 application {
     mainClass.set("dev.mooma.kanade.desktop.MainKt")
     applicationName = "kanade-engine"
-    applicationDefaultJvmArgs = listOf("-Xmx512m", "-Dfile.encoding=UTF-8", "-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8", "-Dsun.java2d.uiScale=1")
+    applicationDefaultJvmArgs = listOf("-Xmx512m", "-Dfile.encoding=UTF-8", "-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8")
 }
 
 tasks.test {

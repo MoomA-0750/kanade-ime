@@ -92,6 +92,7 @@ JNI
   package)
     "$0" tsf Release | tail -2
     "$0" tsf Release x86 | tail -1
+    "$0" settings | tail -1
     ./gradlew -q :desktop:installDist
     A=app/build/generated/kanadeAssets
     mkdir -p "$TMP/Kanade/data"
@@ -106,7 +107,7 @@ JNI
     ps "powershell -NoProfile -ExecutionPolicy Bypass -File $REMOTE\\dist\\Kanade\\install.ps1" ;;
   start)
     # エンジンの起動の命令を HKCU\Software\Kanade\EngineCommand に書き（DLL がつながらないときに使う）、タスクで起動する
-    ps "\$java = '$JBR\\bin\\javaw.exe'; \$jargs = '-Xmx512m -Dfile.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dsun.java2d.uiScale=1 -Dkanade.native=$REMOTE\\native -Dkanade.settings=$REMOTE\\settings\\Kanade.Settings.exe -cp \"$REMOTE\\engine\\lib\\*\" dev.mooma.kanade.desktop.MainKt serve'; New-Item -Force HKCU:\\Software\\Kanade | Out-Null; Set-ItemProperty HKCU:\\Software\\Kanade EngineCommand ('\"' + \$java + '\" ' + \$jargs); \$a = New-ScheduledTaskAction -Execute \$java -Argument \$jargs; \$p = New-ScheduledTaskPrincipal -UserId \$env:USERNAME -LogonType Interactive -RunLevel Limited; Register-ScheduledTask -TaskName KanadeEngine -Action \$a -Principal \$p -Force | Out-Null; Start-ScheduledTask KanadeEngine; Start-Sleep 3; Get-Content -Encoding UTF8 \$env:LOCALAPPDATA\\Kanade\\engine.log -Tail 3" ;;
+    ps "\$java = '$JBR\\bin\\javaw.exe'; \$jargs = '-Xmx512m -Dfile.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dkanade.native=$REMOTE\\native -Dkanade.settings=$REMOTE\\settings\\Kanade.Settings.exe -cp \"$REMOTE\\engine\\lib\\*\" dev.mooma.kanade.desktop.MainKt serve'; New-Item -Force HKCU:\\Software\\Kanade | Out-Null; Set-ItemProperty HKCU:\\Software\\Kanade EngineCommand ('\"' + \$java + '\" ' + \$jargs); \$a = New-ScheduledTaskAction -Execute \$java -Argument \$jargs; \$p = New-ScheduledTaskPrincipal -UserId \$env:USERNAME -LogonType Interactive -RunLevel Limited; Register-ScheduledTask -TaskName KanadeEngine -Action \$a -Principal \$p -Force | Out-Null; Start-ScheduledTask KanadeEngine; Start-Sleep 3; Get-Content -Encoding UTF8 \$env:LOCALAPPDATA\\Kanade\\engine.log -Tail 3" ;;
   stop)
     ps "Stop-ScheduledTask KanadeEngine -ErrorAction SilentlyContinue; Get-Process java,javaw -ErrorAction SilentlyContinue | Where-Object { \$_.CommandLine -like '*desktop.MainKt*' } | Stop-Process -Force; 'stopped'" ;;
   type)

@@ -15,7 +15,7 @@ Get-Process java, javaw -ErrorAction SilentlyContinue | Where-Object { $_.Comman
 Start-Sleep -Milliseconds 500
 
 New-Item -ItemType Directory -Force $dest | Out-Null
-foreach ($dir in 'runtime', 'lib', 'native') {
+foreach ($dir in 'runtime', 'lib', 'native', 'settings') {
     $target = Join-Path $dest $dir
     if (Test-Path $target) { Remove-Item -Recurse -Force $target }
     Copy-Item -Recurse (Join-Path $src $dir) $target
@@ -50,10 +50,18 @@ Copy-Item -Recurse -Force (Join-Path $src 'data\*') $data
 
 # エンジンの起動の命令（DLL がつながらないときに使う）と、ログオン時の起動
 $java = Join-Path $dest 'runtime\bin\javaw.exe'
-$command = "`"$java`" -Xmx512m -Dfile.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dsun.java2d.uiScale=1 -Dkanade.native=`"$dest\native`" -cp `"$dest\lib\*`" dev.mooma.kanade.desktop.MainKt serve"
+$command = "`"$java`" -Xmx512m -Dfile.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dkanade.native=`"$dest\native`" -Dkanade.settings=`"$dest\settings\Kanade.Settings.exe`" -cp `"$dest\lib\*`" dev.mooma.kanade.desktop.MainKt serve"
 New-Item -Force 'HKCU:\Software\Kanade' | Out-Null
 Set-ItemProperty 'HKCU:\Software\Kanade' EngineCommand $command
 Set-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' Kanade $command
+
+# スタートメニューの「Kanade の設定」
+$shortcut = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'Kanade の設定.lnk'
+$shell = New-Object -ComObject WScript.Shell
+$link = $shell.CreateShortcut($shortcut)
+$link.TargetPath = Join-Path $dest 'settings\Kanade.Settings.exe'
+$link.WorkingDirectory = Join-Path $dest 'settings'
+$link.Save()
 
 # 日本語のキーボードの一覧に足す（MS-IME は残す。外すのは設定アプリから）
 $list = Get-WinUserLanguageList

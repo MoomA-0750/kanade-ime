@@ -21,6 +21,8 @@ Get-ChildItem (Join-Path $dest 'tsf') -Filter 'kanade_tsf-*.dll' -ErrorAction Si
 }
 Get-Process java, javaw -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*dev.mooma.kanade.desktop.MainKt*' } | Stop-Process -Force
 Remove-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' Kanade -ErrorAction SilentlyContinue
+Get-Process Kanade.Settings -ErrorAction SilentlyContinue | Stop-Process -Force
+Remove-Item (Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'Kanade の設定.lnk') -ErrorAction SilentlyContinue
 Remove-Item -Recurse 'HKCU:\Software\Kanade' -ErrorAction SilentlyContinue
 
 # 使っているアプリが DLL を読み込んだままだと消せない。消せなかったものは再起動のあとに消す
