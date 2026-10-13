@@ -220,7 +220,7 @@ class KanadeInputMethodService : InputMethodService() {
             else -> currentInputConnection?.getTextBeforeCursor(1, 0)?.lastOrNull()
         }
 
-        override fun key(keyCode: Int) = softKey(keyCode, 0)
+        override fun key(keyCode: Int, meta: Int) = softKey(keyCode, meta)
         override fun setJapanese(on: Boolean) {
             handle(KeyInput.SetJapanese(on))
         }

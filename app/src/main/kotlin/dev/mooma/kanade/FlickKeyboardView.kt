@@ -34,8 +34,8 @@ class FlickKeyboardView(
         fun replaceLast(s: String)
         /** 直前の1文字（入力中の文字の最後、なければカーソルの前） */
         fun lastChar(): Char?
-        /** 特別なキー（⌫・矢印・空白・⏎） */
-        fun key(keyCode: Int)
+        /** 特別なキー（⌫・Tab・矢印・空白・⏎）。[meta] は Ctrl などの修飾（↶ を払ったときの Ctrl+C など） */
+        fun key(keyCode: Int, meta: Int = 0)
         /** 日本語入力のオン・オフ（かなはオン、英字・数字はオフ） */
         fun setJapanese(on: Boolean)
         /** 「あa1」を押した: 次の「配列×言語」へ（テンキーの中のかな・英字・数字も、ほかの配列もこれで回る） */
@@ -134,7 +134,7 @@ class FlickKeyboardView(
     /** 日本語入力中か（「あa1」のキーの表示に使う。かなの配列のときだけ意味がある） */
     var japanese = true
 
-    /** 聞き続けるモード中（☺ のキーの色を変える） */
+    /** 聞き続けるモード中（🎤 のキーの色を変える） */
     var voiceActive = false
         set(value) {
             field = value
@@ -151,6 +151,8 @@ class FlickKeyboardView(
         val shown: Cell get() = visual ?: cell
         var repeated = false
         var voiceStarted = false
+        /** Tab のキー: 払った方向で決まるキー（QWERTY の Tab と同じ。上下左右が矢印、四隅が Home/End/PgUp/PgDn） */
+        var tabCode = KeyEvent.KEYCODE_TAB
     }
     private val touches = HashMap<Int, Touch>()
 
@@ -193,8 +195,8 @@ class FlickKeyboardView(
         pill.clear()
         cells.clear()
         val wide = ScreenWidth.isWide(context, w)
-        val left = listOf("undo", "left", "emoji", "mode")
-        val right = listOf("backspace", "right", "space", "enter")
+        val left = listOf("undo", "emoji", "voice", "mode")
+        val right = listOf("backspace", "tab", "space", "enter")
         fun block(x0: Float, width: Float, withLeft: Boolean, withRight: Boolean) {
             val cols = 3 + (if (withLeft) 1 else 0) + (if (withRight) 1 else 0)
             val cw = width / cols
@@ -232,7 +234,7 @@ class FlickKeyboardView(
         val fn = (slot as? Slot.Fn)?.id
         val (fill, ink) = when {
             touch != null -> palette.pressed to palette.text
-            fn == "emoji" && voiceActive -> palette.voice to palette.onVoice
+            fn == "voice" && voiceActive -> palette.voice to palette.onVoice
             fn == "enter" -> palette.accent to palette.onAccent
             fn != null -> palette.functionKey to palette.text
             isSpecialChars(slot) -> palette.functionKey to palette.text
@@ -248,9 +250,9 @@ class FlickKeyboardView(
         if (fn != null) {
             val icon = when (fn) {
                 "undo" -> R.drawable.sym_undo
-                "left" -> R.drawable.sym_arrow_back
-                "right" -> R.drawable.sym_arrow_forward
+                "tab" -> R.drawable.sym_keyboard_tab
                 "emoji" -> R.drawable.sym_mood
+                "voice" -> R.drawable.sym_mic
                 "backspace" -> R.drawable.sym_backspace
                 "space" -> R.drawable.sym_space_bar
                 "enter" -> R.drawable.sym_keyboard_return
@@ -266,8 +268,20 @@ class FlickKeyboardView(
             }
             // 払うと使えるものの小さな目印
             if (fn == "emoji") {
-                drawIcon(canvas, R.drawable.sym_mic, cx, cell.rect.top + 10 * density, 11 * density, palette.dim)
                 drawIcon(canvas, R.drawable.sym_content_paste, cell.rect.left + 10 * density, cy, 11 * density, palette.dim)
+            }
+            if (fn == "undo") {
+                drawIcon(canvas, R.drawable.sym_content_copy, cx, cell.rect.top + 10 * density, 11 * density, palette.dim)
+                drawIcon(canvas, R.drawable.sym_content_paste, cx, cell.rect.bottom - 10 * density, 11 * density, palette.dim)
+                drawIcon(canvas, R.drawable.sym_select_all, cell.rect.left + 10 * density, cy, 11 * density, palette.dim)
+                drawIcon(canvas, R.drawable.sym_redo, cell.rect.right - 10 * density, cy, 11 * density, palette.dim)
+            }
+            if (fn == "tab") {
+                val dx = cell.rect.width() / 2 - 9 * density
+                val dy = cell.rect.height() / 2 - 9 * density
+                for ((code, d) in TAB_CORNERS) {
+                    drawIcon(canvas, arrowIcon(code), cx + d.first * dx, cy + d.second * dy, 11 * density, palette.dim)
+                }
             }
             if (fn == "mode") {
                 drawIcon(canvas, R.drawable.sym_keyboard, cx, cell.rect.top + 10 * density, 11 * density, palette.dim)
@@ -336,6 +350,11 @@ class FlickKeyboardView(
                 }
                 animatePill(t.shown, pressed = true)
                 performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                // 🎤 は押している間だけ録音する（短く押したら聞き続けるモード。QWERTY の 🎤 と同じ）
+                if ((cell.slot as? Slot.Fn)?.id == "voice") {
+                    t.voiceStarted = true
+                    actions.voice(true)
+                }
                 scheduleRepeat(id, t)
                 // 「あa1」の長押しで「配列×言語」の一覧
                 if ((cell.slot as? Slot.Fn)?.id == "mode") handler.postAtTime({
@@ -349,16 +368,20 @@ class FlickKeyboardView(
             }
             MotionEvent.ACTION_MOVE -> {
                 for (p in 0 until event.pointerCount) {
-                    val t = touches[event.getPointerId(p)] ?: continue
+                    val pid = event.getPointerId(p)
+                    val t = touches[pid] ?: continue
+                    if ((t.cell.slot as? Slot.Fn)?.id == "tab") {
+                        // 払う方向が変わったら、長押しの繰り返しもその方向のキーで数え直す
+                        val code = tabCode(t, event.getX(p), event.getY(p))
+                        if (code != t.tabCode) {
+                            t.tabCode = code
+                            scheduleRepeat(pid, t)
+                        }
+                    }
                     val dir = direction(t, event.getX(p), event.getY(p))
                     if (dir != t.dir) {
                         t.dir = dir
-                        handler.removeCallbacksAndMessages(event.getPointerId(p))
-                        // ☺ を上に払ったら、その場で録音を始める（離すまで。短ければ聞き続けるモード）
-                        if ((t.cell.slot as? Slot.Fn)?.id == "emoji" && dir == FlickTables.Dir.UP && !t.voiceStarted) {
-                            t.voiceStarted = true
-                            actions.voice(true)
-                        }
+                        if ((t.cell.slot as? Slot.Fn)?.id != "tab") handler.removeCallbacksAndMessages(pid)
                         invalidate()
                     }
                 }
@@ -368,6 +391,7 @@ class FlickKeyboardView(
                 handler.removeCallbacksAndMessages(id)
                 if (touches.values.none { it.shown === t.shown }) animatePill(t.shown, pressed = false)
                 t.dir = direction(t, event.getX(i), event.getY(i))
+                t.tabCode = tabCode(t, event.getX(i), event.getY(i))
                 t.lastX = event.getX(i)
                 t.lastY = event.getY(i)
                 if (t.voiceStarted) actions.voice(false) else if (!t.repeated) fire(t)
@@ -395,18 +419,45 @@ class FlickKeyboardView(
         }
     }
 
-    /** ⌫・◀・▶ は長押しで繰り返す */
+    /**
+     * Tab のキーを払った方向のキー（QWERTY の Tab のキーと同じ）。8方向に分け、上下左右が矢印、
+     * 左上・右上が Home/End、左下・右下が PgUp/PgDn。払っていなければ Tab
+     */
+    private fun tabCode(t: Touch, x: Float, y: Float): Int {
+        val dx = x - t.x0
+        val dy = y - t.y0
+        if (hypot(dx, dy) < swipe) return KeyEvent.KEYCODE_TAB
+        // 画面の上を 0 度として時計回りに 8 つ
+        val angle = (Math.toDegrees(kotlin.math.atan2(dx.toDouble(), -dy.toDouble())) + 360 + 22.5) % 360
+        return TAB_DIRS[(angle / 45).toInt() % 8]
+    }
+
+    private fun arrowIcon(code: Int) = when (code) {
+        KeyEvent.KEYCODE_DPAD_UP -> R.drawable.sym_arrow_upward
+        KeyEvent.KEYCODE_DPAD_DOWN -> R.drawable.sym_arrow_downward
+        KeyEvent.KEYCODE_DPAD_LEFT -> R.drawable.sym_arrow_back
+        KeyEvent.KEYCODE_DPAD_RIGHT -> R.drawable.sym_arrow_forward
+        KeyEvent.KEYCODE_MOVE_HOME -> R.drawable.sym_first_page
+        KeyEvent.KEYCODE_MOVE_END -> R.drawable.sym_last_page
+        KeyEvent.KEYCODE_PAGE_UP -> R.drawable.sym_keyboard_double_arrow_up
+        else -> R.drawable.sym_keyboard_double_arrow_down
+    }
+
+    /** ⌫ と、Tab のキーを払った矢印・PgUp/PgDn は長押しで繰り返す（QWERTY と同じ） */
     private fun scheduleRepeat(id: Int, t: Touch) {
+        handler.removeCallbacksAndMessages(id)
         val fn = (t.cell.slot as? Slot.Fn)?.id ?: return
         val code = when (fn) {
             "backspace" -> KeyEvent.KEYCODE_DEL
-            "left" -> KeyEvent.KEYCODE_DPAD_LEFT
-            "right" -> KeyEvent.KEYCODE_DPAD_RIGHT
+            "tab" -> t.tabCode.takeIf { it !in NO_REPEAT } ?: return
             else -> return
         }
         val tick = object : Runnable {
             override fun run() {
-                if (touches[id] !== t || t.dir != FlickTables.Dir.TAP) return
+                if (touches[id] !== t) return
+                if (fn == "tab") {
+                    if (t.tabCode != code) return
+                } else if (t.dir != FlickTables.Dir.TAP) return
                 actions.key(code)
                 t.repeated = true
                 handler.postAtTime(this, id, android.os.SystemClock.uptimeMillis() + 50)
@@ -418,15 +469,22 @@ class FlickKeyboardView(
     private fun fire(t: Touch) {
         when (val slot = t.cell.slot) {
             is Slot.Fn -> {
-                if (slot.id != "undo") toggleKey = null
+                if (slot.id != "undo" || t.dir != FlickTables.Dir.TAP) toggleKey = null
                 when (slot.id) {
-                    "undo" -> undoToggle()
-                    "left" -> actions.key(KeyEvent.KEYCODE_DPAD_LEFT)
-                    "right" -> actions.key(KeyEvent.KEYCODE_DPAD_RIGHT)
+                    // ↶ は払うと、左で全選択・右でやり直し・上でコピー・下で貼り付け（Ctrl のショートカットで送る）
+                    "undo" -> when (t.dir) {
+                        FlickTables.Dir.TAP -> undoToggle()
+                        FlickTables.Dir.LEFT -> actions.key(KeyEvent.KEYCODE_A, CTRL)
+                        FlickTables.Dir.RIGHT -> actions.key(KeyEvent.KEYCODE_Z, CTRL or SHIFT)
+                        FlickTables.Dir.UP -> actions.key(KeyEvent.KEYCODE_C, CTRL)
+                        FlickTables.Dir.DOWN -> actions.key(KeyEvent.KEYCODE_V, CTRL)
+                    }
+                    "tab" -> actions.key(t.tabCode)
                     "backspace" -> actions.key(KeyEvent.KEYCODE_DEL)
                     "space" -> actions.key(KeyEvent.KEYCODE_SPACE)
                     "enter" -> actions.key(KeyEvent.KEYCODE_ENTER)
-                    "emoji" -> if (t.dir == FlickTables.Dir.LEFT) actions.clipboard() else actions.emoji()
+                    // 払うとクリップボード（どの向きでも）
+                    "emoji" -> if (t.dir != FlickTables.Dir.TAP) actions.clipboard() else actions.emoji()
                     "mode" -> when (t.dir) {
                         FlickTables.Dir.UP -> actions.switchToQwerty()
                         FlickTables.Dir.DOWN -> actions.toggleFloat()
@@ -564,5 +622,21 @@ class FlickKeyboardView(
         const val TOGGLE_MS = 1000L
         /** タップの補いで候補にする近くのキー（中心までの距離。キーの大きさを 1 として） */
         const val NEIGHBOR_RADIUS = 1.1f
+        const val CTRL = KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
+        const val SHIFT = KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
+        /** Tab のキーを払った向き（上から時計回り） */
+        val TAB_DIRS = intArrayOf(
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_MOVE_END, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_PAGE_DOWN,
+            KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_PAGE_UP, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MOVE_HOME,
+        )
+        /** Tab のキーの目印の位置（中心からの向き） */
+        val TAB_CORNERS = listOf(
+            KeyEvent.KEYCODE_DPAD_UP to (0f to -1f), KeyEvent.KEYCODE_MOVE_END to (1f to -1f),
+            KeyEvent.KEYCODE_DPAD_RIGHT to (1f to 0f), KeyEvent.KEYCODE_PAGE_DOWN to (1f to 1f),
+            KeyEvent.KEYCODE_DPAD_DOWN to (0f to 1f), KeyEvent.KEYCODE_PAGE_UP to (-1f to 1f),
+            KeyEvent.KEYCODE_DPAD_LEFT to (-1f to 0f), KeyEvent.KEYCODE_MOVE_HOME to (-1f to -1f),
+        )
+        /** 長押しで繰り返さないもの（QWERTY と同じ） */
+        val NO_REPEAT = setOf(KeyEvent.KEYCODE_TAB, KeyEvent.KEYCODE_MOVE_HOME, KeyEvent.KEYCODE_MOVE_END)
     }
 }
