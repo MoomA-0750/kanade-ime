@@ -38,7 +38,7 @@ case "$1" in
   data)
     A=app/build/generated/kanadeAssets
     ps "New-Item -ItemType Directory -Force \$env:LOCALAPPDATA\\Kanade\\data | Out-Null"
-    scp -q -o BatchMode=yes $A/system.kdic.kgz $A/connection.kcon.kgz $A/pos.kpos $A/symbol.ksym $A/emoji.ksym $A/zenz.gguf "tofu:AppData/Local/Kanade/data/"
+    scp -q -o BatchMode=yes $A/system.kdic.kgz $A/connection.kcon.kgz $A/pos.kpos $A/symbol.ksym $A/emoji.ksym $A/english.ksym $A/zenz.gguf "tofu:AppData/Local/Kanade/data/"
     echo "data -> %LOCALAPPDATA%\\Kanade\\data" ;;
   tsf)
     CONFIG=${2:-Debug}
@@ -91,7 +91,7 @@ JNI
     A=app/build/generated/kanadeAssets
     mkdir -p "$TMP/Kanade/data"
     cp -r desktop/build/install/kanade-engine/lib "$TMP/Kanade/lib"
-    cp $A/system.kdic.kgz $A/connection.kcon.kgz $A/pos.kpos $A/symbol.ksym $A/emoji.ksym $A/zenz.gguf "$TMP/Kanade/data/"
+    cp $A/system.kdic.kgz $A/connection.kcon.kgz $A/pos.kpos $A/symbol.ksym $A/emoji.ksym $A/english.ksym $A/zenz.gguf "$TMP/Kanade/data/"
     cp windows/installer/install.ps1 windows/installer/uninstall.ps1 docs/THIRD-PARTY.md "$TMP/Kanade/"
     tar -C "$TMP" -czf "$TMP/dist.tgz" Kanade
     scp -q -o BatchMode=yes "$TMP/dist.tgz" windows/installer/package.ps1 "tofu:kanade/"

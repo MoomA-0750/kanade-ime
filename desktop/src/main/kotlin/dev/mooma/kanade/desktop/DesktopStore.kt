@@ -10,12 +10,16 @@ data class DesktopSettings(
     val fullWidthSymbols: Boolean = true,
     val liveConversion: Boolean = true,
     val punctuation: String = "、。",
+    /** 開き括弧を打ったら閉じ括弧も入れ、カーソルを中に置く */
+    val pairBrackets: Boolean = true,
     val toggles: Set<WinToggle> = WinToggle.entries.toSet(),
     val spokenPunctuation: Boolean = true,
     val learning: Boolean = true,
     val lastJapanese: Boolean = false,
 ) {
-    fun engineSettings() = EngineSettings(fullWidthSymbols = fullWidthSymbols, liveConversion = liveConversion, punctuation = punctuation)
+    fun engineSettings() = EngineSettings(
+        fullWidthSymbols = fullWidthSymbols, liveConversion = liveConversion, punctuation = punctuation, pairBrackets = pairBrackets,
+    )
 }
 
 /**
@@ -47,6 +51,7 @@ class DesktopStore(val dir: File = defaultDir()) {
             fullWidthSymbols = bool(KEY_FULL_WIDTH, d.fullWidthSymbols),
             liveConversion = bool(KEY_LIVE, d.liveConversion),
             punctuation = p.getProperty(KEY_PUNCTUATION)?.trim()?.takeIf { it.length == 2 } ?: d.punctuation,
+            pairBrackets = bool(KEY_PAIR_BRACKETS, d.pairBrackets),
             toggles = p.getProperty(KEY_TRIGGERS)?.split(',')?.mapNotNull { name -> WinToggle.entries.find { it.name == name.trim() } }?.toSet()
                 ?: d.toggles,
             spokenPunctuation = bool(KEY_SPOKEN_PUNCT, d.spokenPunctuation),
@@ -64,6 +69,8 @@ class DesktopStore(val dir: File = defaultDir()) {
             appendLine("$KEY_LIVE=${s.liveConversion}")
             appendLine("# 句読点（、。 ，． 、． ，。 のどれか）")
             appendLine("$KEY_PUNCTUATION=${s.punctuation}")
+            appendLine("# 開き括弧を打ったら閉じ括弧も入れ、カーソルを中に置く")
+            appendLine("$KEY_PAIR_BRACKETS=${s.pairBrackets}")
             appendLine("# 日本語のオン/オフに使うキー（RIGHT_ALT_TAP・CTRL_SPACE・F13 をカンマ区切りで。変換/無変換・半角/全角はいつでも使える）")
             appendLine("$KEY_TRIGGERS=${s.toggles.joinToString(",") { it.name }}")
             appendLine("# 音声入力で「まる」「てん」などを句読点にする")
@@ -115,6 +122,7 @@ class DesktopStore(val dir: File = defaultDir()) {
             fullWidthSymbols = take(KEY_FULL_WIDTH, { it as? Boolean }, now.fullWidthSymbols),
             liveConversion = take(KEY_LIVE, { it as? Boolean }, now.liveConversion),
             punctuation = take(KEY_PUNCTUATION, { (it as? String)?.takeIf { s -> s.length == 2 } }, now.punctuation),
+            pairBrackets = take(KEY_PAIR_BRACKETS, { it as? Boolean }, now.pairBrackets),
             toggles = take(KEY_TRIGGERS, { v ->
                 (v as? org.json.JSONArray)?.let { arr -> (0 until arr.length()).mapNotNull { i -> WinToggle.entries.find { it.name == arr.getString(i) } }.toSet() }
             }, now.toggles),
@@ -138,6 +146,7 @@ class DesktopStore(val dir: File = defaultDir()) {
         const val KEY_FULL_WIDTH = "full_width_symbols"
         const val KEY_LIVE = "live_conversion"
         const val KEY_PUNCTUATION = "punctuation"
+        const val KEY_PAIR_BRACKETS = "pair_brackets"
         const val KEY_SPOKEN_PUNCT = "spoken_punctuation"
         const val KEY_LEARNING = "learning"
         const val KEY_LAST_MODE = "last_japanese"

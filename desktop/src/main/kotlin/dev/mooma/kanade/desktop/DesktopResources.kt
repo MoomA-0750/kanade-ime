@@ -22,7 +22,10 @@ class DesktopResources(private val dataDir: File, private val cacheDir: File = d
     fun candidateSource(): DictionaryCandidateSource {
         val converter = KanaKanjiConverter(SystemDictionary(map("system.kdic")), ConnectionMatrix(map("connection.kcon")))
         fun table(name: String) = File(dataDir, name).takeIf { it.exists() }?.let { SymbolTable.parse(it.readText()) } ?: SymbolTable(emptyMap())
-        return DictionaryCandidateSource(converter, Segmenter(PosTable.read(map("pos.kpos"))), table("symbol.ksym"), table("emoji.ksym"))
+        val source = DictionaryCandidateSource(converter, Segmenter(PosTable.read(map("pos.kpos"))), table("symbol.ksym"), table("emoji.ksym"))
+        // カタカナ→英語の表記の表（約11万の読み）は読むのに時間がかかるので、Android 版と同じく裏で読んで差し替える
+        Thread({ runCatching { source.setEnglishTable(table("english.ksym")) } }, "english").apply { isDaemon = true }.start()
+        return source
     }
 
     /** zenz のモデル（なければ null） */
