@@ -166,9 +166,12 @@ A 12-key layout that works like Gboard's. Tap the center character of a key for 
 
 - "小゛゜" adds or removes a voiced mark, semi-voiced mark, or small form on the previous character (か→が, は→ば→ぱ, つ→っ→づ)
 - Pressing the same key repeatedly cycles to the next character (toggle input; you can turn this off in settings). ↶ steps back one
+- Swipe ↶ left to select all, right to redo, up to copy, and down to paste (it sends Ctrl+A, Ctrl+Shift+Z, Ctrl+C, and Ctrl+V)
 - "あa1" switches between kana, letters, and numbers. Swipe it up for QWERTY
-- Tap ☺ for emoji, swipe it left for the clipboard, or up for voice input
-- The right column is Backspace, →, Space (converts while composing), and Enter
+- Tap ☺ for emoji, or swipe it for the clipboard
+- The mic key records only while you hold it (same as the mic on QWERTY). A short tap keeps listening
+- The left column is ↶, ☺, mic, and あa1; the right column is Backspace, Tab, Space (converts while composing), and Enter
+- The Tab key works like Tab on QWERTY: swipe up/down/left/right for arrows, or to a corner for Home, End, PgUp, and PgDn. Arrows and PgUp/PgDn repeat while you keep holding after the swipe
 - On wide screens (such as the inner screen of a Fold), the keyboard splits into left and right halves, just like Gboard
 
 ### Emoji
