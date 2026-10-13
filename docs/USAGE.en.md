@@ -44,7 +44,7 @@ When you type an opening bracket such as 「 or （ in Japanese input, Kanade al
 
 - Typing the closing bracket skips over the existing one instead of inserting another
 - Pressing Backspace on an empty pair deletes both brackets
-- Pressing Space on an empty pair cycles through （）→「」→『』→【】→［］→｛｝… (Shift+Space goes backwards; you can also pick from the candidate window). This is handy for turning the （ you get from "や" on the flick keyboard into another bracket
+- Pressing Space on an empty pair cycles through （）→「」→『』→【】→［］→｛｝… (Shift+Space goes backwards; you can also pick from the candidate window). This is handy for turning the （ you get from "や" on the 12-key layout into another bracket
 - During conversion, if a segment is a single bracket, other brackets also appear as candidates
 
 ## Converting (after you press Space)
@@ -151,7 +151,7 @@ Works the same way as Unexpected Keyboard, and shortcuts work as-is.
 - Swipe a key toward a corner or up, down, left, or right to enter the small character printed there (on the top row, numbers are at the top right and symbols at the top left; the second row also has symbols at the top right and top left)
 - Shift, Ctrl, Alt, and Fn apply to the next keystroke only. Press twice to lock them (press again to release). While active, the key becomes pill-shaped
 - You can also hold a modifier while pressing another key (hold Ctrl and press a to select all; hold Shift and swipe Space left to select one character at a time). Modifier presses and releases are sent to the app too, so Shift+arrow selection and app shortcuts work just like on a physical keyboard
-- Swipe Ctrl up to switch to the 12-key (flick) layout, or down to float the keyboard (same position and directions as "あa1" on Flick)
+- Swipe Ctrl up to switch to the 12-key layout, or down to float the keyboard (same position and directions as "あa1" on 12-key)
 - Swipe Alt up for Meta (⌘, the equivalent of the Windows key)
 - Fn+digits gives F1–F10, and Fn+`-` `=` gives F11 and F12 (`-` is at the top right of g, `=` at the top right of h)
 - Drag Space sideways to move the cursor along with your finger (it selects if Shift or similar is active). A short swipe moves one character
@@ -160,7 +160,7 @@ Works the same way as Unexpected Keyboard, and shortcuts work as-is.
 - The あ/A key turns Japanese on and off. Swipe it up for the emoji panel, or down for the clipboard
 - The mic key records only while you hold it (same as the record key). A short press starts continuous listening
 
-### Flick
+### 12-key
 
 A 12-key layout that works like Gboard's. Tap the center character of a key for "あ", or swipe left, up, right, or down for "い", "う", "え", or "お".
 
