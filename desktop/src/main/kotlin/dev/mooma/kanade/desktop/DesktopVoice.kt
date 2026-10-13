@@ -18,12 +18,14 @@ interface VoiceService {
 }
 
 /**
- * マイク（javax.sound）と whisper.cpp（kanade_whisper.dll）での音声入力。Android 版の「確定の文」を whisper で作るのと同じ。
+ * マイク（javax.sound）での音声入力。確定の文は [finalModel]（whisper.cpp か sherpa-onnx のモデル。Android 版と同じ一覧）で作る。
  * モデルは最初に使うときに読み、5分使わなければ放す（Android 版と同じ）。話した句読点（「まる」→「。」）も同じく直す
  */
 class DesktopVoice(
+    /** whisper.cpp のネイティブ（kanade_whisper.dll） */
     private val library: File,
-    private val model: File,
+    /** モデルの置き場所（%LOCALAPPDATA%\Kanade\data） */
+    private val data: File,
     private val log: (String) -> Unit,
     /** 話しながらの途中の文字（なければ出さない） */
     private val partial: ReazonPartial? = null,
@@ -36,7 +38,11 @@ class DesktopVoice(
     private fun spoken(text: String) = if (spokenPunctuation) SpokenPunctuation.apply(text) else text
     private val worker = Executors.newSingleThreadScheduledExecutor { Thread(it, "whisper").apply { isDaemon = true } }
     private var unload: java.util.concurrent.ScheduledFuture<*>? = null
-    private var whisper: WhisperModel? = null
+    private var loaded: FinalRecognizer? = null
+    private var loadedModel: VoiceFinal? = null
+
+    /** 確定の文に使うモデル（設定の voice_final）。変えたら、次に使うときに読み直す */
+    @Volatile var finalModel: VoiceFinal = VoiceFinal.DEFAULT
 
     @Volatile private var line: TargetDataLine? = null
     private var recordThread: Thread? = null
@@ -93,8 +99,8 @@ class DesktopVoice(
         }
         worker.execute {
             val started = System.nanoTime()
-            val text = runCatching { model()?.transcribe(pcm) }.onFailure { log("whisper: $it") }.getOrNull()
-            log("whisper ${pcm.size / WhisperModel.SAMPLE_RATE.toFloat()}秒 -> ${(System.nanoTime() - started) / 1_000_000}ms ${text ?: "（なし）"}")
+            val text = runCatching { model()?.transcribe(pcm) }.onFailure { log("音声認識: $it") }.getOrNull()
+            log("${loadedModel?.id} ${pcm.size / WhisperModel.SAMPLE_RATE.toFloat()}秒 -> ${(System.nanoTime() - started) / 1_000_000}ms ${text ?: "（なし）"}")
             // 確定の文が作れなければ、話している途中に出していた文を使う（Android 版と同じ）
             onText((text ?: lastPartial)?.let { spoken(it) })
             scheduleUnload()
@@ -119,23 +125,37 @@ class DesktopVoice(
         return model()?.transcribe(pcm)
     }
 
-    private fun model(): WhisperModel? = synchronized(this) {
-        whisper?.let { return it }
+    /** 確定の文を作るモデルを読む。選んだものが入っていなければ whisper small、それもなければ null（話している途中の文を使う） */
+    private fun model(): FinalRecognizer? = synchronized(this) {
+        val wanted = finalModel.takeIf { it.isReady(data) } ?: VoiceFinal.DEFAULT.takeIf { it.isReady(data) } ?: return null
+        if (loadedModel == wanted) loaded?.let { return it }
+        loaded?.close()
+        loaded = null
+        loadedModel = null
         val started = System.nanoTime()
-        whisper = runCatching {
-            System.load(library.absolutePath)
-            WhisperModel.open(model.absolutePath, threads = Runtime.getRuntime().availableProcessors().coerceIn(1, 8))
-        }.onFailure { log("whisper を読めない: $it") }.getOrNull()
-        whisper?.let { log("whisper を読んだ ${(System.nanoTime() - started) / 1_000_000}ms") }
-        return whisper
+        val threads = Runtime.getRuntime().availableProcessors().coerceIn(1, 8)
+        loaded = runCatching {
+            if (wanted.kind == VoiceFinal.Kind.WHISPER) {
+                System.load(library.absolutePath)
+                WhisperModel.open(File(data, wanted.path).absolutePath, threads = threads)?.let { WhisperFinal(it) }
+            } else {
+                SherpaFinal.open(wanted, data, threads)
+            }
+        }.onFailure { log("${wanted.id} を読めない: $it") }.getOrNull()
+        if (loaded != null) {
+            loadedModel = wanted
+            log("${wanted.id} を読んだ ${(System.nanoTime() - started) / 1_000_000}ms")
+        }
+        return loaded
     }
 
     private fun scheduleUnload() = synchronized(this) {
         unload?.cancel(false)
         unload = worker.schedule({
             synchronized(this) {
-                whisper?.close()
-                whisper = null
+                loaded?.close()
+                loaded = null
+                loadedModel = null
             }
         }, 5, java.util.concurrent.TimeUnit.MINUTES)
     }

@@ -59,19 +59,13 @@ private fun build(data: File): Built {
         log("zenz なし（${library.path}、モデル ${model?.path}）")
         null
     }
-    val whisperLibrary = DesktopVoice.libraryFile()
-    val whisperModel = File(data, WHISPER_MODEL)
-    val reazon = ReazonPartial(File(data, "reazonspeech"), ::log).takeIf { it.isReady }
-    if (reazon == null) log("話しながらの途中の文字なし（${File(data, "reazonspeech").path}）")
-    val voice = if (whisperLibrary.exists() && whisperModel.exists()) DesktopVoice(whisperLibrary, whisperModel, ::log, reazon) else {
-        log("音声入力なし（${whisperLibrary.path}、モデル ${whisperModel.path}）")
-        null
-    }
+    // 話している途中の文字（ReazonSpeech）。設定の画面から後で落としても使えるよう、録音を始めるたびに入っているかを見る
+    val reazon = ReazonPartial(File(data, "reazonspeech"), ::log)
+    // 確定の文のモデルは設定の画面から落として選べるので、いま入っていなくても音声入力は用意しておく
+    val voice = DesktopVoice(DesktopVoice.libraryFile(), data, ::log, reazon)
     return Built(EngineHost(InputEngine(candidateSource = source), reranker, voice), source, voice)
 }
 
-/** 音声入力のモデル（Android 版の既定と同じ whisper small）。設定の画面で選べるようにするのはフェーズ7 */
-private const val WHISPER_MODEL = "ggml-small-q5_1.bin"
 
 private fun serve(data: File, socket: Path) {
     // DLL が javaw で起動する（コンソールがない）ので、記録は自分でファイルに書く。1MB を超えたら前のものは捨てる
@@ -156,7 +150,8 @@ private fun zenzCheck(data: File, readings: List<String>) {
 }
 
 private fun voiceCheck(data: File, args: List<String>) {
-    val voice = DesktopVoice(DesktopVoice.libraryFile(), File(data, WHISPER_MODEL), ::log)
+    val voice = DesktopVoice(DesktopVoice.libraryFile(), data, ::log)
+    System.getProperty("kanade.voiceFinal")?.let { voice.finalModel = VoiceFinal.of(it) }
     if (args.firstOrNull() == "--reazon") {
         val reazon = ReazonPartial(File(data, "reazonspeech"), ::log)
         for (wav in args.drop(1)) {

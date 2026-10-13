@@ -15,15 +15,12 @@
                 <ToggleSwitch x:Name="Spoken" Toggled="OnChanged" OnContent="オン" OffContent="オフ" />
             </tk:SettingsCard>
 
-            <TextBlock Text="モデル" Style="{StaticResource SectionHeader}" />
-            <tk:SettingsCard x:Name="Whisper" Header="whisper small（確定の文）" Description="句読点付きの文を作ります">
-                <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8F1;" /></tk:SettingsCard.HeaderIcon>
-                <TextBlock x:Name="WhisperState" />
-            </tk:SettingsCard>
-            <tk:SettingsCard x:Name="Reazon" Header="ReazonSpeech（話している途中の文字）" Description="話しながら途中の文字を出します（句読点は付きません）">
-                <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8F1;" /></tk:SettingsCard.HeaderIcon>
-                <TextBlock x:Name="ReazonState" />
-            </tk:SettingsCard>
+            <TextBlock Text="確定の文を作るモデル" Style="{StaticResource SectionHeader}" />
+            <TextBlock Text="録音キーを離したときに、句読点付きの文を作るモデルです。使うには落としておきます（途中で止めても、続きから落とせます）。ReazonSpeech は話している途中の文字にも使います"
+                       TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="1,0,0,8" />
+            <StackPanel x:Name="Models" Spacing="{StaticResource SettingsCardSpacing}" />
+
+            <TextBlock Text="そのほか" Style="{StaticResource SectionHeader}" />
             <tk:SettingsCard Header="マイクの許可" Description="録音できないときは、Windows の設定で「デスクトップ アプリがマイクにアクセスできるようにする」をオンにしてください">
                 <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE1D6;" /></tk:SettingsCard.HeaderIcon>
                 <HyperlinkButton Content="マイクの設定を開く" NavigateUri="ms-settings:privacy-microphone" />

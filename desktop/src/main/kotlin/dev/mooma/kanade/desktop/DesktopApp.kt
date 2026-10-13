@@ -57,6 +57,7 @@ class DesktopApp(
         }
         host.toggles = s.toggles
         voice?.spokenPunctuation = s.spokenPunctuation
+        voice?.finalModel = VoiceFinal.of(s.voiceFinal)
         log(if (first) "設定を読んだ" else "設定を読み直した")
     }
 

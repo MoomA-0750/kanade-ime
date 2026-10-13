@@ -23,6 +23,7 @@ public sealed class Store
     public bool SpokenPunctuation { get; set; } = true;
     public bool Learning { get; set; } = true;
     public bool LastJapanese { get; set; }
+    public string VoiceFinal { get; set; } = VoiceModel.DefaultId;
 
     public static Store Load()
     {
@@ -47,6 +48,7 @@ public sealed class Store
                 case "spoken_punctuation": s.SpokenPunctuation = Bool(s.SpokenPunctuation); break;
                 case "learning": s.Learning = Bool(s.Learning); break;
                 case "last_japanese": s.LastJapanese = Bool(s.LastJapanese); break;
+                case "voice_final": if (VoiceModel.All.Any(m => m.Id == value)) s.VoiceFinal = value; break;
             }
         }
         return s;
@@ -72,6 +74,8 @@ public sealed class Store
             .AppendLine($"toggle_triggers={string.Join(",", order.Where(Toggles.Contains))}")
             .AppendLine("# 音声入力で「まる」「てん」などを句読点にする")
             .AppendLine($"spoken_punctuation={B(SpokenPunctuation)}")
+            .AppendLine("# 音声入力の確定の文を作るモデル（parakeet・reazon・sensevoice・whisper-small・whisper-kotoba・whisper-turbo）")
+            .AppendLine($"voice_final={VoiceFinal}")
             .AppendLine("# 選んだ変換を覚えて次から先に出す")
             .AppendLine($"learning={B(Learning)}")
             .AppendLine("# 前回の日本語のオン/オフ（エンジンが書く）")

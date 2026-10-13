@@ -16,6 +16,8 @@ data class DesktopSettings(
     val spokenPunctuation: Boolean = true,
     val learning: Boolean = true,
     val lastJapanese: Boolean = false,
+    /** 確定の文を作る音声認識のモデル（Android 版と同じ id。VoiceFinal） */
+    val voiceFinal: String = VoiceFinal.DEFAULT.id,
 ) {
     fun engineSettings() = EngineSettings(
         fullWidthSymbols = fullWidthSymbols, liveConversion = liveConversion, punctuation = punctuation, pairBrackets = pairBrackets,
@@ -57,6 +59,7 @@ class DesktopStore(val dir: File = defaultDir()) {
             spokenPunctuation = bool(KEY_SPOKEN_PUNCT, d.spokenPunctuation),
             learning = bool(KEY_LEARNING, d.learning),
             lastJapanese = bool(KEY_LAST_MODE, d.lastJapanese),
+            voiceFinal = p.getProperty(KEY_VOICE_FINAL)?.trim()?.takeIf { id -> VoiceFinal.entries.any { it.id == id } } ?: d.voiceFinal,
         )
     }
 
@@ -75,6 +78,8 @@ class DesktopStore(val dir: File = defaultDir()) {
             appendLine("$KEY_TRIGGERS=${s.toggles.joinToString(",") { it.name }}")
             appendLine("# 音声入力で「まる」「てん」などを句読点にする")
             appendLine("$KEY_SPOKEN_PUNCT=${s.spokenPunctuation}")
+            appendLine("# 音声入力の確定の文を作るモデル（parakeet・reazon・sensevoice・whisper-small・whisper-kotoba・whisper-turbo）")
+            appendLine("$KEY_VOICE_FINAL=${s.voiceFinal}")
             appendLine("# 選んだ変換を覚えて次から先に出す")
             appendLine("$KEY_LEARNING=${s.learning}")
             appendLine("# 前回の日本語のオン/オフ（エンジンが書く）")
@@ -128,6 +133,7 @@ class DesktopStore(val dir: File = defaultDir()) {
             }, now.toggles),
             spokenPunctuation = take(KEY_SPOKEN_PUNCT, { it as? Boolean }, now.spokenPunctuation),
             learning = take(KEY_LEARNING, { it as? Boolean }, now.learning),
+            voiceFinal = take(KEY_VOICE_FINAL, { v -> (v as? String)?.takeIf { id -> VoiceFinal.entries.any { it.id == id } } }, now.voiceFinal),
         )
         val files = root.optJSONObject("files") ?: JSONObject()
         var fileCount = 0
@@ -156,6 +162,7 @@ class DesktopStore(val dir: File = defaultDir()) {
             .put(KEY_TRIGGERS, entry("stringSet", org.json.JSONArray(s.toggles.map { it.name }.sorted())))
             .put(KEY_SPOKEN_PUNCT, entry("boolean", s.spokenPunctuation))
             .put(KEY_LEARNING, entry("boolean", s.learning))
+            .put(KEY_VOICE_FINAL, entry("string", s.voiceFinal))
         val files = JSONObject()
         if (userDictionaryFile.exists()) files.put("user_dictionary.txt", userDictionaryFile.readText())
         if (snippetsFile.exists()) files.put("snippets.txt", snippetsFile.readText())
@@ -177,6 +184,7 @@ class DesktopStore(val dir: File = defaultDir()) {
         const val KEY_SPOKEN_PUNCT = "spoken_punctuation"
         const val KEY_LEARNING = "learning"
         const val KEY_LAST_MODE = "last_japanese"
+        const val KEY_VOICE_FINAL = "voice_final"
 
         /** Windows は %APPDATA%\Kanade、ほかは ~/.config/kanade-desktop */
         fun defaultDir(): File {
