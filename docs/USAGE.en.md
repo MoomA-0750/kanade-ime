@@ -204,7 +204,7 @@ While recording, "🎤" appears near the cursor; while recognizing, "…" appear
 
 ### Models
 
-ReazonSpeech shows the text while you speak, and the model you applied with "Apply" produces the text that goes into the field. Each model has tags for language, accuracy, speed, punctuation, and size.
+Nemotron (or ReazonSpeech if Nemotron isn't downloaded) shows the text while you speak, and the model you applied with "Apply" produces the text that goes into the field. Each model has tags for language, accuracy, speed, punctuation, and size.
 
 | Model | Size | Tags |
 |---|---|---|
@@ -214,8 +214,9 @@ ReazonSpeech shows the text while you speak, and the model you applied with "App
 | whisper small | 190MB | Multilingual, low accuracy, slow, punctuation |
 | kotoba-whisper v2.0 | 538MB | Japanese, high accuracy, very slow, little punctuation |
 | whisper large-v3-turbo | 574MB | Multilingual, high accuracy, very slow, punctuation |
+| Nemotron-3.5 Streaming | 682MB | Japanese, medium accuracy, streaming, punctuation, live preview (from NVIDIA; when downloaded, the live preview uses it) |
 
-If the applied model isn't downloaded, Kanade uses another downloaded model (a note appears above the list). Remove models you no longer need with "Delete". To see text while you speak, download ReazonSpeech and turn on "Show text while speaking" (on by default).
+If the applied model isn't downloaded, Kanade uses another downloaded model (a note appears above the list). Remove models you no longer need with "Delete". To see text while you speak, download Nemotron or ReazonSpeech and turn on "Show text while speaking" (on by default). Nemotron transcribes the audio as it arrives, so it stays fast during long speech and adds punctuation. The first use takes a few seconds to load, and no text appears during that time.
 
 "Import a model not on the list" lets you add model files that aren't in the list. Kanade guesses the format from the file names and asks you to confirm before importing.
 

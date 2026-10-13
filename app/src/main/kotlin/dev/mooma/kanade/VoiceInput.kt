@@ -77,17 +77,24 @@ object VoiceInput {
     @Volatile private var recorder: AudioRecord? = null
     private var recordThread: Thread? = null
     private val samples = ShortArrayBuilder()
+    /** 録ってある音声の頭が変わるたびに増える数（取り出し・切り詰め。逐次認識が流れを始め直す目印） */
+    @Volatile var epoch = 0
+        private set
 
     fun hasPermission(context: Context) =
         context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
-    val isRecording: Boolean get() = recorder != null
+    /** 試験用の音声を流しているか（[INJECT_FILE]） */
+    @Volatile private var injecting = false
+
+    val isRecording: Boolean get() = recorder != null || injecting
 
     /** 録音を始める。権限がなければ false */
     @SuppressLint("MissingPermission")
     fun start(context: Context): Boolean {
-        if (recorder != null) return true
+        if (isRecording) return true
         if (!hasPermission(context)) return false
+        if (startInjection(context)) return true
         val min = AudioRecord.getMinBufferSize(WhisperModel.SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
         val r = AudioRecord(
             MediaRecorder.AudioSource.VOICE_RECOGNITION, WhisperModel.SAMPLE_RATE,
@@ -97,7 +104,10 @@ object VoiceInput {
             r.release()
             return false
         }
-        synchronized(samples) { samples.clear() }
+        synchronized(samples) {
+            samples.clear()
+            epoch++
+        }
         r.startRecording()
         recorder = r
         recordThread = Thread({
@@ -110,8 +120,52 @@ object VoiceInput {
         return true
     }
 
+    /**
+     * 試験用: デバッグ版で files/[INJECT_FILE]（16kHz・モノラル・16bit の wav）があれば、マイクの代わりにそれを実時間で流す
+     * （エミュレータにはマイクの音が入らないので、話しながらの途中表示を確かめるため）。流し終えたら無音を流す
+     */
+    private fun startInjection(context: Context): Boolean {
+        if (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE == 0) return false
+        val file = File(context.filesDir, INJECT_FILE)
+        if (!file.exists()) return false
+        val bytes = file.readBytes()
+        val pcm = ShortArray(maxOf(0, (bytes.size - 44) / 2)) { ((bytes[44 + it * 2].toInt() and 0xff) or (bytes[45 + it * 2].toInt() shl 8)).toShort() }
+        synchronized(samples) {
+            samples.clear()
+            epoch++
+        }
+        injecting = true
+        recordThread = Thread({
+            val chunk = 1600
+            var pos = 0
+            val silence = ShortArray(chunk)
+            while (injecting) {
+                Thread.sleep(100)
+                val n = minOf(chunk, pcm.size - pos)
+                synchronized(samples) {
+                    if (samples.size < MAX_SAMPLES) {
+                        if (n > 0) samples.append(pcm.copyOfRange(pos, pos + n), n) else samples.append(silence, chunk)
+                    }
+                }
+                if (n > 0) pos += n
+            }
+        }, "kanade-record").also { it.start() }
+        return true
+    }
+
     /** 録音中の、ここまでの音声（話しながら途中の文字を出すため） */
     fun snapshot(): FloatArray = synchronized(samples) { WhisperModel.pcm16ToFloat(samples.array, samples.size) }
+
+    /**
+     * 逐次認識に流す、[from] サンプル目からの音声。[fromEpoch] のあとに頭が変わっていたら（取り出し・切り詰め）、
+     * 頭から全部を返す。返すのは (今の epoch, 音声, 次に渡す from)
+     */
+    fun since(fromEpoch: Int, from: Int): Triple<Int, FloatArray, Int> = synchronized(samples) {
+        val start = if (fromEpoch == epoch) minOf(from, samples.size) else 0
+        val n = samples.size - start
+        val out = FloatArray(n) { samples.array[start + it] / 32768f }
+        Triple(epoch, out, samples.size)
+    }
 
     /** 録ってある音声の長さ（サンプル数） */
     fun sampleCount(): Int = synchronized(samples) { samples.size }
@@ -132,14 +186,24 @@ object VoiceInput {
     fun take(): FloatArray = synchronized(samples) {
         val pcm = WhisperModel.pcm16ToFloat(samples.array, samples.size)
         samples.clear()
+        epoch++
         pcm
     }
 
     /** 録音は続けたまま、最後の [keep] サンプルだけ残す（話していない間の音を溜めない。話し始めの直前は残す） */
-    fun trimTo(keep: Int) = synchronized(samples) { samples.keepLast(keep) }
+    fun trimTo(keep: Int) = synchronized(samples) {
+        if (samples.size > keep) epoch++
+        samples.keepLast(keep)
+    }
 
     /** 録音をやめて、録った音声を返す（録音していなければ null） */
     fun stopRecording(): FloatArray? {
+        if (injecting) {
+            injecting = false
+            recordThread?.join(500)
+            recordThread = null
+            return snapshot()
+        }
         val r = recorder ?: return null
         recorder = null
         recordThread?.join(500)
@@ -151,6 +215,13 @@ object VoiceInput {
 
     /** 録音をやめて捨てる */
     fun cancel() {
+        if (injecting) {
+            injecting = false
+            recordThread?.join(500)
+            recordThread = null
+            model?.cancel()
+            return
+        }
         val r = recorder ?: return
         recorder = null
         recordThread?.join(500)
@@ -206,6 +277,9 @@ object VoiceInput {
 
     /** これだけ使わなければモデルを放す */
     const val IDLE_UNLOAD_MINUTES = 5L
+
+    /** 試験用にマイクの代わりに流す音声（デバッグ版だけ） */
+    const val INJECT_FILE = "voice-inject.wav"
 
     /** 60 秒で録音を打ち切る */
     private const val MAX_SAMPLES = WhisperModel.SAMPLE_RATE * 60

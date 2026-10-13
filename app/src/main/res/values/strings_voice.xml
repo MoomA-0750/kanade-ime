@@ -14,7 +14,7 @@
     <!-- Speaking -->
     <string name="voice_speaking_section_title">Speaking</string>
     <string name="voice_streaming_title">Show text while speaking</string>
-    <string name="voice_streaming_summary">Shows text while you are still speaking, using ReazonSpeech.</string>
+    <string name="voice_streaming_summary">Shows text while you are still speaking (with Nemotron if downloaded, otherwise ReazonSpeech).</string>
     <string name="voice_spoken_punctuation_title">Speak punctuation</string>
     <string name="voice_spoken_punctuation_summary">Say these Japanese words: くてん→。 とうてん→、 かいぎょう→new line はてなマーク→？ びっくりマーク→！ かぎかっこ／かぎかっことじ→「」 かっこ／かっことじ→（） なかぐろ→・</string>
     <string name="voice_threads_label">Recognition threads</string>
@@ -95,9 +95,11 @@
     <string name="voice_tag_punctuation_few">Little punctuation</string>
     <string name="voice_tag_punctuation_no">No punctuation</string>
     <string name="voice_tag_live_preview">Live preview</string>
+    <string name="voice_tag_streaming">Streaming</string>
     <string name="voice_tag_imported">Imported</string>
     <string name="voice_note_parakeet">A Japanese-only model from NVIDIA.</string>
-    <string name="voice_note_reazon">Also used to show text while you speak. To add punctuation, say words like \"くてん\".</string>
+    <string name="voice_note_reazon">When Nemotron is not downloaded, also used to show text while you speak. To add punctuation, say words like \"くてん\".</string>
+    <string name="voice_note_nemotron">A streaming model from NVIDIA. When downloaded, it shows the text while you speak, and the text is replaced by the applied model when you finish.</string>
     <string name="voice_note_kotoba">A whisper model tuned for Japanese.</string>
 
     <!-- VoiceModel (whisper) labels -->

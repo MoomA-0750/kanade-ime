@@ -116,6 +116,16 @@ object VoiceCatalog {
             VoiceModel.TURBO, "whisper-turbo", "whisper large-v3-turbo",
             tags(L to R.string.voice_tag_multilingual, A to R.string.voice_tag_accuracy_high, S to R.string.voice_tag_very_slow, P to R.string.voice_tag_punctuation_yes, Z to "574MB"), null,
         ),
+        // 逐次認識。落としてあれば、話しながらの途中表示はこれを使う（確定用として適用もできる）
+        VoiceModelSpec(
+            "nemotron", StreamingRecognizer.LABEL,
+            tags(L to R.string.voice_tag_japanese, A to R.string.voice_tag_accuracy_medium, S to R.string.voice_tag_streaming, P to R.string.voice_tag_punctuation_yes, RL to R.string.voice_tag_live_preview, Z to "682MB"),
+            R.string.voice_note_nemotron, custom = false,
+            ready = { StreamingRecognizer.isReady(it) },
+            download = { StreamingRecognizer.downloadItems(it) },
+            run = { c, pcm, threads, cb -> StreamingRecognizer.recognize(c, pcm, threads, cb) },
+            remove = { c -> StreamingRecognizer.delete(c) },
+        ),
     )
 
     private fun customRoot(context: Context) = File(context.getExternalFilesDir("models"), "custom")

@@ -15,6 +15,7 @@
 | ReazonSpeech の k2 モデル（`csukuangfj/reazonspeech-k2-v2-ja-en`） | 設定画面の「ReazonSpeech をダウンロード」で HuggingFace から落とす | Apache-2.0（ReazonSpeech の表記。公開前に確かめる） | |
 | SenseVoice-Small（FunAudioLLM、sherpa-onnx の int8 版 `sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17`） | 設定画面の「SenseVoice をダウンロード」で HuggingFace から落とす | モデルのライセンス（FunASR Model License）を公開前に確かめる | |
 | parakeet-tdt_ctc-0.6b-ja（NVIDIA、sherpa-onnx の int8 版 `sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8`） | 設定画面の「parakeet-ja をダウンロード」で HuggingFace から落とす | CC-BY-4.0（公開するなら表示が要る） | |
+| Nemotron-3.5-ASR-Streaming-0.6B（NVIDIA、sherpa-onnx の int8 版 `sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11`） | 設定画面の「モデル」の一覧から HuggingFace で落とす | OpenMDW-1.1（公開前に条件を確かめる） | |
 | Material Symbols（Google、Rounded の 24px。`app/src/main/res/drawable/sym_*.xml` に変換して同梱） | リポジトリ・APK | Apache-2.0 | 画面キーボードと設定画面のアイコン |
 | FrequencyWords の英語の上位5万語（hermitdave/FrequencyWords、`content/2018/en/en_50k.txt`、コミット 525f9b5。OpenSubtitles 2018 由来） | ビルド時に取得して、グライド入力の英単語（`glide-en.txt`）として assets へ | CC BY-SA 4.0（コードは MIT） | 公開するときは出典の表示と、同じ許諾での単語リストの公開が要る |
 | SCOWL 2020.12.07（Kevin Atkinson ほか。english-words・american-words の大きさ 70 まで） | ビルド時に取得して、グライドの英単語のふるいに使う（辞書にある語だけを残す）。著作権表示を `scowl-license.txt` として assets へ | MIT に近い許諾（著作権表示と許諾文を添える） | |

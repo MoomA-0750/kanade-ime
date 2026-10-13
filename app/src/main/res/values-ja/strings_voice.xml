@@ -14,7 +14,7 @@
     <!-- 話し方 -->
     <string name="voice_speaking_section_title">話し方</string>
     <string name="voice_streaming_title">話しながら文字を出す</string>
-    <string name="voice_streaming_summary">ReazonSpeech で、話している途中の文字を出します。</string>
+    <string name="voice_streaming_summary">話している途中の文字を出します（Nemotron を落としてあればそれで、なければ ReazonSpeech で）。</string>
     <string name="voice_spoken_punctuation_title">話して句読点を入れる</string>
     <string name="voice_spoken_punctuation_summary">くてん→。 とうてん→、 かいぎょう→改行 はてなマーク→？ びっくりマーク→！ かぎかっこ／かぎかっことじ→「」 かっこ／かっことじ→（） なかぐろ→・</string>
     <string name="voice_threads_label">認識に使うスレッド数</string>
@@ -95,9 +95,11 @@
     <string name="voice_tag_punctuation_few">句読点 少</string>
     <string name="voice_tag_punctuation_no">句読点なし</string>
     <string name="voice_tag_live_preview">途中の表示</string>
+    <string name="voice_tag_streaming">逐次</string>
     <string name="voice_tag_imported">取り込み</string>
     <string name="voice_note_parakeet">NVIDIA の日本語専用のモデルです</string>
-    <string name="voice_note_reazon">話している途中の文字を出すのにも使います。句読点は「くてん」のように話して入れます</string>
+    <string name="voice_note_reazon">Nemotron を落としていないときは、話している途中の文字を出すのにも使います。句読点は「くてん」のように話して入れます</string>
+    <string name="voice_note_nemotron">NVIDIA の逐次認識のモデルです。落としてあれば、話している途中の文字はこれで出し、話し終わったら「適用」したモデルの文で書き換えます</string>
     <string name="voice_note_kotoba">日本語向けの whisper です</string>
 
     <!-- VoiceModel（whisper）の表示名 -->

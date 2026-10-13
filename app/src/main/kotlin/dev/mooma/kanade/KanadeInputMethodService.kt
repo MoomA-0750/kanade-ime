@@ -1167,8 +1167,13 @@ class KanadeInputMethodService : InputMethodService() {
         }
     }
 
-    /** 話しながら途中の文字を出しているか（ReazonSpeech が使えるとき） */
+    /** 話しながら途中の文字を出しているか（Nemotron か ReazonSpeech が使えるとき） */
     private var voiceStreaming = false
+    /** 途中の文字を Nemotron の逐次認識で出すか（落としてあるとき）。でなければ ReazonSpeech に毎回全部をかけ直す */
+    private var partialStreaming = false
+    /** 逐次認識に流した音声の位置（VoiceInput.since に渡す） */
+    private var streamEpoch = -1
+    private var streamFed = 0
     private var partialBusy = false
     private var partialText: String? = null
     private val partialTick = object : Runnable {
@@ -1177,14 +1182,24 @@ class KanadeInputMethodService : InputMethodService() {
             // 聞き続けるモードでは、話している間だけ途中の文字を出す
             if (!partialBusy && (!continuous || endpointer.inSpeech)) {
                 partialBusy = true
-                SherpaRecognizer.reazon.recognize(this@KanadeInputMethodService, VoiceInput.snapshot(), settings.voiceThreads) { text ->
+                val done = { text: String? ->
                     main.post {
                         partialBusy = false
-                        if (VoiceInput.isRecording && text != null && (!continuous || endpointer.inSpeech)) showPartial(text)
+                        if (VoiceInput.isRecording && !text.isNullOrEmpty() && (!continuous || endpointer.inSpeech)) showPartial(text)
                     }
                 }
+                if (partialStreaming) {
+                    // 前回の続きの音声だけを流す（聞き続けるモードで区切って音声を取り出したら、流れを始め直す）
+                    val (epoch, pcm, next) = VoiceInput.since(streamEpoch, streamFed)
+                    val reset = epoch != streamEpoch
+                    streamEpoch = epoch
+                    streamFed = next
+                    StreamingRecognizer.feed(this@KanadeInputMethodService, pcm, reset, settings.voiceThreads) { done(it) }
+                } else {
+                    SherpaRecognizer.reazon.recognize(this@KanadeInputMethodService, VoiceInput.snapshot(), settings.voiceThreads) { done(it) }
+                }
             }
-            main.postDelayed(this, PARTIAL_INTERVAL_MS)
+            main.postDelayed(this, if (partialStreaming) STREAM_INTERVAL_MS else PARTIAL_INTERVAL_MS)
         }
     }
 
@@ -1286,6 +1301,7 @@ class KanadeInputMethodService : InputMethodService() {
         flickView?.voiceActive = false
         main.removeCallbacks(continuousTick)
         main.removeCallbacks(partialTick)
+        if (partialStreaming) StreamingRecognizer.finishStream()
         val speaking = endpointer.inSpeech
         endpointer.reset()
         val pcm = VoiceInput.stopRecording()
@@ -1302,7 +1318,8 @@ class KanadeInputMethodService : InputMethodService() {
 
     private fun startVoice() {
         if (VoiceInput.isRecording) return
-        val streamingReady = settings.voiceStreaming && SherpaRecognizer.reazon.isReady(this)
+        val nemotronReady = settings.voiceStreaming && StreamingRecognizer.isReady(this)
+        val streamingReady = nemotronReady || (settings.voiceStreaming && SherpaRecognizer.reazon.isReady(this))
         val message = when {
             !VoiceInput.hasPermission(this) -> getString(R.string.ime_voice_no_permission)
             VoiceCatalog.finalModel(this, settings) == null -> getString(R.string.ime_voice_no_model)
@@ -1317,9 +1334,14 @@ class KanadeInputMethodService : InputMethodService() {
         // 入力中の文字があれば先に確定し、認識した文はその後ろに入れる
         apply(engine.commitAll())
         voiceStreaming = streamingReady
+        partialStreaming = nemotronReady
+        streamEpoch = -1
+        streamFed = 0
+        // 逐次認識のモデルは大きく、初めの読み込みに数秒かかるので、録音を始めたらすぐ読み始める
+        if (partialStreaming) StreamingRecognizer.preload(this, settings.voiceThreads)
         partialText = null
         showIndicatorText("🎤", 0)
-        if (voiceStreaming) main.postDelayed(partialTick, PARTIAL_INTERVAL_MS)
+        if (voiceStreaming) main.postDelayed(partialTick, if (partialStreaming) STREAM_INTERVAL_MS else PARTIAL_INTERVAL_MS)
     }
 
     /**
@@ -1375,6 +1397,7 @@ class KanadeInputMethodService : InputMethodService() {
     private fun stopVoice() {
         val pcm = VoiceInput.stopRecording() ?: return
         main.removeCallbacks(partialTick)
+        if (partialStreaming) StreamingRecognizer.finishStream()
         showIndicatorText("…", 0)
         recognizeUtterance(pcm, continuousMode = false)
     }
@@ -1532,6 +1555,8 @@ class KanadeInputMethodService : InputMethodService() {
 
         /** 話しながら途中の文字を出し直す間隔 */
         const val PARTIAL_INTERVAL_MS = 600L
+        /** 逐次認識に音声を流す間隔（モデルは 560ms ごとに文字を出すので、その半分ほど） */
+        const val STREAM_INTERVAL_MS = 280L
         /** 録音キーをこれより短く押したら、聞き続けるモード */
         const val TAP_MS = 300L
         const val VAD_INTERVAL_MS = 100L
