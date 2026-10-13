@@ -5,8 +5,6 @@ import dev.mooma.kanade.core.convert.DictionaryCandidateSource
 import dev.mooma.kanade.core.dict.LearningHistory
 import dev.mooma.kanade.core.dict.Snippets
 import dev.mooma.kanade.core.dict.UserDictionary
-import java.awt.FileDialog
-import java.awt.Frame
 import java.io.File
 import kotlin.concurrent.thread
 
@@ -78,31 +76,57 @@ class DesktopApp(
         }
     }
 
-    /** タスクバーの入力の表示の右クリックのメニュー（DLL から届く） */
+    /** タスクバーの入力の表示の右クリックのメニュー（DLL から届く）。設定の画面（WinUI 3）を、選んだものの画面で開く */
     fun handleMenu(action: String) {
-        when (action) {
-            "settings" -> open(store.settingsFile)
-            "user-dictionary" -> open(store.userDictionaryFile)
-            "snippets" -> open(store.snippetsFile)
-            "import-android" -> importAndroid()
-            "log" -> System.getenv("LOCALAPPDATA")?.let { open(File(it, "Kanade\\engine.log")) }
+        val page = when (action) {
+            "settings" -> "input"
+            "user-dictionary" -> "dictionary"
+            "snippets" -> "snippets"
+            "import-android" -> "backup"
+            "log" -> {
+                System.getenv("LOCALAPPDATA")?.let { open(File(it, "Kanade\\engine.log")) }
+                return
+            }
+            else -> return
+        }
+        val exe = System.getProperty("kanade.settings")?.let(::File)
+        if (exe != null && exe.exists()) {
+            ProcessBuilder(exe.absolutePath, page).start()
+        } else {
+            // 設定の画面がない（開発中など）ときは、ファイルをメモ帳で開く
+            log("設定の画面がない: ${exe?.path}")
+            open(
+                when (page) {
+                    "dictionary" -> store.userDictionaryFile
+                    "snippets" -> store.snippetsFile
+                    else -> store.settingsFile
+                },
+            )
         }
     }
 
-    private fun importAndroid() {
-        val dialog = FileDialog(null as Frame?, "Android 版の設定のファイル（kanade-settings-*.json）", FileDialog.LOAD).apply {
-            file = "*.json"
-            isVisible = true
+    /** 設定の画面からの頼みごと */
+    fun handleAdmin(command: String, argument: String): Pair<Boolean, String> = when (command) {
+        "import-android" -> {
+            val r = store.importAndroid(File(argument))
+            apply(first = false)
+            true to "設定 ${r.settings} 件、ユーザー辞書・スニペット ${r.files} 件を読み込みました"
         }
-        val name = dialog.file ?: return
-        val result = runCatching { store.importAndroid(File(dialog.directory, name)) }
-        val message = result.fold(
-            { "設定 ${it.settings} 件、辞書・スニペット ${it.files} 件を読み込みました" },
-            { "読み込めませんでした: ${it.message}" },
-        )
-        log(message)
-        javax.swing.JOptionPane.showMessageDialog(null, message, "Kanade", javax.swing.JOptionPane.INFORMATION_MESSAGE)
-        if (result.isSuccess) apply(first = false)
+        "export-android" -> {
+            store.exportAndroid(File(argument))
+            true to "書き出しました: $argument"
+        }
+        "clear-learning" -> {
+            host.locked {
+                if (source.learning != null) {
+                    source.learning = LearningHistory()
+                    source.learningChanged = true
+                }
+            }
+            save()
+            true to "覚えたものを消しました"
+        }
+        else -> false to "知らない頼みごとです: $command"
     }
 
     /** メモ帳で開く（保存するとエンジンが読み直す） */

@@ -53,6 +53,9 @@ class EngineHost(
     /** タスクバーの入力の表示の右クリックのメニューで選んだもの（"settings"・"user-dictionary"・"snippets"・"import-android"・"log"） */
     @Volatile var onMenu: (String) -> Unit = {}
 
+    /** 設定の画面からの頼みごと（"import-android"・"export-android"・"clear-learning"）。成功したかと、出す文を返す */
+    @Volatile var onAdmin: (String, String) -> Pair<Boolean, String> = { _, _ -> false to "できません" }
+
     /** エンジンのロックの中で動かす（設定の読み直しなど、キーの処理と重ならないように） */
     fun <T> locked(block: () -> T): T = synchronized(lock, block)
 
@@ -108,6 +111,15 @@ class EngineHost(
                 if (engine.japanese != on) client.send(reply(0, run(engine.handle(KeyInput.SetJapanese(on)).commands), false))
             }
             "menu" -> f.getOrNull(1)?.let { action -> Thread({ runCatching { onMenu(action) } }, "menu").start() }
+            // 設定の画面（windows/settings）からの頼みごと。時間のかかるものもあるので別のスレッドで
+            "admin" -> {
+                val id = f.getOrElse(1) { "0" }
+                Thread({
+                    val (ok, message) = runCatching { onAdmin(f.getOrElse(2) { "" }, f.getOrElse(3) { "" }) }
+                        .getOrElse { false to (it.message ?: it.toString()) }
+                    client.send(listOf(Protocol.encode("admin", id, if (ok) 1 else 0, message)))
+                }, "admin").start()
+            }
             "bye" -> disconnected(client)
         }
     }

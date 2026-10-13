@@ -1,0 +1,8 @@
+<Page
+    x:Class="Kanade.Settings.Pages.UsagePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer>
+        <StackPanel x:Name="Body" Margin="36,24,36,36" MaxWidth="900" Spacing="6" />
+    </ScrollViewer>
+</Page>

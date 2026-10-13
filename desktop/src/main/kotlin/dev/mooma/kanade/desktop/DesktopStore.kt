@@ -141,6 +141,33 @@ class DesktopStore(val dir: File = defaultDir()) {
         return ImportResult(count, fileCount)
     }
 
+    /**
+     * Android 版の「設定の読み込み」で読める形（kanade-settings の JSON）で書き出す。項目名と型は Android 版と同じ。
+     * 学習・前回の日本語のオン/オフは入れない（Android 版の書き出しと同じく、その端末での記録のため）
+     */
+    fun exportAndroid(json: File) {
+        val s = loadSettings()
+        fun entry(type: String, value: Any) = JSONObject().put("type", type).put("value", value)
+        val prefs = JSONObject()
+            .put(KEY_FULL_WIDTH, entry("boolean", s.fullWidthSymbols))
+            .put(KEY_LIVE, entry("boolean", s.liveConversion))
+            .put(KEY_PUNCTUATION, entry("string", s.punctuation))
+            .put(KEY_PAIR_BRACKETS, entry("boolean", s.pairBrackets))
+            .put(KEY_TRIGGERS, entry("stringSet", org.json.JSONArray(s.toggles.map { it.name }.sorted())))
+            .put(KEY_SPOKEN_PUNCT, entry("boolean", s.spokenPunctuation))
+            .put(KEY_LEARNING, entry("boolean", s.learning))
+        val files = JSONObject()
+        if (userDictionaryFile.exists()) files.put("user_dictionary.txt", userDictionaryFile.readText())
+        if (snippetsFile.exists()) files.put("snippets.txt", snippetsFile.readText())
+        val root = JSONObject()
+            .put("format", "kanade-settings")
+            .put("version", 1)
+            .put("exportedAt", System.currentTimeMillis())
+            .put("prefs", prefs)
+            .put("files", files)
+        write(json, root.toString(2))
+    }
+
     companion object {
         const val KEY_TRIGGERS = "toggle_triggers"
         const val KEY_FULL_WIDTH = "full_width_symbols"

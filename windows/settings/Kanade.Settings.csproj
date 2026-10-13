@@ -1,0 +1,39 @@
+<!-- Kanade（Windows 版）の設定の画面。WinUI 3（Windows App SDK）。設定・辞書は %APPDATA%\Kanade のファイルを直接読み書きし、
+     エンジンが変更を見て読み直す。Android 版の設定の読み込み・書き出しと学習の消去は、エンジンにソケット越しに頼む -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>Kanade.Settings</RootNamespace>
+    <AssemblyName>Kanade.Settings</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Kanade.ico</ApplicationIcon>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <UseWinUI>true</UseWinUI>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- インストールの要らない（パッケージにしない）アプリにし、Windows App SDK も同梱する -->
+    <WindowsPackageType>None</WindowsPackageType>
+    <!-- パッケージにしないアプリでも、画面の部品（.pri）を作るのに要る -->
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+    <!-- 英語以外の部品の訳（使わない言語のもの）は入れない -->
+    <SatelliteResourceLanguages>ja;en</SatelliteResourceLanguages>
+    <!-- 使わないコードを削って小さくする（WinUI 3 は Windows App SDK 1.6 から対応） -->
+    <PublishTrimmed>true</PublishTrimmed>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260921001" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" />
+    <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" Version="8.2.251219" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Kanade.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\docs\WINDOWS-USAGE.md" Link="WINDOWS-USAGE.md" LogicalName="WINDOWS-USAGE.md" />
+  </ItemGroup>
+</Project>

@@ -91,6 +91,7 @@ private fun serve(data: File, socket: Path) {
     val app = DesktopApp(DesktopStore(), host, built.source, built.voice, ::log)
     app.start()
     host.onMenu = app::handleMenu
+    host.onAdmin = app::handleAdmin
     val started = runCatching { SocketServer(socket, host, ::log).start() }.getOrElse {
         log("待ち受けられない: $it")
         false

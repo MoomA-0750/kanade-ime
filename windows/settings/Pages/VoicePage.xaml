@@ -1,0 +1,33 @@
+<Page
+    x:Class="Kanade.Settings.Pages.VoicePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:tk="using:CommunityToolkit.WinUI.Controls">
+    <ScrollViewer>
+        <StackPanel Margin="36,24,36,36" MaxWidth="1000" Spacing="{StaticResource SettingsCardSpacing}">
+            <TextBlock Text="音声入力" Style="{StaticResource TitleTextBlockStyle}" Margin="0,0,0,12" />
+            <tk:SettingsCard Header="録音キー" Description="押している間だけ録音し、離すと句読点付きの文を入れます。話している途中の文字はカーソルの近くに出ます">
+                <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE720;" /></tk:SettingsCard.HeaderIcon>
+                <TextBlock Text="F12" Style="{StaticResource BodyStrongTextBlockStyle}" />
+            </tk:SettingsCard>
+            <tk:SettingsCard Header="話した句読点" Description="「まる」「てん」「かいぎょう」などを、句読点や改行にします">
+                <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8C1;" /></tk:SettingsCard.HeaderIcon>
+                <ToggleSwitch x:Name="Spoken" Toggled="OnChanged" OnContent="オン" OffContent="オフ" />
+            </tk:SettingsCard>
+
+            <TextBlock Text="モデル" Style="{StaticResource SectionHeader}" />
+            <tk:SettingsCard x:Name="Whisper" Header="whisper small（確定の文）" Description="句読点付きの文を作ります">
+                <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8F1;" /></tk:SettingsCard.HeaderIcon>
+                <TextBlock x:Name="WhisperState" />
+            </tk:SettingsCard>
+            <tk:SettingsCard x:Name="Reazon" Header="ReazonSpeech（話している途中の文字）" Description="話しながら途中の文字を出します（句読点は付きません）">
+                <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8F1;" /></tk:SettingsCard.HeaderIcon>
+                <TextBlock x:Name="ReazonState" />
+            </tk:SettingsCard>
+            <tk:SettingsCard Header="マイクの許可" Description="録音できないときは、Windows の設定で「デスクトップ アプリがマイクにアクセスできるようにする」をオンにしてください">
+                <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE1D6;" /></tk:SettingsCard.HeaderIcon>
+                <HyperlinkButton Content="マイクの設定を開く" NavigateUri="ms-settings:privacy-microphone" />
+            </tk:SettingsCard>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

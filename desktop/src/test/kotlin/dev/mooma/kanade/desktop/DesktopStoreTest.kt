@@ -51,6 +51,25 @@ class DesktopStoreTest {
     }
 
     @Test
+    fun exportThenImport() {
+        val a = store()
+        a.ensureFiles()
+        a.saveSettings(DesktopSettings(liveConversion = false, punctuation = "，．", pairBrackets = false, toggles = setOf(WinToggle.F13)))
+        a.write(a.userDictionaryFile, "かなで Kanade\nもあ MoomA\n")
+        val json = File(a.dir, "out.json")
+        a.exportAndroid(json)
+        val b = store()
+        b.ensureFiles()
+        b.importAndroid(json)
+        val s = b.loadSettings()
+        assertFalse(s.liveConversion)
+        assertFalse(s.pairBrackets)
+        assertEquals("，．", s.punctuation)
+        assertEquals(setOf(WinToggle.F13), s.toggles)
+        assertEquals("かなで Kanade\nもあ MoomA\n", b.read(b.userDictionaryFile))
+    }
+
+    @Test
     fun rejectsOtherFiles() {
         val s = store()
         val json = File(s.dir, "other.json").apply { writeText("""{"format":"other"}""") }
