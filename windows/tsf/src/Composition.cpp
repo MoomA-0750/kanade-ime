@@ -73,7 +73,7 @@ void TextService::ApplyInSession(TfEditCookie ec, ITfContext* context, const std
             Replace(ec, context, FromUtf8(c[1]), FromUtf8(c[2]), FromUtf8(c[3]));
         }
     }
-    if (composition_) SendCaret(ec, composition_ && compositionContext_ ? compositionContext_.Get() : context);
+    if (composition_) UpdateCaret(ec, compositionContext_ ? compositionContext_.Get() : context);
 }
 
 HRESULT TextService::StartComposition(TfEditCookie ec, ITfContext* context) {
@@ -198,33 +198,24 @@ void TextService::EndComposition(TfEditCookie ec) {
     compositionContext_.Reset();
 }
 
-void TextService::SendCaret(TfEditCookie ec, ITfContext* context) {
-    if (!engine_ || !composition_ || !context) return;
+void TextService::UpdateCaret(TfEditCookie ec, ITfContext* context) {
+    if (!composition_ || !context) return;
     ComPtr<ITfRange> range;
     if (FAILED(composition_->GetRange(&range))) return;
     // 選んでいる文節の下に候補の窓を出す
     auto anchor = SubRange(ec, range.Get(), anchorOffset_, std::max<LONG>(anchorLength_, 1));
-    SendRect(ec, context, anchor ? anchor.Get() : range.Get());
+    UpdateRect(ec, context, anchor ? anchor.Get() : range.Get());
 }
 
-void TextService::SendRect(TfEditCookie ec, ITfContext* context, ITfRange* range) {
-    if (!engine_) return;
+void TextService::UpdateRect(TfEditCookie ec, ITfContext* context, ITfRange* range) {
     ComPtr<ITfContextView> view;
     if (FAILED(context->GetActiveView(&view))) return;
     RECT rect = {};
     BOOL clipped = FALSE;
-    // 描画がまだのアプリ（ブラウザなど）では E_PENDING が返る。そのときは送らない（前の位置のまま）
+    // 描画がまだのアプリ（ブラウザなど）では E_PENDING が返る。そのときは前の位置のまま。
+    // 候補の窓はこのプロセスの中に出すので、座標はそのまま使える（拡大率に対応していないアプリでも同じ座標の世界）
     if (view->GetTextExt(ec, range, &rect, &clipped) != S_OK) return;
-    // 拡大率に対応していないアプリでは、引き伸ばす前の座標が返る。エンジン（拡大率に対応）に合わせて実際の画面の座標に直す
-    HWND hwnd = nullptr;
-    if (SUCCEEDED(view->GetWnd(&hwnd)) && hwnd) {
-        POINT topLeft = {rect.left, rect.top};
-        POINT bottomRight = {rect.right, rect.bottom};
-        if (LogicalToPhysicalPointForPerMonitorDPI(hwnd, &topLeft) && LogicalToPhysicalPointForPerMonitorDPI(hwnd, &bottomRight)) {
-            rect = {topLeft.x, topLeft.y, bottomRight.x, bottomRight.y};
-        }
-    }
-    engine_->Send({"caret", std::to_string(rect.left), std::to_string(rect.top), std::to_string(rect.right), std::to_string(rect.bottom)});
+    caretRect_ = rect;
 }
 
 void TextService::SetSelectionAt(TfEditCookie ec, ITfContext* context, ITfRange* range, TfAnchor anchor) {

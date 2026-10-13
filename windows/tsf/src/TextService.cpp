@@ -177,6 +177,8 @@ STDMETHODIMP TextService::Deactivate() {
         DestroyWindow(window_);
         window_ = nullptr;
     }
+    candidates_.reset();
+    indicator_.reset();
     if (langBar_) {
         ComPtr<ITfLangBarItemMgr> items;
         if (threadMgr_ && SUCCEEDED(threadMgr_.As(&items))) items->RemoveItem(langBar_);
@@ -219,6 +221,7 @@ bool TextService::Connect() {
 
 STDMETHODIMP TextService::OnSetFocus(ITfDocumentMgr* focus, ITfDocumentMgr*) {
     pending_ = {};
+    HidePopups();
     // 別の入力欄へ移ったら、入力中の文字はそのまま確定させる（エンジンの入力は捨てる）
     if (composition_ && compositionContext_) {
         ComPtr<ITfContext> context = compositionContext_;
@@ -244,6 +247,7 @@ STDMETHODIMP TextService::OnSetThreadFocus() {
 }
 
 STDMETHODIMP TextService::OnKillThreadFocus() {
+    HidePopups();
     if (engine_ && engine_->connected()) engine_->Send({"focus", "0"});
     return S_OK;
 }
@@ -372,8 +376,11 @@ void TextService::HandleKey(ITfContext* context, WPARAM wParam, LPARAM lParam, b
     bool hasCommands = !reply.commands.empty();
     for (const auto& c : reply.commands) modeChanged = modeChanged || c[0] == "mode";
     if (hasCommands) ApplyCommands(context, std::move(reply.commands), true);
-    // 「あ」「A」をカーソルの近くに出すため、切り替えたらカーソルの位置を送る
-    if (modeChanged && context && !composition_) SendSelectionCaret(context);
+    // 切り替えたら、カーソルの近くに「あ」「A」を少しのあいだ出す
+    if (modeChanged) {
+        if (context && !composition_) UpdateSelectionRect(context);
+        ShowIndicator(japanese_ ? L"あ" : L"A", 900);
+    }
     *eaten = reply.consumed;
     // 入力中の文字を確定してからキーをアプリへ渡すとき、IMM のアプリ（一時的な文書）では FALSE を返してもキーが届かない。
     // キーを食べて、確定のあとで同じキーを送り直す（送り直したキーは、入力中の文字がないのでそのままアプリへ届く）
@@ -444,16 +451,55 @@ void TextService::SendContext(ITfContext* context) {
     engine_->Send({"ctx", ToUtf8(left), ToUtf8(right)});
 }
 
-void TextService::SendSelectionCaret(ITfContext* context) {
+void TextService::UpdateSelectionRect(ITfContext* context) {
     EditSync(context, TF_ES_READ, [&](TfEditCookie ec) {
         TF_SELECTION sel;
         ULONG fetched = 0;
         if (FAILED(context->GetSelection(ec, TF_DEFAULT_SELECTION, 1, &sel, &fetched)) || fetched == 0) return S_OK;
         ComPtr<ITfRange> range;
         range.Attach(sel.range);
-        SendRect(ec, context, range.Get());
+        UpdateRect(ec, context, range.Get());
         return S_OK;
     });
+}
+
+void TextService::ShowIndicator(const std::wstring& text, UINT durationMs) {
+    if (!indicator_) indicator_ = std::make_unique<IndicatorWindow>();
+    indicator_->Show(text, durationMs, caretRect_);
+}
+
+void TextService::HidePopups() {
+    if (candidates_) candidates_->Hide();
+    if (indicator_) indicator_->Hide();
+}
+
+void TextService::ApplyUi(const std::vector<Command>& ui) {
+    for (const auto& c : ui) {
+        if (c[0] == "cands" && c.size() >= 3) {
+            int selected = atoi(c[1].c_str());
+            size_t n = static_cast<size_t>(std::max(0, atoi(c[2].c_str())));
+            std::vector<std::wstring> items, labels;
+            for (size_t i = 0; i < n && 4 + i * 2 < c.size() + 1; i++) {
+                items.push_back(FromUtf8(c[3 + i * 2]));
+                labels.push_back(4 + i * 2 < c.size() ? FromUtf8(c[4 + i * 2]) : L"");
+            }
+            if (!candidates_) {
+                candidates_ = std::make_unique<CandidateWindow>([this](int index) {
+                    // 候補をクリックした（数字キーと同じ）。結果はエンジンから自分から届く
+                    Log("candidate clicked %d", index);
+                    if (engine_ && engine_->connected()) engine_->Send({"select", std::to_string(index)});
+                });
+            }
+            if (indicator_) indicator_->Hide();
+            candidates_->Show(std::move(items), std::move(labels), selected, caretRect_);
+        } else if (c[0] == "hidecands") {
+            if (candidates_) candidates_->Hide();
+        } else if (c[0] == "indicator" && c.size() >= 2) {
+            ShowIndicator(FromUtf8(c[1]), c.size() > 2 ? static_cast<UINT>(atoi(c[2].c_str())) : 0);
+        } else if (c[0] == "hideindicator") {
+            if (indicator_) indicator_->Hide();
+        }
+    }
 }
 
 HRESULT TextService::EditSync(ITfContext* context, DWORD flags, std::function<HRESULT(TfEditCookie)> fn) {
@@ -467,11 +513,13 @@ HRESULT TextService::EditSync(ITfContext* context, DWORD flags, std::function<HR
 void TextService::ApplyCommands(ITfContext* context, std::vector<Command> commands, bool sync) {
     // 文字は編集セッションで書き、モードはそのあとで切り替える。先に切り替えると、IMM のアプリ（EDIT など）では
     // 入力中の文字をシステムが確定させ、そのあとの確定と2重になる
-    std::vector<Command> edits;
+    std::vector<Command> edits, ui;
     int mode = -1;
     for (auto& c : commands) {
         if (c[0] == "mode") {
             mode = c.size() > 1 && c[1] == "1";
+        } else if (c[0] == "cands" || c[0] == "hidecands" || c[0] == "indicator" || c[0] == "hideindicator") {
+            ui.push_back(std::move(c));
         } else {
             edits.push_back(std::move(c));
         }
@@ -483,11 +531,20 @@ void TextService::ApplyCommands(ITfContext* context, std::vector<Command> comman
             if (mode >= 0) self->SetMode(mode == 1);
         }
     } modeAfter{this, mode};
-    if (edits.empty() || !context) return;
+    if (edits.empty() || !context) {
+        // 窓だけのもの（音声入力の様子など）。入力中でなければ、カーソルの位置を取ってから出す
+        if (!ui.empty()) {
+            if (context && sync && !composition_) UpdateSelectionRect(context);
+            ApplyUi(ui);
+        }
+        return;
+    }
     ComPtr<ITfContext> ctx = context;
     ComPtr<ITfTextInputProcessorEx> self(this);  // 非同期のとき、書く前に消えないように
-    auto* session = new EditSession([this, self, ctx, edits](TfEditCookie ec) {
+    // 窓は、文字を書いて入力中の文字の位置が分かってから出す
+    auto* session = new EditSession([this, self, ctx, edits, ui](TfEditCookie ec) {
         ApplyInSession(ec, ctx.Get(), edits);
+        ApplyUi(ui);
         return S_OK;
     });
     HRESULT hr = E_FAIL;
@@ -503,6 +560,7 @@ void TextService::ApplyCommands(ITfContext* context, std::vector<Command> comman
 
 void TextService::OnPushMessage() {
     if (!engine_) return;
+    Log("push");
     for (auto& batch : engine_->TakePushes()) {
         // 届いたあとにキーを処理していたら、この入力中の文字（並べ替えの結果など）は古い。確定の文やモードは捨てない
         unsigned long long seq = keySeq_;
@@ -566,6 +624,8 @@ STDMETHODIMP TextService::OnChange(REFGUID guid) {
 }
 
 STDMETHODIMP TextService::OnCompositionTerminated(TfEditCookie, ITfComposition*) {
+    Log("composition terminated by app");
+    if (candidates_) candidates_->Hide();
     // アプリが入力中の文字を終わらせた（クリックなど）。文字はアプリに残るので、エンジンの入力は捨てる
     composition_.Reset();
     compositionContext_.Reset();

@@ -16,6 +16,11 @@ class FakeDll(private val out: (String) -> Unit) {
         private set
     var japanese = false
         private set
+    /** いま出ている候補の窓（出ていなければ空）と、選んでいる位置 */
+    var candidates: List<String> = emptyList()
+        private set
+    var selectedCandidate = -1
+        private set
 
     /** 届いたものすべて（確かめる用） */
     val received = mutableListOf<List<String>>()
@@ -41,6 +46,9 @@ class FakeDll(private val out: (String) -> Unit) {
     }
 
     fun commitAll() = request("commitall")
+
+    /** 候補の窓で候補をクリックした */
+    fun select(index: Int) = out(Protocol.encode("select", index))
 
     private fun request(type: String, vararg fields: Any): Boolean {
         val id = synchronized(this) { nextId++ }
@@ -75,6 +83,14 @@ class FakeDll(private val out: (String) -> Unit) {
                 document.append(c[1])
             }
             "mode" -> japanese = c[1] == "1"
+            "cands" -> {
+                selectedCandidate = c[1].toInt()
+                candidates = (0 until c[2].toInt()).map { c[3 + it * 2] }
+            }
+            "hidecands" -> {
+                candidates = emptyList()
+                selectedCandidate = -1
+            }
             "replace" -> {
                 val expected = c[1]
                 if (document.endsWith(expected)) {

@@ -11,6 +11,7 @@
 
 #include "EngineClient.h"
 #include "LangBarButton.h"
+#include "Popups.h"
 
 namespace kanade {
 
@@ -88,8 +89,12 @@ private:
     static void Resend(WPARAM wParam, LPARAM lParam);
     void HandleKey(ITfContext* context, WPARAM wParam, LPARAM lParam, bool down, BOOL* eaten);
     void SendContext(ITfContext* context);
-    void SendSelectionCaret(ITfContext* context);
-    void SendRect(TfEditCookie ec, ITfContext* context, ITfRange* range);
+    void UpdateSelectionRect(ITfContext* context);
+    void UpdateRect(TfEditCookie ec, ITfContext* context, ITfRange* range);
+    // 候補の窓・カーソルの近くの表示（cands・hidecands・indicator・hideindicator）
+    void ApplyUi(const std::vector<Command>& ui);
+    void ShowIndicator(const std::wstring& text, UINT durationMs);
+    void HidePopups();
     HRESULT EditSync(ITfContext* context, DWORD flags, std::function<HRESULT(TfEditCookie)> fn);
     void ApplyCommands(ITfContext* context, std::vector<Command> commands, bool sync);
     void InitDisplayAttributes();
@@ -108,7 +113,7 @@ private:
     void Replace(TfEditCookie ec, ITfContext* context, const std::wstring& expected, const std::wstring& typed,
                  const std::wstring& replacement);
     void EndComposition(TfEditCookie ec);
-    void SendCaret(TfEditCookie ec, ITfContext* context);
+    void UpdateCaret(TfEditCookie ec, ITfContext* context);
     static void SetSelectionAt(TfEditCookie ec, ITfContext* context, ITfRange* range, TfAnchor anchor);
 
     // OnTestKeyDown で処理して、OnKeyDown で書くのを待っているキー
@@ -132,6 +137,10 @@ private:
     std::unique_ptr<EngineClient> engine_;
     // タスクバーの入力の表示（「あ」「A」と右クリックのメニュー）
     LangBarButton* langBar_ = nullptr;
+    // 候補の窓と、カーソルの近くの表示（このプロセスの中に出す）。最後に分かった入力中の文字（選んでいる文節）の位置
+    std::unique_ptr<CandidateWindow> candidates_;
+    std::unique_ptr<IndicatorWindow> indicator_;
+    RECT caretRect_ = {100, 100, 100, 120};
     HWND window_ = nullptr;
     bool japanese_ = false;
     bool settingCompartment_ = false;

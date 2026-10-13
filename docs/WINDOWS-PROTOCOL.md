@@ -22,7 +22,8 @@ Kotlin 側は `desktop/src/main/kotlin/dev/mooma/kanade/desktop/`（`Protocol.kt
 | `ctx	<左の文>	<右の文>` | 入力を始める前の、カーソルの前後の文（zenz の文脈）。入力中でなければ受け取る |
 | `reset` | アプリが入力中の文字を終わらせた（OnCompositionTerminated）。エンジンは入力を捨てる |
 | `focus	<1\|0>` | フォーカスを得た/失った。得たら、エンジンはこの DLL を「いまの相手」にして `mode` を返す |
-| `caret	<left>	<top>	<right>	<bottom>` | 入力中の文字の画面上の位置（GetTextExt）。候補の窓をここに出す |
+| `caret	<left>	<top>	<right>	<bottom>` | （前の版の DLL だけ）入力中の文字の画面上の位置。今は候補の窓を DLL が描くので送らない |
+| `select	<番号>` | 候補の窓で候補をクリックした（数字キーと同じ）。結果はエンジンから id 0 で届く |
 | `mode	<1\|0>` | 言語バーなど、キー以外で日本語のオン/オフが変わった |
 | `menu	<項目>` | タスクバーの入力の表示の右クリックのメニューで選んだ（`settings`・`user-dictionary`・`snippets`・`import-android`・`log`）。エンジンが画面を開く |
 | `admin	<id>	<頼みごと>	<引数>` | 設定の画面（windows/settings）から。`import-android <json>`・`export-android <json>`・`clear-learning`。返事は `admin	<id>	<1\|0>	<文>` |
@@ -41,6 +42,10 @@ Kotlin 側は `desktop/src/main/kotlin/dev/mooma/kanade/desktop/`（`Protocol.kt
 | `compose	<文字>	<カーソル>	<選んでいる文節>	<文節の長さ,区切り>` | 入力中の文字を置き換える（空なら消す）。カーソルは先頭からの文字数、-1 は末尾。文節がなければ空 |
 | `commit	<文字>` | 確定する（入力中の文字は消える） |
 | `mode	<1\|0>` | 日本語のオン/オフ（DLL は言語バーのアイコンなどを合わせる） |
+| `cands	<選んでいる位置>	<数>	<候補1>	<説明1>	<候補2>	<説明2>...` | 候補の窓を出す（説明がなければ空）。DLL が入力中の文字（選んでいる文節）の下に描く |
+| `hidecands` | 候補の窓を消す |
+| `indicator	<文字>	<ミリ秒>` | カーソルの近くに小さな表示を出す（音声入力の「🎤」と話している途中の文字など）。0 なら消すまで |
+| `hideindicator` | その表示を消す |
 | `replace	<前の文字>	<打った文字>	<置き換え>` | スニペット（直接入力中）。カーソルの前が「前の文字」なら消して「置き換え」を入れる。違えば「打った文字」を入れる |
 
-候補の窓・入力モードの表示はエンジンが自分の窓で出すので、DLL には送らない。
+候補の窓と、カーソルの近くの「あ」「A」（DLL がモードの切り替えを見て自分で出す）・音声入力の様子は、DLL がアプリの中に描く。

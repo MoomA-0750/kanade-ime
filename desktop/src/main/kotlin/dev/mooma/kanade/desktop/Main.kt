@@ -46,9 +46,9 @@ private fun log(s: String) = System.err.println("[kanade] ${java.time.LocalTime.
 
 private class Built(val host: EngineHost, val source: dev.mooma.kanade.core.convert.DictionaryCandidateSource, val voice: DesktopVoice?)
 
-private fun newHost(data: File, view: CandidateView = object : CandidateView {}): EngineHost = build(data, view).host
+private fun newHost(data: File): EngineHost = build(data).host
 
-private fun build(data: File, view: CandidateView): Built {
+private fun build(data: File): Built {
     val started = System.nanoTime()
     val resources = DesktopResources(data)
     val source = resources.candidateSource()
@@ -67,7 +67,7 @@ private fun build(data: File, view: CandidateView): Built {
         log("音声入力なし（${whisperLibrary.path}、モデル ${whisperModel.path}）")
         null
     }
-    return Built(EngineHost(InputEngine(candidateSource = source), view, reranker, voice), source, voice)
+    return Built(EngineHost(InputEngine(candidateSource = source), reranker, voice), source, voice)
 }
 
 /** 音声入力のモデル（Android 版の既定と同じ whisper small）。設定の画面で選べるようにするのはフェーズ7 */
@@ -85,8 +85,7 @@ private fun serve(data: File, socket: Path) {
         log("別のエンジンが動いている: $socket")
         exitProcess(1)
     }
-    val view = if (java.awt.GraphicsEnvironment.isHeadless()) object : CandidateView {} else SwingCandidateView()
-    val built = build(data, view)
+    val built = build(data)
     val host = built.host
     val app = DesktopApp(DesktopStore(), host, built.source, built.voice, ::log)
     app.start()

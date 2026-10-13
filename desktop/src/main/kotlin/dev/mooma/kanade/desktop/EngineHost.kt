@@ -13,17 +13,6 @@ interface Client {
     fun send(lines: List<String>)
 }
 
-/** 候補の窓（エンジンが自前で出す）。届いた順にエンジンのロックの中から呼ぶ */
-interface CandidateView {
-    fun show(candidates: List<String>, selected: Int, labels: List<String?>, anchorOffset: Int) {}
-    fun hide() {}
-    /** 入力中の文字の、画面上の位置（DLL が ITfContextView::GetTextExt で取ったもの） */
-    fun caret(left: Int, top: Int, right: Int, bottom: Int) {}
-    fun mode(japanese: Boolean) {}
-    /** 音声入力の様子（「録音中」「認識中」）。null で消す */
-    fun voice(status: String?) {}
-}
-
 /** 言語モデルでの並べ替え（zenz）。重いので裏のスレッドから呼ぶ。できなければ null */
 fun interface RerankService {
     fun rerank(request: ImeCommand.RequestRerank): List<String>?
@@ -41,7 +30,6 @@ fun interface RerankService {
  */
 class EngineHost(
     val engine: InputEngine,
-    private val view: CandidateView = object : CandidateView {},
     private val reranker: RerankService? = null,
     private val voice: VoiceService? = null,
     /** 録音キー（押している間だけ録音）。Android 版と同じ F12 */
@@ -89,21 +77,20 @@ class EngineHost(
                 }
             }
             "reset" -> synchronized(lock) {
-                if (active === client) {
-                    engine.reset()
-                    view.hide()
-                }
+                if (active === client) engine.reset()
             }
             "focus" -> synchronized(lock) {
                 if (f.getOrNull(1) == "1") {
                     activate(client)
                     client.send(reply(0, listOf(ImeCommand.ModeChanged(engine.japanese)), false))
-                } else if (active === client) {
-                    view.hide()
                 }
             }
-            "caret" -> synchronized(lock) {
-                if (active === client) view.caret(f[1].toInt(), f[2].toInt(), f[3].toInt(), f[4].toInt())
+            // 候補の窓で候補をクリックした（数字キーと同じ）。結果はこの DLL へ自分から送る
+            "select" -> synchronized(lock) {
+                val index = f.getOrNull(1)?.toIntOrNull() ?: return@synchronized
+                if (active !== client || !engine.isConverting) return@synchronized
+                val commands = run(engine.handle(KeyInput.SelectCandidate(index)).commands)
+                if (commands.isNotEmpty()) client.send(reply(0, commands, false))
             }
             "mode" -> synchronized(lock) {
                 activate(client)
@@ -127,7 +114,6 @@ class EngineHost(
     fun disconnected(client: Client) = synchronized(lock) {
         if (active === client) {
             engine.reset()
-            view.hide()
             active = null
         }
     }
@@ -135,7 +121,6 @@ class EngineHost(
     private fun activate(client: Client) {
         if (active !== client) {
             if (engine.isComposing) engine.reset()
-            view.hide()
             active = client
         }
     }
@@ -185,19 +170,19 @@ class EngineHost(
             if (key.repeat || recording) return reply(id, emptyList(), true)
             activate(client)
             val commands = run(engine.commitAll())
-            recording = v.start { partial -> synchronized(lock) { if (recording) view.voice("🎤 $partial") } }
-            view.voice(if (recording) "🎤" else "マイクを使えません")
+            recording = v.start { partial -> synchronized(lock) { if (recording) indicate("🎤 $partial") } }
+            indicate(if (recording) "🎤" else "マイクを使えません", if (recording) 0 else 2000)
             return reply(id, commands, true)
         }
         if (!recording) {
-            view.voice(null)
+            indicate(null)
             return reply(id, emptyList(), true)
         }
         recording = false
-        view.voice("認識中")
+        indicate("🎤 認識中")
         v.stop { text ->
             synchronized(lock) {
-                view.voice(null)
+                indicate(null)
                 val target = active ?: return@synchronized
                 if (text.isNullOrEmpty()) return@synchronized
                 // 認識しているあいだに打ち始めていたら、その文字を先に確定する
@@ -211,17 +196,22 @@ class EngineHost(
 
     /** 命令のうち、DLL に送らずエンジンで済ませるもの（候補の窓・並べ替え）を片付け、残りを返す */
     private fun run(commands: List<ImeCommand>): List<ImeCommand> = commands.filter { c ->
-        when (c) {
-            is ImeCommand.ShowCandidates -> view.show(c.candidates, c.selected, c.labels, c.anchorOffset)
-            ImeCommand.HideCandidates -> view.hide()
-            is ImeCommand.RequestRerank -> requestRerank(c)
-            is ImeCommand.ModeChanged -> {
-                view.mode(c.japanese)
-                return@filter true
-            }
-            else -> return@filter true
+        if (c is ImeCommand.RequestRerank) {
+            requestRerank(c)
+            false
+        } else {
+            true
         }
-        false
+    }
+
+    /**
+     * 音声入力の様子（「🎤」と話している途中の文字、「認識中」）をカーソルの近くに出す。DLL が窓を描く。
+     * [durationMs] が 0 なら消すまで出しておく。null なら消す
+     */
+    private fun indicate(text: String?, durationMs: Int = 0) {
+        val target = active ?: return
+        val command = if (text == null) listOf("hideindicator") else listOf("indicator", text, durationMs.toString())
+        target.send(listOf(Protocol.encode(listOf("c", "0") + command), Protocol.encode("done", 0, 0)))
     }
 
     private fun requestRerank(request: ImeCommand.RequestRerank) {
@@ -249,6 +239,10 @@ class EngineHost(
         is ImeCommand.Commit -> listOf("commit", c.text)
         is ImeCommand.ModeChanged -> listOf("mode", if (c.japanese) "1" else "0")
         is ImeCommand.ReplaceBeforeCursor -> listOf("replace", c.expected, c.typed.toString(), c.replacement)
+        // 候補の窓は DLL が描く。選んでいる位置・数・候補と説明（説明がなければ空）を並べる
+        is ImeCommand.ShowCandidates -> listOf("cands", c.selected.toString(), c.candidates.size.toString()) +
+            c.candidates.flatMapIndexed { i, cand -> listOf(cand, c.labels.getOrNull(i).orEmpty()) }
+        ImeCommand.HideCandidates -> listOf("hidecands")
         else -> null
     }
 

@@ -68,6 +68,71 @@ bool Named(std::string name) {
         Pump(500);
         return true;
     }
+    // 候補の窓の N 行目（1 から）をクリックする（候補の窓は、このプロセスの中に DLL が出している）
+    if (name.rfind("click", 0) == 0 && name.size() > 5) {
+        int row = atoi(name.c_str() + 5) - 1;
+        HWND popup = nullptr;
+        EnumThreadWindows(GetCurrentThreadId(), [](HWND hwnd, LPARAM lp) -> BOOL {
+            wchar_t cls[64];
+            GetClassNameW(hwnd, cls, 64);
+            if (wcsncmp(cls, L"KanadePopup_", 12) == 0 && IsWindowVisible(hwnd)) {
+                RECT r;
+                GetWindowRect(hwnd, &r);
+                // 候補の窓は、小さな表示（36x36）より大きい
+                if (r.bottom - r.top > 60) {
+                    *reinterpret_cast<HWND*>(lp) = hwnd;
+                    return FALSE;
+                }
+            }
+            return TRUE;
+        }, reinterpret_cast<LPARAM>(&popup));
+        if (!popup) {
+            fprintf(stderr, "no candidate window\n");
+            return true;
+        }
+        RECT r;
+        GetWindowRect(popup, &r);
+        SetCursorPos(r.left + 60, r.top + 4 + 34 * row + 17);
+        Pump(100);
+        INPUT in[2] = {};
+        in[0].type = in[1].type = INPUT_MOUSE;
+        in[0].mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+        in[1].mi.dwFlags = MOUSEEVENTF_LEFTUP;
+        SendInput(2, in, sizeof(INPUT));
+        Pump(300);
+        return true;
+    }
+    // 窓のまわり（候補の窓が出るところも含めて）を撮って、%USERPROFILE%\kanade\shot-<番号>.bmp に置く
+    if (name == "shot") {
+        static int count = 0;
+        Pump(300);
+        RECT r;
+        GetWindowRect(g_main, &r);
+        int w = 900, h = 700;
+        HDC screen = GetDC(nullptr);
+        HDC dc = CreateCompatibleDC(screen);
+        HBITMAP bmp = CreateCompatibleBitmap(screen, w, h);
+        HGDIOBJ old = SelectObject(dc, bmp);
+        BitBlt(dc, 0, 0, w, h, screen, r.left - 20, r.top - 20, SRCCOPY | CAPTUREBLT);
+        BITMAPINFOHEADER bi = {sizeof(bi), w, h, 1, 24, BI_RGB};
+        std::vector<BYTE> pixels(((w * 3 + 3) & ~3) * h);
+        GetDIBits(dc, bmp, 0, h, pixels.data(), reinterpret_cast<BITMAPINFO*>(&bi), DIB_RGB_COLORS);
+        SelectObject(dc, old);
+        DeleteObject(bmp);
+        DeleteDC(dc);
+        ReleaseDC(nullptr, screen);
+        wchar_t path[MAX_PATH];
+        swprintf_s(path, L"%s\\kanade\\shot-%d.bmp", _wgetenv(L"USERPROFILE"), ++count);
+        FILE* f = nullptr;
+        if (_wfopen_s(&f, path, L"wb") == 0 && f) {
+            BITMAPFILEHEADER fh = {0x4D42, static_cast<DWORD>(sizeof(fh) + sizeof(bi) + pixels.size()), 0, 0, sizeof(fh) + sizeof(bi)};
+            fwrite(&fh, sizeof(fh), 1, f);
+            fwrite(&bi, sizeof(bi), 1, f);
+            fwrite(pixels.data(), 1, pixels.size(), f);
+            fclose(f);
+        }
+        return true;
+    }
     // F12（録音キー）を2秒押し続ける
     if (name == "f12hold") {
         if (!Foreground()) return false;

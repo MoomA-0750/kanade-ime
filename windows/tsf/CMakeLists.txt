@@ -21,8 +21,9 @@ add_library(kanade_tsf SHARED
     src/DisplayAttributes.cpp
     src/EngineLauncher.cpp
     src/LangBarButton.cpp
+    src/Popups.cpp
     kanade_tsf.def)
-target_link_libraries(kanade_tsf PRIVATE ws2_32 uuid ole32 oleaut32 advapi32 user32 shell32)
+target_link_libraries(kanade_tsf PRIVATE ws2_32 uuid ole32 oleaut32 advapi32 user32 shell32 d2d1 dwrite dwmapi shcore)
 
 # エンジンとのやりとりだけを試す道具（TSF なしで、ssh からも動かせる）
 add_executable(kanade_probe ${COMMON_SOURCES} src/Probe.cpp)

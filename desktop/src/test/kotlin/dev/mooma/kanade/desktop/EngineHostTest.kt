@@ -100,6 +100,23 @@ class EngineHostTest {
         assertEquals("き", b.toString())
     }
 
+    /** 試験用の候補（「かな」→ 仮名・カナ・かな） */
+    private val source = object : dev.mooma.kanade.core.CandidateSource {
+        override fun convert(reading: String, n: Int) =
+            listOf(dev.mooma.kanade.core.Conversion(listOf(dev.mooma.kanade.core.Segment(reading, if (reading == "かな") "仮名" else reading))))
+        override fun segmentCandidates(reading: String, n: Int) = if (reading == "かな") listOf("仮名", "カナ", "かな") else listOf(reading)
+    }
+
+    @Test
+    fun candidatesGoToDllAndClickSelects() {
+        val d = FakeDll.inProcess(EngineHost(InputEngine(candidateSource = source))).apply { hello() }
+        d.type("{Henkan}kana{Space}{Space}")
+        assertEquals(listOf("仮名", "カナ", "かな"), d.candidates, d.received.toString())
+        d.select(2)
+        assertTrue(d.candidates.isEmpty())
+        assertEquals("かな", d.toString())
+    }
+
     @Test
     fun keyScriptMarksShiftForCapitals() {
         val keys = KeyScript.parse("A{Ctrl+Space}")
