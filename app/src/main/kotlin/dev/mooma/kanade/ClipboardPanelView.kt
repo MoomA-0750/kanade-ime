@@ -42,6 +42,23 @@ class ClipboardPanelView(
     private val palette = KeyboardPalette.of(context)
     private val density = resources.displayMetrics.density
     private val list = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+
+    /**
+     * 物理キーボードで開いたとき（重ねる窓に出すとき）の幅。null なら画面の幅。列の数とカードの幅をこれで決める
+     */
+    var contentWidth: Int? = null
+
+    /** 物理キーボードで開いているか。選んでいるカードに枠を付け、先頭の9枚に数字を出す */
+    var keyboardMode = false
+        set(value) {
+            field = value
+            updateSelection()
+        }
+
+    /** 並んでいる順のカード（キーで選ぶため）。項目と、枠を付ける外側の入れ物と、数字の札 */
+    private class Card(val item: ClipboardHistory.Item, val frame: FrameLayout, val badge: TextView)
+    private val cards = ArrayList<Card>()
+    private var selected = 0
     private val message = TextView(context)
 
     private fun dp(v: Int) = (v * density).toInt()
@@ -83,6 +100,7 @@ class ClipboardPanelView(
 
     fun refresh() {
         list.removeAllViews()
+        cards.clear()
         // パスワード管理アプリ（1Password など）のコピーは機密の印が付いていて履歴に残さないので、いまクリップボードにある間だけ伏せて出す
         currentSensitive()?.let { secret ->
             section(context.getString(R.string.ime_clipboard_section_sensitive), listOf(ClipboardHistory.Item(SENSITIVE_ID, secret, null, null, false, 0L)))
@@ -100,6 +118,63 @@ class ClipboardPanelView(
         val recent = items.filter { !it.pinned }
         if (pinned.isNotEmpty()) section(context.getString(R.string.ime_clipboard_section_pinned), pinned)
         if (recent.isNotEmpty()) section(context.getString(R.string.ime_clipboard_section_recent), recent)
+        // キーで開いたときは、最近のものの先頭（いちばん新しいコピー）から選ぶ
+        selected = cards.indexOfFirst { !it.item.pinned && it.item.id != SENSITIVE_ID }.takeIf { it >= 0 } ?: 0
+        updateSelection()
+    }
+
+    /** 幅 [width] で並べたときの、見出しから最後のカードまでの高さ */
+    fun contentHeight(width: Int): Int {
+        val spec = MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY)
+        val unspecified = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+        list.measure(spec, unspecified)
+        message.measure(spec, unspecified)
+        val shownMessage = if (message.visibility == VISIBLE) message.measuredHeight else 0
+        return dp(52) + shownMessage + list.measuredHeight + dp(4)
+    }
+
+    /** いま選んでいる項目（キーで開いているとき） */
+    fun selectedItem(): ClipboardHistory.Item? = cards.getOrNull(selected)?.item
+
+    /** 数字キー（1〜9）の項目 */
+    fun numberedItem(n: Int): ClipboardHistory.Item? = cards.getOrNull(n - 1)?.item
+
+    /** 左右は並びの順に1つずつ、上下は画面の上で上下にあるカードへ動く */
+    fun moveSelection(dx: Int, dy: Int) {
+        if (cards.isEmpty()) return
+        if (dy == 0) {
+            selected = (selected + dx).coerceIn(0, cards.size - 1)
+        } else {
+            val rects = cards.map { c -> android.graphics.Rect().also { r -> c.frame.getDrawingRect(r); list.offsetDescendantRectToMyCoords(c.frame, r) } }
+            val cur = rects[selected]
+            val candidates = rects.indices.filter { i -> if (dy > 0) rects[i].top >= cur.bottom else rects[i].bottom <= cur.top }
+            if (candidates.isNotEmpty()) {
+                // いちばん近い行の中で、横の位置がいちばん近いもの
+                val row = if (dy > 0) candidates.minOf { rects[it].top } else candidates.maxOf { rects[it].bottom }
+                selected = candidates.filter { (if (dy > 0) rects[it].top else rects[it].bottom) == row }
+                    .minBy { kotlin.math.abs(rects[it].centerX() - cur.centerX()) }
+            }
+        }
+        updateSelection()
+    }
+
+    /** 最初・最後のカードへ */
+    fun selectEdge(last: Boolean) {
+        if (cards.isEmpty()) return
+        selected = if (last) cards.size - 1 else 0
+        updateSelection()
+    }
+
+    private fun updateSelection() {
+        for ((i, c) in cards.withIndex()) {
+            c.frame.foreground = if (keyboardMode && i == selected) GradientDrawable().apply {
+                cornerRadius = dp(14).toFloat()
+                setStroke(dp(3), palette.accent)
+            } else null
+            c.badge.visibility = if (keyboardMode && i < 9) VISIBLE else GONE
+        }
+        val c = cards.getOrNull(selected) ?: return
+        if (keyboardMode) c.frame.post { c.frame.requestRectangleOnScreen(android.graphics.Rect(0, -dp(32), c.frame.width, c.frame.height + dp(8))) }
     }
 
     private fun section(title: String, items: List<ClipboardHistory.Item>) {
@@ -110,14 +185,15 @@ class ClipboardPanelView(
             setPadding(dp(16), dp(8), dp(16), dp(4))
         })
         // 幅に合わせて列の数を決める（スマホは2列、広い画面は4列）
-        val columns = if (ScreenWidth.isWide(context)) 4 else 2
+        val panelWidth = contentWidth ?: resources.displayMetrics.widthPixels
+        val columns = if (contentWidth != null) (panelWidth / dp(170)).coerceIn(2, 4) else if (ScreenWidth.isWide(context)) 4 else 2
         val grid = GridLayout(context).apply {
             columnCount = columns
             setPadding(dp(8), 0, dp(8), dp(8))
         }
         for (item in items) {
             // 列の幅は画面の幅から決める（1件だけでも横いっぱいに伸ばさない）
-            val cellWidth = (resources.displayMetrics.widthPixels - dp(16)) / columns - dp(8)
+            val cellWidth = (panelWidth - dp(16)) / columns - dp(8)
             grid.addView(card(item), GridLayout.LayoutParams().apply {
                 width = cellWidth
                 height = dp(96)
@@ -160,9 +236,24 @@ class ClipboardPanelView(
             true
         }
         val source = item.source?.let { appLabel(it) ?: it }
-        if (!item.pinned && source == null) return view
+        // 物理キーボードで開いたときの数字の札（数字キーでその項目を貼り付ける）
+        val badge = TextView(context).apply {
+            text = "${cards.size + 1}"
+            setTextColor(palette.onAccent)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            gravity = Gravity.CENTER
+            minWidth = dp(18)
+            setPadding(dp(4), 0, dp(4), 0)
+            background = GradientDrawable().apply {
+                cornerRadius = dp(9).toFloat()
+                setColor(palette.accent)
+            }
+            visibility = GONE
+        }
         return FrameLayout(context).apply {
+            cards += Card(item, this, badge)
             addView(view, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+            addView(badge, LayoutParams(LayoutParams.WRAP_CONTENT, dp(18), Gravity.BOTTOM or Gravity.END).apply { setMargins(0, 0, dp(6), dp(6)) })
             // ピン留めの印
             if (item.pinned) addView(ImageView(context).apply {
                 setImageResource(R.drawable.sym_push_pin_fill)

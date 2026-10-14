@@ -157,6 +157,15 @@ class KanadeSettings(context: Context) {
         get() = prefs.getInt(KEY_CLIPBOARD_EXPIRY, 0)
         set(value) = prefs.edit().putInt(KEY_CLIPBOARD_EXPIRY, value).apply()
 
+    /** 物理キーボードでクリップボードを開くキー。既定は Ctrl+Shift+V。null なら使わない（空の文字で残す） */
+    var clipboardShortcut: KeyShortcut?
+        get() = when (val s = prefs.getString(KEY_CLIPBOARD_SHORTCUT, null)) {
+            null -> KeyShortcut.CLIPBOARD_DEFAULT
+            "" -> null
+            else -> KeyShortcut.decode(s) ?: KeyShortcut.CLIPBOARD_DEFAULT
+        }
+        set(value) = prefs.edit().putString(KEY_CLIPBOARD_SHORTCUT, value?.encode() ?: "").apply()
+
     var lastJapanese: Boolean
         get() = prefs.getBoolean(KEY_LAST_MODE, false)
         set(value) = prefs.edit().putBoolean(KEY_LAST_MODE, value).apply()
@@ -218,6 +227,7 @@ class KanadeSettings(context: Context) {
         const val KEY_FLOAT_WIDTH = "float_width"
         const val KEY_CLIPBOARD_HISTORY = "clipboard_history"
         const val KEY_CLIPBOARD_EXPIRY = "clipboard_expiry_hours"
+        const val KEY_CLIPBOARD_SHORTCUT = "clipboard_shortcut"
         const val KEY_SPOKEN_PUNCT = "spoken_punctuation"
         const val KEY_VOICE_FINAL = "voice_final"
         const val KEY_PUNCTUATION = "punctuation"

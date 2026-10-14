@@ -49,8 +49,13 @@
     <string name="input_flick_toggle_title">トグル入力</string>
     <string name="input_flick_toggle_summary">同じキーを続けて押すと、次の文字になります（あ→い→う）。オフにするとフリックだけで入力します。</string>
     <string name="input_clipboard_title">クリップボード</string>
-    <string name="input_clipboard_description">あ/A のキーを下に払う（テンキーでは ☺ を払う、物理キーボードでは Ctrl+Alt+V）と、コピーした文字や画像の履歴が出ます。押すと貼り付け、長押しでピン留め・編集・切り抜き・削除ができます。カードの下には、コピーしたときにキーボードがつながっていたアプリの名前が出ます。パスワードなど機密の印が付いたコピーは残しません。</string>
+    <string name="input_clipboard_description">あ/A のキーを下に払う（テンキーでは ☺ を払う、物理キーボードでは下のキー）と、コピーした文字や画像の履歴が出ます。押すと貼り付け、長押しでピン留め・編集・切り抜き・削除ができます。カードの下には、コピーしたときにキーボードがつながっていたアプリの名前が出ます。パスワードなど機密の印が付いたコピーは残しません。</string>
     <string name="input_clipboard_history">コピーの履歴を残す</string>
+    <string name="input_clipboard_shortcut">物理キーボードで開くキー</string>
+    <string name="input_clipboard_shortcut_note">物理キーボードをつないでいるときは、このキーで画面キーボードと同じクリップボードがカーソルの近くに出ます。矢印・Tab で選んで Enter、数字で貼り付け、Esc で閉じます。Ctrl+Shift+V にすると、アプリの「書式なしで貼り付け」の代わりにこちらが開きます。</string>
+    <string name="shortcut_none">使わない</string>
+    <string name="shortcut_dialog_title">%1$s（今: %2$s）</string>
+    <string name="shortcut_dialog_note">物理キーボードで組み合わせを押すと、それにします（Ctrl・Shift・Alt・Meta と一緒に）。一覧からも選べます。端末が先に取ってしまう組み合わせ（Meta+V など）は効かないことがあります。</string>
     <string name="input_clipboard_expiry">残しておく期間</string>
     <string name="input_clipboard_expiry_never">期限なし（新しい 30 件まで）</string>
     <string name="input_clipboard_expiry_hour">1 時間</string>

@@ -30,8 +30,7 @@
     <string name="ime_clipboard_edit">Edit</string>
     <string name="ime_clipboard_edit_title">Edit copied text</string>
     <string name="ime_clipboard_edit_missing">This item could not be found (it expired or was deleted).</string>
-    <string name="ime_clipboard_pick_empty">No copied items yet.</string>
-    <string name="ime_clipboard_image_item">Image</string>
+    <string name="ime_clipboard_overlay_permission">To show the clipboard with a physical keyboard, allow \"Display over other apps\" in Kanade\'s settings.</string>
 
     <!-- EmojiPanelView -->
     <string name="ime_emoji_search">Search emoji</string>

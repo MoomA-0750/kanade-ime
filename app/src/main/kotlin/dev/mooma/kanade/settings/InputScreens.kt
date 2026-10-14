@@ -152,6 +152,30 @@ fun ColumnScope.KeyboardScreen() {
     Section(stringResource(R.string.input_clipboard_title), stringResource(R.string.input_clipboard_description)) {
         var on by rememberPref({ settings.clipboardHistory }, { settings.clipboardHistory = it })
         SwitchRow(stringResource(R.string.input_clipboard_history), on, { on = it })
+        // 物理キーボードで開くキー
+        var shortcutDialog by remember { mutableStateOf(false) }
+        var shortcut by rememberPref({ settings.clipboardShortcut }, { settings.clipboardShortcut = it })
+        val shortcutTitle = stringResource(R.string.input_clipboard_shortcut)
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Text(shortcutTitle, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            FilledTonalButton(onClick = { shortcutDialog = true }) { Text(shortcut?.label() ?: stringResource(R.string.shortcut_none)) }
+        }
+        Note(stringResource(R.string.input_clipboard_shortcut_note))
+        if (shortcutDialog) {
+            val v = android.view.KeyEvent.KEYCODE_V
+            ShortcutDialog(
+                shortcutTitle, shortcut,
+                presets = listOf(
+                    dev.mooma.kanade.KeyShortcut.CLIPBOARD_DEFAULT,
+                    dev.mooma.kanade.KeyShortcut(v, ctrl = true, alt = true),
+                    dev.mooma.kanade.KeyShortcut(v, meta = true),
+                    dev.mooma.kanade.KeyShortcut(v, alt = true),
+                    dev.mooma.kanade.KeyShortcut(android.view.KeyEvent.KEYCODE_F11),
+                ),
+                onPick = { shortcut = it; shortcutDialog = false },
+                onDismiss = { shortcutDialog = false },
+            )
+        }
         if (on) {
             var expiry by rememberPref({ settings.clipboardExpiryHours }, { settings.clipboardExpiryHours = it })
             Text(stringResource(R.string.input_clipboard_expiry), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))

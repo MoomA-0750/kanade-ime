@@ -49,8 +49,13 @@
     <string name="input_flick_toggle_title">Toggle input</string>
     <string name="input_flick_toggle_summary">Pressing the same key repeatedly moves to the next character (あ→い→う). When off, only flicks are used.</string>
     <string name="input_clipboard_title">Clipboard</string>
-    <string name="input_clipboard_description">Swipe down on the あ/A key (on the keypad, swipe ☺; on a physical keyboard, press Ctrl+Alt+V) to see the history of copied text and images. Tap to paste; long-press to pin, edit, crop, or delete. Each card shows the app the keyboard was connected to when you copied. Copies marked as sensitive, such as passwords, are not kept.</string>
+    <string name="input_clipboard_description">Swipe down on the あ/A key (on the keypad, swipe ☺; on a physical keyboard, press the shortcut below) to see the history of copied text and images. Tap to paste; long-press to pin, edit, crop, or delete. Each card shows the app the keyboard was connected to when you copied. Copies marked as sensitive, such as passwords, are not kept.</string>
     <string name="input_clipboard_history">Keep copy history</string>
+    <string name="input_clipboard_shortcut">Physical keyboard shortcut</string>
+    <string name="input_clipboard_shortcut_note">With a physical keyboard connected, this shortcut opens the same clipboard as the on-screen keyboard, near the cursor. Choose with the arrow keys or Tab and press Enter, or press a number to paste; Esc closes it. With Ctrl+Shift+V, it opens instead of the app\'s \"paste as plain text\".</string>
+    <string name="shortcut_none">None</string>
+    <string name="shortcut_dialog_title">%1$s (now: %2$s)</string>
+    <string name="shortcut_dialog_note">Press a key combination on the physical keyboard to use it (with Ctrl, Shift, Alt, or Meta). You can also pick from the list. Combinations the device takes first (such as Meta+V) may not work.</string>
     <string name="input_clipboard_expiry">Keep items for</string>
     <string name="input_clipboard_expiry_never">No limit (latest 30 items)</string>
     <string name="input_clipboard_expiry_hour">1 hour</string>

@@ -96,6 +96,7 @@ class KanadeInputMethodService : InputMethodService() {
     override fun onDestroy() {
         clipboardManager.removePrimaryClipChangedListener(clipListener)
         overlay?.hide()
+        clipOverlay?.hide()
         modeIndicator?.dismiss()
         zenzThread.shutdownNow()
         super.onDestroy()
@@ -292,92 +293,77 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     /**
-     * 物理キーボードから呼ぶクリップボードの一覧（Meta+V か Ctrl+Alt+V）。画面キーボードを出していなければ、
-     * 候補の窓と同じ重ねる窓に、新しい順（ピン留めは後ろ）に1行ずつ出す。開いている間は [clipPickKey] がキーを受ける
+     * 物理キーボードから開くクリップボード（既定は Ctrl+Shift+V。設定で変えられる）。画面キーボードを出していなければ、
+     * 画面キーボードと同じパネルを重ねる窓に出す（[ClipboardOverlay]）。開いている間は [clipOverlayKey] がキーを受ける
      */
-    private var clipPick: List<ClipboardHistory.Item>? = null
-    private var clipPickSelected = 0
+    private var clipOverlay: ClipboardOverlay? = null
 
-    private fun isClipboardShortcut(event: KeyEvent): Boolean {
-        if (event.keyCode != KeyEvent.KEYCODE_V || event.isShiftPressed) return false
-        val meta = event.isMetaPressed && !event.isCtrlPressed && !event.isAltPressed
-        val ctrlAlt = event.isCtrlPressed && event.isAltPressed && !event.isMetaPressed
-        return meta || ctrlAlt
-    }
+    private val clipOverlayShown: Boolean get() = clipOverlay?.isShowing == true
 
-    private fun openClipPick() {
+    private fun isClipboardShortcut(event: KeyEvent): Boolean = settings.clipboardShortcut?.matches(event) == true
+
+    private fun openClipOverlay() {
         if (isInputViewShown && host != null) {
             showClipboard()
             return
         }
         apply(engine.commitAll())
-        if (!settings.clipboardHistory) {
-            showIndicatorText(getString(R.string.ime_clipboard_history_off), 2500)
-            return
-        }
-        val items = clipboardHistory.all().let { all -> all.filter { !it.pinned }.sortedByDescending { it.time } + all.filter { it.pinned } }
-        if (items.isEmpty()) {
-            showIndicatorText(getString(R.string.ime_clipboard_pick_empty), 2500)
-            return
-        }
-        clipPick = items
-        clipPickSelected = 0
-        showClipPick()
-    }
-
-    private fun showClipPick() {
-        val items = clipPick ?: return
-        val lines = items.map { item ->
-            item.text?.let { t -> t.trim().replace(Regex("\\s*\\n\\s*"), " ⏎ ").take(CLIP_LINE_CHARS) }
-                ?: getString(R.string.ime_clipboard_image_item)
-        }
-        val pinned = getString(R.string.ime_clipboard_section_pinned)
-        val labels = items.map { if (it.pinned) pinned else it.source?.let { s -> clipboardHistory.appLabel(s) ?: s } }
-        showBar { it.showCandidates(lines, clipPickSelected, getString(R.string.ime_clipboard_title), labels) }
-    }
-
-    private fun closeClipPick() {
-        if (clipPick == null) return
-        clipPick = null
         hideBar()
+        if (!ClipboardOverlay.permitted(this)) {
+            android.widget.Toast.makeText(this, R.string.ime_clipboard_overlay_permission, android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
+        val o = clipOverlay ?: run {
+            val ctx = window?.window?.context ?: this
+            val panel = ClipboardPanelView(
+                ctx, clipboardHistory,
+                onPaste = { item ->
+                    closeClipOverlay()
+                    pasteClip(item)
+                },
+                onClose = ::closeClipOverlay,
+                currentSensitive = ::currentSensitiveClip,
+                onEdit = { item ->
+                    closeClipOverlay()
+                    editClip(item)
+                },
+            )
+            ClipboardOverlay(ctx, anchor, panel).also { clipOverlay = it }
+        }
+        o.panel.showMessage(if (settings.clipboardHistory) null else getString(R.string.ime_clipboard_history_off))
+        runCatching { o.show() }.onFailure { log("clipboard overlay failed: $it") }
     }
 
-    private fun pickClip(index: Int) {
-        val item = clipPick?.getOrNull(index) ?: return
-        closeClipPick()
-        pasteClip(item)
+    private fun closeClipOverlay() {
+        clipOverlay?.hide()
     }
 
-    /** 一覧を開いている間のキー。使ったら true。使わないキー（文字など）は一覧を閉じて、ふだんどおりに処理させる */
-    private fun clipPickKey(event: KeyEvent): Boolean {
-        val items = clipPick ?: return false
-        val n = items.size
-        fun select(i: Int) {
-            clipPickSelected = i
-            showClipPick()
+    /** パネルを開いている間のキー。使ったら true。使わないキー（文字など）はパネルを閉じて、ふだんどおりに処理させる */
+    private fun clipOverlayKey(event: KeyEvent): Boolean {
+        val panel = clipOverlay?.panel ?: return false
+        fun paste(item: ClipboardHistory.Item?) {
+            if (item == null) return
+            closeClipOverlay()
+            pasteClip(item)
         }
         when (event.keyCode) {
-            KeyEvent.KEYCODE_DPAD_DOWN -> select((clipPickSelected + 1) % n)
-            KeyEvent.KEYCODE_DPAD_UP -> select((clipPickSelected - 1 + n) % n)
-            KeyEvent.KEYCODE_PAGE_DOWN -> select(minOf(clipPickSelected + CandidateBar.PAGE, n - 1))
-            KeyEvent.KEYCODE_PAGE_UP -> select(maxOf(clipPickSelected - CandidateBar.PAGE, 0))
-            KeyEvent.KEYCODE_MOVE_HOME -> select(0)
-            KeyEvent.KEYCODE_MOVE_END -> select(n - 1)
-            KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_SPACE -> pickClip(clipPickSelected)
-            KeyEvent.KEYCODE_ESCAPE -> closeClipPick()
-            in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_9 -> {
-                val i = clipPickSelected / CandidateBar.PAGE * CandidateBar.PAGE + (event.keyCode - KeyEvent.KEYCODE_1)
-                if (i < n) pickClip(i)
-            }
+            KeyEvent.KEYCODE_DPAD_LEFT -> panel.moveSelection(-1, 0)
+            KeyEvent.KEYCODE_DPAD_RIGHT -> panel.moveSelection(1, 0)
+            KeyEvent.KEYCODE_DPAD_UP -> panel.moveSelection(0, -1)
+            KeyEvent.KEYCODE_DPAD_DOWN -> panel.moveSelection(0, 1)
+            KeyEvent.KEYCODE_TAB -> panel.moveSelection(if (event.isShiftPressed) -1 else 1, 0)
+            KeyEvent.KEYCODE_MOVE_HOME -> panel.selectEdge(last = false)
+            KeyEvent.KEYCODE_MOVE_END -> panel.selectEdge(last = true)
+            KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_SPACE -> paste(panel.selectedItem())
+            KeyEvent.KEYCODE_ESCAPE -> closeClipOverlay()
+            in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_9 -> paste(panel.numberedItem(event.keyCode - KeyEvent.KEYCODE_0))
+            in KeyEvent.KEYCODE_NUMPAD_1..KeyEvent.KEYCODE_NUMPAD_9 -> paste(panel.numberedItem(event.keyCode - KeyEvent.KEYCODE_NUMPAD_0))
             else -> {
-                // 修飾キーだけ（Meta+V の Meta を離す前など）は閉じない。もう一度 Meta+V で閉じる
+                // 修飾キーだけ（開いたキーの Ctrl などを離す前）は閉じない
                 if (KeyEvent.isModifierKey(event.keyCode)) return false
-                if (isClipboardShortcut(event)) {
-                    closeClipPick()
-                    return true
-                }
-                closeClipPick()
-                return false
+                closeClipOverlay()
+                // もう一度開くキーを押したら閉じるだけ
+                return isClipboardShortcut(event)
             }
         }
         return true
@@ -924,10 +910,6 @@ class KanadeInputMethodService : InputMethodService() {
 
     /** 候補の窓で候補を指で選んだ */
     private fun onCandidateTapped(index: Int) {
-        if (clipPick != null) {
-            main.post { pickClip(index) }
-            return
-        }
         if (lastGlide != null) {
             // 帯を押した処理の途中で帯を消して出し直すと出なくなるので、押した処理が終わってから置き換える
             main.post { if (!replaceGlide(index)) handle(KeyInput.SelectCandidate(index)) }
@@ -1005,6 +987,7 @@ class KanadeInputMethodService : InputMethodService() {
 
     override fun onFinishInput() {
         log("finish-input")
+        closeClipOverlay()
         inputGeneration++
         saveLearning()
         if (VoiceInput.isRecording) {
@@ -1053,13 +1036,13 @@ class KanadeInputMethodService : InputMethodService() {
     private fun handleKeyDown(event: KeyEvent): Boolean {
         val keyCode = event.keyCode
         if (secureField) return false
-        if (clipPick != null && clipPickKey(event)) {
+        if (clipOverlayShown && clipOverlayKey(event)) {
             consumedDown += keyCode
             log(event, "clipboard")
             return true
         }
         if (isClipboardShortcut(event)) {
-            if (event.repeatCount == 0) openClipPick()
+            if (event.repeatCount == 0) openClipOverlay()
             consumedDown += keyCode
             log(event, "clipboard")
             return true
@@ -1611,7 +1594,6 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     private fun hideBar() {
-        clipPick = null
         overlay?.hide()
         if (barShown) {
             barShown = false
@@ -1662,9 +1644,6 @@ class KanadeInputMethodService : InputMethodService() {
 
         /** 自分が確定してから、選択範囲の通知を古いものとして扱う時間 */
         const val STALE_SELECTION_MS = 300L
-
-        /** クリップボードの一覧の1行に出す文字数（長い文は頭だけ） */
-        const val CLIP_LINE_CHARS = 80
 
         /** 話しながら途中の文字を出し直す間隔 */
         const val PARTIAL_INTERVAL_MS = 600L

@@ -189,7 +189,8 @@ A history of text and images you've copied. Tap an item to paste it; long-press 
 - Up to the 30 newest unpinned items are kept. Items older than "Keep items for" in settings (no limit, 1 hour, 1 day, 1 week, or 30 days) are deleted automatically. Pinned items are kept
 - Copies marked as sensitive, such as passwords, are not kept. You can turn history off with "Keep copy history" in settings
 - In input fields that don't accept images directly, Kanade puts the image on the clipboard and lets you know. Long-press the field to paste it
-- With a physical keyboard, press Ctrl+Alt+V to open it. If the on-screen keyboard isn't shown, a list in the same style as the candidate window appears near the cursor (newest first, pinned items last). Choose with ↑↓ and press Enter (or Space), or press a number to paste; Esc closes it. Typing any other character closes it and types as usual. Meta (Windows key)+V also opens it, but the device may take that shortcut before it reaches the keyboard
+- With a physical keyboard, press Ctrl+Shift+V to open it. Even when the on-screen keyboard isn't shown, the same cards appear near the cursor. Choose with the arrow keys or Tab and press Enter (or Space), or press the number in a card's bottom-right corner to paste; Esc closes it. Typing any other character closes it and types as usual. Touch works the same as with the on-screen keyboard
+- You can change the shortcut under Settings → On-screen keyboard → Clipboard → "Physical keyboard shortcut". Tap the button, then press a combination on the physical keyboard. You can also choose "None". With Ctrl+Shift+V, it opens instead of the app's "paste as plain text". Combinations the device takes first, such as Meta+V, may not work
 
 ## Voice input
 
