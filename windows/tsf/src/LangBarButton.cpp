@@ -156,32 +156,70 @@ STDMETHODIMP LangBarButton::GetIcon(HICON* icon) {
     return *icon ? S_OK : E_FAIL;
 }
 
-STDMETHODIMP LangBarButton::OnClick(TfLBIClick click, POINT, const RECT*) {
-    // 右クリックは、システムが InitMenu で項目を聞いてメニューを描く（Windows 11 の見た目になる）
+STDMETHODIMP LangBarButton::OnClick(TfLBIClick click, POINT pt, const RECT*) {
     Log("OnClick %d", static_cast<int>(click));
     try {
         if (click == TF_LBI_CLK_LEFT && onToggle_) onToggle_();
+        if (click == TF_LBI_CLK_RIGHT) ShowMenu(pt);
     } catch (...) {
         Log("exception in OnClick");
     }
     return S_OK;
 }
 
+void LangBarButton::AddItems(const std::function<void(UINT, bool, bool, const wchar_t*)>& add) const {
+    // (id, 区切り, 印, 文字)
+    add(kMenuJapanese, false, japanese_, L"ひらがな（あ）");
+    add(kMenuDirect, false, !japanese_, L"半角英数（A）");
+    add(0, true, false, nullptr);
+    add(kMenuSettings, false, false, L"設定");
+    add(kMenuUserDictionary, false, false, L"ユーザー辞書");
+    add(kMenuSnippets, false, false, L"スニペット");
+    add(kMenuImportAndroid, false, false, L"Android 版の設定を読み込む");
+    add(0, true, false, nullptr);
+    add(kMenuLog, false, false, L"記録を開く");
+}
+
+void LangBarButton::ShowMenu(POINT pt) {
+    // タスクバーの入力の表示（BTN_BUTTON）では、右クリックでもシステムは InitMenu を呼ばず OnClick だけが来る。
+    // そこで自分でメニューを出す。メニューの持ち主にする見えない窓を前面にしないと、外をクリックしても閉じない
+    HMENU menu = CreatePopupMenu();
+    if (!menu) return;
+    AddItems([menu](UINT id, bool separator, bool checked, const wchar_t* text) {
+        if (separator) {
+            AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+            return;
+        }
+        MENUITEMINFOW mii = {sizeof(mii)};
+        mii.fMask = MIIM_ID | MIIM_STRING | MIIM_FTYPE | MIIM_STATE;
+        mii.fType = MFT_STRING | ((id == kMenuJapanese || id == kMenuDirect) ? MFT_RADIOCHECK : 0);
+        mii.fState = checked ? MFS_CHECKED : 0;
+        mii.wID = id;
+        mii.dwTypeData = const_cast<wchar_t*>(text);
+        InsertMenuItemW(menu, GetMenuItemCount(menu), TRUE, &mii);
+    });
+    HWND owner = CreateWindowExW(WS_EX_TOOLWINDOW, L"STATIC", L"", WS_POPUP, pt.x, pt.y, 0, 0, nullptr, nullptr, g_module, nullptr);
+    if (owner) SetForegroundWindow(owner);
+    UINT flags = TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON | TPM_BOTTOMALIGN |
+                 (GetSystemMetrics(SM_MENUDROPALIGNMENT) ? TPM_RIGHTALIGN : TPM_LEFTALIGN);
+    UINT id = static_cast<UINT>(TrackPopupMenuEx(menu, flags, pt.x, pt.y, owner ? owner : GetForegroundWindow(), nullptr));
+    if (owner) {
+        PostMessageW(owner, WM_NULL, 0, 0);
+        DestroyWindow(owner);
+    }
+    DestroyMenu(menu);
+    Log("menu %u", id);
+    if (id) OnMenuSelect(id);
+}
+
 STDMETHODIMP LangBarButton::InitMenu(ITfMenu* menu) {
+    // 言語バー（古い浮く形）で出すときはこちらが呼ばれる
     Log("InitMenu");
     if (!menu) return E_INVALIDARG;
-    auto add = [menu](UINT id, DWORD flags, const wchar_t* text) {
+    AddItems([menu](UINT id, bool separator, bool checked, const wchar_t* text) {
+        DWORD flags = separator ? TF_LBMENUF_SEPARATOR : (checked ? TF_LBMENUF_RADIOCHECKED : 0);
         menu->AddMenuItem(id, flags, nullptr, nullptr, text, text ? static_cast<ULONG>(wcslen(text)) : 0, nullptr);
-    };
-    add(kMenuJapanese, japanese_ ? TF_LBMENUF_RADIOCHECKED : 0, L"ひらがな（あ）");
-    add(kMenuDirect, japanese_ ? 0 : TF_LBMENUF_RADIOCHECKED, L"半角英数（A）");
-    add(0, TF_LBMENUF_SEPARATOR, nullptr);
-    add(kMenuSettings, 0, L"設定");
-    add(kMenuUserDictionary, 0, L"ユーザー辞書");
-    add(kMenuSnippets, 0, L"スニペット");
-    add(kMenuImportAndroid, 0, L"Android 版の設定を読み込む");
-    add(0, TF_LBMENUF_SEPARATOR, nullptr);
-    add(kMenuLog, 0, L"記録を開く");
+    });
     return S_OK;
 }
 

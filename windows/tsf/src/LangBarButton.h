@@ -43,6 +43,8 @@ public:
 
 private:
     ~LangBarButton();
+    void AddItems(const std::function<void(UINT, bool, bool, const wchar_t*)>& add) const;
+    void ShowMenu(POINT pt);
 
     LONG refs_ = 1;
     bool japanese_ = false;
