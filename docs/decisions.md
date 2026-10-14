@@ -270,3 +270,9 @@ SPEC.md の未決事項に本人が答えた。
 - to-fu で実際に右クリックして確かめたところ、タスクバーの入力の表示（GUID_LBI_INPUTMODE、TF_LBI_STYLE_BTN_BUTTON）では、システムは `OnClick(TF_LBI_CLK_RIGHT)` を呼ぶだけで `InitMenu` は呼ばず、メニューが出なかった。
 - そこで右クリックのときに `TrackPopupMenuEx` で自分でメニューを出す。外をクリックしたら閉じるよう、見えない窓を持ち主にして前面にする。
 - BTN_MENU にする手はとらなかった（左クリックでもメニューになり、MS-IME と同じ「左クリックで切り替え」にならないため）。`InitMenu` は古い浮く言語バーのために残す。
+
+## 2026-10-14 音声のモデルのダウンロードを to-fu で確かめた
+
+- 設定の画面から SenseVoice（239MB）と parakeet（656MB）を落とした。parakeet は 283MB で「止める」→「落とす」で続きから落ち、終わった。
+- 見本の音声で、SenseVoice・parakeet とも句読点付きの文になった。SenseVoice を「使う」にすると、動いているエンジンが設定を読み直し、F12 で SenseVoice を読んで使った（最初の1回は読み込みに約5秒）。
+- 既定は whisper small のまま（仮決定は変えない）。
