@@ -19,6 +19,7 @@ public sealed partial class InputPage : Page
         CtrlSpace.IsOn = store.Toggles.Contains("CTRL_SPACE");
         F13.IsOn = store.Toggles.Contains("F13");
         Learning.IsOn = store.Learning;
+        DisplayLanguage.SelectedItem = DisplayLanguage.Items.OfType<ComboBoxItem>().First(i => (string)i.Tag == store.UiLanguage);
         loading = false;
     }
 
@@ -38,15 +39,23 @@ public sealed partial class InputPage : Page
         store.Save();
     }
 
+    private void OnLanguageChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (loading || DisplayLanguage.SelectedItem is not ComboBoxItem item) return;
+        store.UiLanguage = (string)item.Tag;
+        store.Save();
+        App.Reopen("input");
+    }
+
     private async void OnClearLearning(object sender, RoutedEventArgs e)
     {
         var dialog = new ContentDialog
         {
             XamlRoot = XamlRoot,
-            Title = "覚えたものを消しますか？",
-            Content = "学習した変換をすべて消します。元に戻せません。",
-            PrimaryButtonText = "消す",
-            CloseButtonText = "やめる",
+            Title = Lang.T("覚えたものを消しますか？", "Clear learned conversions?"),
+            Content = Lang.T("学習した変換をすべて消します。元に戻せません。", "Everything learned will be deleted. This cannot be undone."),
+            PrimaryButtonText = Lang.T("消す", "Clear"),
+            CloseButtonText = Lang.T("やめる", "Cancel"),
             DefaultButton = ContentDialogButton.Close,
         };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;

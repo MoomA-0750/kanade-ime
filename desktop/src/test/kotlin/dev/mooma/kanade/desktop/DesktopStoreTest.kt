@@ -15,10 +15,19 @@ class DesktopStoreTest {
         val s = store()
         s.ensureFiles()
         assertEquals(DesktopSettings(), s.loadSettings())
-        val changed = DesktopSettings(fullWidthSymbols = false, punctuation = "，．", toggles = setOf(WinToggle.CTRL_SPACE), lastJapanese = true)
+        val changed = DesktopSettings(fullWidthSymbols = false, punctuation = "，．", toggles = setOf(WinToggle.CTRL_SPACE), lastJapanese = true, uiLanguage = "en")
         s.saveSettings(changed)
         assertEquals(changed, s.loadSettings())
         assertTrue(s.read(s.snippetsFile).contains("->"))
+    }
+
+    @Test
+    fun uiLanguageFollowsWindowsWhenAuto() {
+        assertFalse(Ui.isEnglish("auto", "ja"))
+        assertTrue(Ui.isEnglish("auto", "en"))
+        assertTrue(Ui.isEnglish("auto", "de"))
+        assertFalse(Ui.isEnglish("ja", "en"))
+        assertTrue(Ui.isEnglish("en", "ja"))
     }
 
     @Test

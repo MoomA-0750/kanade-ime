@@ -2,27 +2,30 @@
     x:Class="Kanade.Settings.Pages.BackupPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Kanade.Settings"
     xmlns:tk="using:CommunityToolkit.WinUI.Controls">
     <ScrollViewer>
         <StackPanel Margin="36,24,36,36" MaxWidth="1000" Spacing="{StaticResource SettingsCardSpacing}">
-            <TextBlock Text="読み込み・書き出し" Style="{StaticResource TitleTextBlockStyle}" Margin="0,0,0,12" />
-            <tk:SettingsCard Header="Android 版の設定を読み込む"
-                             Description="Android 版の設定画面の「設定の書き出し」で作ったファイル（kanade-settings-*.json）から、設定・ユーザー辞書・スニペットを読み込みます。今のユーザー辞書・スニペットは .bak に残します">
+            <TextBlock Text="{local:L Ja='読み込み・書き出し', En='Import and export'}" Style="{StaticResource TitleTextBlockStyle}" Margin="0,0,0,12" />
+            <tk:SettingsCard Header="{local:L Ja='Android 版の設定を読み込む', En='Import settings from Android'}"
+                             Description="{local:L Ja='Android 版の設定画面の「設定の書き出し」で作ったファイル（kanade-settings-*.json）から、設定・ユーザー辞書・スニペットを読み込みます。今のユーザー辞書・スニペットは .bak に残します', En='Imports settings, the user dictionary and snippets from a file made with Export settings in the Android app (kanade-settings-*.json). The current dictionary and snippets are kept as .bak'}">
                 <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8B5;" /></tk:SettingsCard.HeaderIcon>
-                <Button Content="ファイルを選ぶ" Click="OnImport" />
+                <Button Content="{local:L Ja='ファイルを選ぶ', En='Choose file'}" Click="OnImport" />
             </tk:SettingsCard>
-            <tk:SettingsCard Header="Android 版で読める形で書き出す"
-                             Description="設定・ユーザー辞書・スニペットを、Android 版の「設定の読み込み」で読める1つのファイルにします（学習は入れません）">
+            <tk:SettingsCard Header="{local:L Ja='Android 版で読める形で書き出す', En='Export for Android'}"
+                             Description="{local:L Ja='設定・ユーザー辞書・スニペットを、Android 版の「設定の読み込み」で読める1つのファイルにします（学習は入れません）', En='Saves settings, the user dictionary and snippets as one file that Import settings in the Android app can read (learning is not included)'}">
                 <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xEDE1;" /></tk:SettingsCard.HeaderIcon>
-                <Button Content="書き出す" Click="OnExport" />
+                <Button Content="{local:L Ja='書き出す', En='Export'}" Click="OnExport" />
             </tk:SettingsCard>
-            <tk:SettingsCard Header="設定のフォルダ" Description="設定・ユーザー辞書・スニペット・学習を置いているところです">
+            <tk:SettingsCard Header="{local:L Ja='設定のフォルダ', En='Settings folder'}"
+                             Description="{local:L Ja='設定・ユーザー辞書・スニペット・学習を置いているところです', En='Where settings, the user dictionary, snippets and learning are stored'}">
                 <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8B7;" /></tk:SettingsCard.HeaderIcon>
-                <Button Content="開く" Click="OnOpenFolder" />
+                <Button Content="{local:L Ja='開く', En='Open'}" Click="OnOpenFolder" />
             </tk:SettingsCard>
-            <tk:SettingsCard Header="記録" Description="うまく動かないときの手がかり（エンジンの記録）です">
+            <tk:SettingsCard Header="{local:L Ja='記録', En='Log'}"
+                             Description="{local:L Ja='うまく動かないときの手がかり（エンジンの記録）です', En='The engine log, useful when something does not work'}">
                 <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE9F9;" /></tk:SettingsCard.HeaderIcon>
-                <Button Content="開く" Click="OnOpenLog" />
+                <Button Content="{local:L Ja='開く', En='Open'}" Click="OnOpenLog" />
             </tk:SettingsCard>
             <InfoBar x:Name="Message" IsOpen="False" Margin="0,8,0,0" />
         </StackPanel>

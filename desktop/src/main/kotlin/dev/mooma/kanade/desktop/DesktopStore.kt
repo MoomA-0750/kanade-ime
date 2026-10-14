@@ -18,6 +18,8 @@ data class DesktopSettings(
     val lastJapanese: Boolean = false,
     /** 確定の文を作る音声認識のモデル（Android 版と同じ id。VoiceFinal） */
     val voiceFinal: String = VoiceFinal.DEFAULT.id,
+    /** 画面に出す文字の言語（auto・ja・en。Ui） */
+    val uiLanguage: String = "auto",
 ) {
     fun engineSettings() = EngineSettings(
         fullWidthSymbols = fullWidthSymbols, liveConversion = liveConversion, punctuation = punctuation, pairBrackets = pairBrackets,
@@ -60,6 +62,7 @@ class DesktopStore(val dir: File = defaultDir()) {
             learning = bool(KEY_LEARNING, d.learning),
             lastJapanese = bool(KEY_LAST_MODE, d.lastJapanese),
             voiceFinal = p.getProperty(KEY_VOICE_FINAL)?.trim()?.takeIf { id -> VoiceFinal.entries.any { it.id == id } } ?: d.voiceFinal,
+            uiLanguage = p.getProperty(KEY_UI_LANGUAGE)?.trim()?.takeIf { it in UI_LANGUAGES } ?: d.uiLanguage,
         )
     }
 
@@ -82,6 +85,8 @@ class DesktopStore(val dir: File = defaultDir()) {
             appendLine("$KEY_VOICE_FINAL=${s.voiceFinal}")
             appendLine("# 選んだ変換を覚えて次から先に出す")
             appendLine("$KEY_LEARNING=${s.learning}")
+            appendLine("# 画面に出す文字の言語（auto は Windows の表示言語に合わせる・ja・en）")
+            appendLine("$KEY_UI_LANGUAGE=${s.uiLanguage}")
             appendLine("# 前回の日本語のオン/オフ（エンジンが書く）")
             appendLine("$KEY_LAST_MODE=${s.lastJapanese}")
         }
@@ -111,9 +116,9 @@ class DesktopStore(val dir: File = defaultDir()) {
      * 今のユーザー辞書・スニペットは .bak に残してから置き換える
      */
     fun importAndroid(json: File): ImportResult {
-        val root = runCatching { JSONObject(json.readText()) }.getOrElse { error("Kanade の設定のファイルではありません") }
-        if (root.optString("format") != "kanade-settings") error("Kanade の設定のファイルではありません")
-        if (root.optInt("version") > 1) error("新しい Kanade で書き出したファイルです")
+        val root = runCatching { JSONObject(json.readText()) }.getOrElse { error(Ui.t("Kanade の設定のファイルではありません", "This is not a Kanade settings file")) }
+        if (root.optString("format") != "kanade-settings") error(Ui.t("Kanade の設定のファイルではありません", "This is not a Kanade settings file"))
+        if (root.optInt("version") > 1) error(Ui.t("新しい Kanade で書き出したファイルです", "This file was exported by a newer Kanade"))
         val prefs = root.optJSONObject("prefs") ?: JSONObject()
         fun value(key: String): Any? = prefs.optJSONObject(key)?.opt("value")
         val now = loadSettings()
@@ -185,6 +190,8 @@ class DesktopStore(val dir: File = defaultDir()) {
         const val KEY_LEARNING = "learning"
         const val KEY_LAST_MODE = "last_japanese"
         const val KEY_VOICE_FINAL = "voice_final"
+        const val KEY_UI_LANGUAGE = "ui_language"
+        val UI_LANGUAGES = listOf("auto", "ja", "en")
 
         /** Windows は %APPDATA%\Kanade、ほかは ~/.config/kanade-desktop */
         fun defaultDir(): File {

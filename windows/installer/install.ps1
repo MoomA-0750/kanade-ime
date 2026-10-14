@@ -8,7 +8,11 @@ $dest = Join-Path $env:ProgramFiles 'Kanade'
 $clsid = '{92CD23E6-D514-4099-84D0-81969040EE41}'
 $tip = "0411:$clsid{92A70E2C-B06A-4AD4-B6CB-7B6DF9CED95E}"
 
-Write-Host "Kanade を $dest に入れます"
+# 出す文字は Windows の表示言語に合わせる（日本語でなければ英語）
+$en = (Get-UICulture).TwoLetterISOLanguageName -ne 'ja'
+function T($ja, $english) { if ($en) { $english } else { $ja } }
+
+Write-Host (T "Kanade を $dest に入れます" "Installing Kanade to $dest")
 
 # 動いているエンジンを止める（ネイティブの DLL を置き換えられるように）
 Get-Process java, javaw -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*dev.mooma.kanade.desktop.MainKt*' } | Stop-Process -Force
@@ -29,7 +33,7 @@ New-Item -ItemType Directory -Force $tsfDir | Out-Null
 $dll = Join-Path $tsfDir ('kanade_tsf-' + (Get-Date -Format 'yyyyMMddHHmmss') + '.dll')
 Copy-Item (Join-Path $src 'tsf\kanade_tsf.dll') $dll
 $p = Start-Process regsvr32 -ArgumentList '/s', "`"$dll`"" -Wait -PassThru
-if ($p.ExitCode -ne 0) { throw "DLL を登録できませんでした（regsvr32 $($p.ExitCode)）" }
+if ($p.ExitCode -ne 0) { throw (T "DLL を登録できませんでした（regsvr32 $($p.ExitCode)）" "Could not register the DLL (regsvr32 $($p.ExitCode))") }
 Get-ChildItem $tsfDir -Filter 'kanade_tsf-*.dll' | Where-Object { $_.FullName -ne $dll } | ForEach-Object { Remove-Item $_.FullName -ErrorAction SilentlyContinue }
 # 32bit のアプリ用（32bit の regsvr32 で登録する）
 $x86Src = Join-Path $src 'tsf\x86\kanade_tsf.dll'
@@ -39,7 +43,7 @@ if (Test-Path $x86Src) {
     $x86 = Join-Path $x86Dir ('kanade_tsf-' + (Get-Date -Format 'yyyyMMddHHmmss') + '.dll')
     Copy-Item $x86Src $x86
     $p = Start-Process (Join-Path $env:windir 'SysWOW64\regsvr32.exe') -ArgumentList '/s', "`"$x86`"" -Wait -PassThru
-    if ($p.ExitCode -ne 0) { Write-Warning "32bit の DLL を登録できませんでした（regsvr32 $($p.ExitCode)）。64bit のアプリでは使えます" }
+    if ($p.ExitCode -ne 0) { Write-Warning (T "32bit の DLL を登録できませんでした（regsvr32 $($p.ExitCode)）。64bit のアプリでは使えます" "Could not register the 32-bit DLL (regsvr32 $($p.ExitCode)). Kanade still works in 64-bit apps") }
     Get-ChildItem $x86Dir -Filter 'kanade_tsf-*.dll' | Where-Object { $_.FullName -ne $x86 } | ForEach-Object { Remove-Item $_.FullName -ErrorAction SilentlyContinue }
 }
 
@@ -56,7 +60,9 @@ Set-ItemProperty 'HKCU:\Software\Kanade' EngineCommand $command
 Set-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' Kanade $command
 
 # スタートメニューの「Kanade の設定」
-$shortcut = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'Kanade の設定.lnk'
+$programs = [Environment]::GetFolderPath('CommonPrograms')
+Remove-Item (Join-Path $programs 'Kanade の設定.lnk'), (Join-Path $programs 'Kanade Settings.lnk') -ErrorAction SilentlyContinue
+$shortcut = Join-Path $programs (T 'Kanade の設定.lnk' 'Kanade Settings.lnk')
 $shell = New-Object -ComObject WScript.Shell
 $link = $shell.CreateShortcut($shortcut)
 $link.TargetPath = Join-Path $dest 'settings\Kanade.Settings.exe'
@@ -75,4 +81,4 @@ if ($ja.InputMethodTips -notcontains $tip) {
     Set-WinUserLanguageList $list -Force
 }
 
-Write-Host '入れました。Win+Space で「Kanade」を選ぶと使えます（エンジンは最初のキーで立ち上がります）'
+Write-Host (T '入れました。Win+Space で「Kanade」を選ぶと使えます（エンジンは最初のキーで立ち上がります）' 'Installed. Choose Kanade with Win+Space (the engine starts with the first key)')

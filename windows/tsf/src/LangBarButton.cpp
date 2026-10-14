@@ -1,7 +1,10 @@
 #include "LangBarButton.h"
 
 #include <olectl.h>
+#include <shlobj.h>
 
+#include <fstream>
+#include <string>
 #include <vector>
 
 #include "Globals.h"
@@ -24,6 +27,28 @@ enum MenuId : UINT {
     kMenuImportAndroid,
     kMenuLog,
 };
+
+// 表示の言語（設定の ui_language: auto・ja・en）。auto は Windows の表示言語が日本語なら日本語、ほかは英語。
+// エンジン（Ui.kt）・設定の画面（Strings.cs）と同じ決め方。メニューを出すたびに読む（変えてすぐ効くように）
+bool UiEnglish() {
+    std::string setting = "auto";
+    PWSTR roaming = nullptr;
+    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &roaming))) {
+        std::ifstream in(std::wstring(roaming) + L"\\Kanade\\settings.properties");
+        std::string line;
+        while (std::getline(in, line)) {
+            if (line.rfind("ui_language=", 0) != 0) continue;
+            setting = line.substr(12);
+            while (!setting.empty() && (setting.back() == '\r' || setting.back() == ' ')) setting.pop_back();
+        }
+        CoTaskMemFree(roaming);
+    }
+    if (setting == "ja") return false;
+    if (setting == "en") return true;
+    return PRIMARYLANGID(GetUserDefaultUILanguage()) != LANG_JAPANESE;
+}
+
+const wchar_t* T(const wchar_t* ja, const wchar_t* en) { return UiEnglish() ? en : ja; }
 
 // タスクバーがライトなら黒、ダークなら白で描く
 bool TaskbarIsLight() {
@@ -128,7 +153,7 @@ STDMETHODIMP LangBarButton::GetInfo(TF_LANGBARITEMINFO* info) {
     info->guidItem = kGuidLbiInputMode;
     info->dwStyle = TF_LBI_STYLE_BTN_BUTTON | TF_LBI_STYLE_SHOWNINTRAY;
     info->ulSort = 0;
-    wcscpy_s(info->szDescription, L"Kanade の入力モード");
+    wcscpy_s(info->szDescription, T(L"Kanade の入力モード", L"Kanade input mode"));
     return S_OK;
 }
 
@@ -140,7 +165,8 @@ STDMETHODIMP LangBarButton::GetStatus(DWORD* status) {
 
 STDMETHODIMP LangBarButton::GetTooltipString(BSTR* tooltip) {
     if (!tooltip) return E_INVALIDARG;
-    *tooltip = SysAllocString(japanese_ ? L"Kanade: ひらがな（クリックで半角英数）" : L"Kanade: 半角英数（クリックでひらがな）");
+    *tooltip = SysAllocString(japanese_ ? T(L"Kanade: ひらがな（クリックで半角英数）", L"Kanade: Hiragana (click for alphanumeric)")
+                                     : T(L"Kanade: 半角英数（クリックでひらがな）", L"Kanade: Alphanumeric (click for hiragana)"));
     return *tooltip ? S_OK : E_OUTOFMEMORY;
 }
 
@@ -169,15 +195,16 @@ STDMETHODIMP LangBarButton::OnClick(TfLBIClick click, POINT pt, const RECT*) {
 
 void LangBarButton::AddItems(const std::function<void(UINT, bool, bool, const wchar_t*)>& add) const {
     // (id, 区切り, 印, 文字)
-    add(kMenuJapanese, false, japanese_, L"ひらがな（あ）");
-    add(kMenuDirect, false, !japanese_, L"半角英数（A）");
+    bool en = UiEnglish();
+    add(kMenuJapanese, false, japanese_, en ? L"Hiragana (あ)" : L"ひらがな（あ）");
+    add(kMenuDirect, false, !japanese_, en ? L"Alphanumeric (A)" : L"半角英数（A）");
     add(0, true, false, nullptr);
-    add(kMenuSettings, false, false, L"設定");
-    add(kMenuUserDictionary, false, false, L"ユーザー辞書");
-    add(kMenuSnippets, false, false, L"スニペット");
-    add(kMenuImportAndroid, false, false, L"Android 版の設定を読み込む");
+    add(kMenuSettings, false, false, en ? L"Settings" : L"設定");
+    add(kMenuUserDictionary, false, false, en ? L"User dictionary" : L"ユーザー辞書");
+    add(kMenuSnippets, false, false, en ? L"Snippets" : L"スニペット");
+    add(kMenuImportAndroid, false, false, en ? L"Import Android settings" : L"Android 版の設定を読み込む");
     add(0, true, false, nullptr);
-    add(kMenuLog, false, false, L"記録を開く");
+    add(kMenuLog, false, false, en ? L"Open log" : L"記録を開く");
 }
 
 void LangBarButton::ShowMenu(POINT pt) {

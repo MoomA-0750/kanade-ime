@@ -21,6 +21,7 @@ public sealed partial class MainWindow : Window
     public MainWindow(string page)
     {
         InitializeComponent();
+        Title = Lang.T("Kanade の設定", "Kanade Settings");
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(TitleBar);
         AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;

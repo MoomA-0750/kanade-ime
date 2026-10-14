@@ -82,7 +82,7 @@ JNI
     ps "Set-Location $REMOTE\\zenz-src; Remove-Item -Recurse -Force native,third_party,jni -ErrorAction SilentlyContinue; tar -xzf zenz.tgz; Remove-Item zenz.tgz"
     ps "cmd /c $REMOTE\\zenz-src\\native\\build-windows.cmd $REMOTE\\zenz-src $REMOTE\\zenz-src\\jni $LIB 2>&1 | Select-Object -Last 5; New-Item -ItemType Directory -Force $REMOTE\\native | Out-Null; Copy-Item $REMOTE\\zenz-src\\build-$LIB\\kanade_$LIB.dll $REMOTE\\native\\ -Force; Get-Item $REMOTE\\native\\kanade_$LIB.dll | Select-Object Name,Length" ;;
   settings)
-    tar -czf "$TMP/settings.tgz" --exclude='bin' --exclude='obj' windows/settings docs/WINDOWS-USAGE.md
+    tar -czf "$TMP/settings.tgz" --exclude='bin' --exclude='obj' windows/settings docs/WINDOWS-USAGE.md docs/WINDOWS-USAGE.en.md
     scp -q -o BatchMode=yes "$TMP/settings.tgz" "tofu:kanade/settings.tgz"
     ps "Set-Location $REMOTE; if (Test-Path settings-src) { Remove-Item -Recurse -Force settings-src\\windows, settings-src\\docs -ErrorAction SilentlyContinue }; New-Item -ItemType Directory -Force settings-src | Out-Null; tar -xzf settings.tgz -C settings-src; Remove-Item settings.tgz; Get-Process Kanade.Settings -ErrorAction SilentlyContinue | Stop-Process -Force; dotnet publish settings-src\\windows\\settings\\Kanade.Settings.csproj -c Release -o settings -nologo -v q 2>&1 | Select-String -NoEmphasis -Pattern 'error|warn' | Select-Object -First 20 | ForEach-Object { \$_.Line }; if (Test-Path settings\\Kanade.Settings.exe) { 'built ' + ('{0:N0} MB' -f ((Get-ChildItem -Recurse settings | Measure-Object Length -Sum).Sum / 1MB)) }" ;;
   reg)

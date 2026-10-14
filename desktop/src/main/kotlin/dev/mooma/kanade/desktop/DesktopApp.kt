@@ -42,6 +42,7 @@ class DesktopApp(
         known = store.version()
         val s = store.loadSettings()
         settings = s
+        Ui.english = Ui.isEnglish(s.uiLanguage)
         val dictionary = UserDictionary.parse(store.read(store.userDictionaryFile))
         val snippets = Snippets.parse(store.read(store.snippetsFile))
         host.locked {
@@ -111,11 +112,11 @@ class DesktopApp(
         "import-android" -> {
             val r = store.importAndroid(File(argument))
             apply(first = false)
-            true to "設定 ${r.settings} 件、ユーザー辞書・スニペット ${r.files} 件を読み込みました"
+            true to Ui.t("設定 ${r.settings} 件、ユーザー辞書・スニペット ${r.files} 件を読み込みました", "Imported ${r.settings} settings and ${r.files} dictionary/snippet files")
         }
         "export-android" -> {
             store.exportAndroid(File(argument))
-            true to "書き出しました: $argument"
+            true to Ui.t("書き出しました: $argument", "Exported: $argument")
         }
         "clear-learning" -> {
             host.locked {
@@ -125,9 +126,9 @@ class DesktopApp(
                 }
             }
             save()
-            true to "覚えたものを消しました"
+            true to Ui.t("覚えたものを消しました", "Cleared the learned conversions")
         }
-        else -> false to "知らない頼みごとです: $command"
+        else -> false to Ui.t("知らない頼みごとです: $command", "Unknown request: $command")
     }
 
     /** メモ帳で開く（保存するとエンジンが読み直す） */

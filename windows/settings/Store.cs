@@ -24,6 +24,8 @@ public sealed class Store
     public bool Learning { get; set; } = true;
     public bool LastJapanese { get; set; }
     public string VoiceFinal { get; set; } = VoiceModel.DefaultId;
+    /// <summary>画面の文字の言語（auto・ja・en）</summary>
+    public string UiLanguage { get; set; } = "auto";
 
     public static Store Load()
     {
@@ -48,6 +50,7 @@ public sealed class Store
                 case "spoken_punctuation": s.SpokenPunctuation = Bool(s.SpokenPunctuation); break;
                 case "learning": s.Learning = Bool(s.Learning); break;
                 case "last_japanese": s.LastJapanese = Bool(s.LastJapanese); break;
+                case "ui_language": if (value is "auto" or "ja" or "en") s.UiLanguage = value; break;
                 case "voice_final": if (VoiceModel.All.Any(m => m.Id == value)) s.VoiceFinal = value; break;
             }
         }
@@ -78,6 +81,8 @@ public sealed class Store
             .AppendLine($"voice_final={VoiceFinal}")
             .AppendLine("# 選んだ変換を覚えて次から先に出す")
             .AppendLine($"learning={B(Learning)}")
+            .AppendLine("# 画面に出す文字の言語（auto は Windows の表示言語に合わせる・ja・en）")
+            .AppendLine($"ui_language={UiLanguage}")
             .AppendLine("# 前回の日本語のオン/オフ（エンジンが書く）")
             .AppendLine($"last_japanese={B(LastJapanese)}")
             .ToString();

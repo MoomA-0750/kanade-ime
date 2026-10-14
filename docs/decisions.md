@@ -276,3 +276,12 @@ SPEC.md の未決事項に本人が答えた。
 - 設定の画面から SenseVoice（239MB）と parakeet（656MB）を落とした。parakeet は 283MB で「止める」→「落とす」で続きから落ち、終わった。
 - 見本の音声で、SenseVoice・parakeet とも句読点付きの文になった。SenseVoice を「使う」にすると、動いているエンジンが設定を読み直し、F12 で SenseVoice を読んで使った（最初の1回は読み込みに約5秒）。
 - 既定は whisper small のまま（仮決定は変えない）。
+
+## 2026-10-14 Windows 版を英語でも使えるようにする
+
+- 本人の要望。設定の ui_language（auto・ja・en）を、エンジン・設定の画面・DLL がそれぞれ読んで同じ決め方をする。auto は Windows の表示言語が日本語なら日本語、ほかは英語（仮決定。to-fu は表示言語が英語なので、auto だと英語になる）。
+- to-fu では、本人がこれまで日本語の画面で使っていたので ui_language=ja にしておいた。
+- 設定の画面の文字は、XAML のマークアップ拡張 `{local:L Ja='…', En='…'}` で両方を並べて書く。.resw（MRT）にしなかったのは、パッケージにしないアプリで言語を上書きする手（PrimaryLanguageOverride）が効かなかったため（ToggleSwitch のオン/オフで経験済み）。
+- 使い方の英語版は docs/WINDOWS-USAGE.en.md。埋め込むときは `WithCulture="false"` が要る（`.en.md` の名前だと英語用の別アセンブリに振り分けられ、画面が空になった）。
+- DLL は %APPDATA%\Kanade\settings.properties を、メニューを出すたびに読む。スタートメニューなど AppContainer の中では読めないので、Windows の表示言語に従う。
+- to-fu で、英語・日本語の設定の画面と英語の使い方、画面の中での切り替えを確かめた。英語のタスクバーのメニューは、本人が to-fu を使っていたため未確認。

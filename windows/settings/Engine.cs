@@ -25,16 +25,16 @@ public static class Engine
             while (true)
             {
                 var read = reader.ReadLineAsync();
-                if (await Task.WhenAny(read, timeout) == timeout) return (false, "エンジンから返事がありません");
+                if (await Task.WhenAny(read, timeout) == timeout) return (false, Lang.T("エンジンから返事がありません", "The engine did not respond"));
                 var reply = await read;
-                if (reply == null) return (false, "エンジンとの接続が切れました");
+                if (reply == null) return (false, Lang.T("エンジンとの接続が切れました", "Lost the connection to the engine"));
                 var f = reply.Split('\t');
                 if (f.Length >= 3 && f[0] == "admin") return (f[2] == "1", Unescape(f.Length > 3 ? f[3] : ""));
             }
         }
         catch (SocketException)
         {
-            return (false, "Kanade のエンジンが動いていません（文字を1つ打つと起動します）");
+            return (false, Lang.T("Kanade のエンジンが動いていません（文字を1つ打つと起動します）", "The Kanade engine is not running (typing one character starts it)"));
         }
     }
 

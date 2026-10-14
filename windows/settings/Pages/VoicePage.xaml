@@ -2,28 +2,32 @@
     x:Class="Kanade.Settings.Pages.VoicePage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Kanade.Settings"
     xmlns:tk="using:CommunityToolkit.WinUI.Controls">
     <ScrollViewer>
         <StackPanel Margin="36,24,36,36" MaxWidth="1000" Spacing="{StaticResource SettingsCardSpacing}">
-            <TextBlock Text="音声入力" Style="{StaticResource TitleTextBlockStyle}" Margin="0,0,0,12" />
-            <tk:SettingsCard Header="録音キー" Description="押している間だけ録音し、離すと句読点付きの文を入れます。話している途中の文字はカーソルの近くに出ます">
+            <TextBlock Text="{local:L Ja='音声入力', En='Voice input'}" Style="{StaticResource TitleTextBlockStyle}" Margin="0,0,0,12" />
+            <tk:SettingsCard Header="{local:L Ja='録音キー', En='Record key'}"
+                             Description="{local:L Ja='押している間だけ録音し、離すと句読点付きの文を入れます。話している途中の文字はカーソルの近くに出ます', En='Records while held and types the sentence with punctuation when released. Text appears near the cursor while you speak'}">
                 <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE720;" /></tk:SettingsCard.HeaderIcon>
                 <TextBlock Text="F12" Style="{StaticResource BodyStrongTextBlockStyle}" />
             </tk:SettingsCard>
-            <tk:SettingsCard Header="話した句読点" Description="「まる」「てん」「かいぎょう」などを、句読点や改行にします">
+            <tk:SettingsCard Header="{local:L Ja='話した句読点', En='Spoken punctuation'}"
+                             Description="{local:L Ja='「まる」「てん」「かいぎょう」などを、句読点や改行にします', En='Turns spoken words such as maru, ten and kaigyou into punctuation and line breaks'}">
                 <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8C1;" /></tk:SettingsCard.HeaderIcon>
-                <ToggleSwitch x:Name="Spoken" Toggled="OnChanged" OnContent="オン" OffContent="オフ" />
+                <ToggleSwitch x:Name="Spoken" Toggled="OnChanged" OnContent="{local:L Ja='オン', En='On'}" OffContent="{local:L Ja='オフ', En='Off'}" />
             </tk:SettingsCard>
 
-            <TextBlock Text="確定の文を作るモデル" Style="{StaticResource SectionHeader}" />
-            <TextBlock Text="録音キーを離したときに、句読点付きの文を作るモデルです。使うには落としておきます（途中で止めても、続きから落とせます）。ReazonSpeech は話している途中の文字にも使います"
+            <TextBlock Text="{local:L Ja='確定の文を作るモデル', En='Model for the final text'}" Style="{StaticResource SectionHeader}" />
+            <TextBlock Text="{local:L Ja='録音キーを離したときに、句読点付きの文を作るモデルです。使うには落としておきます（途中で止めても、続きから落とせます）。ReazonSpeech は話している途中の文字にも使います', En='The model that writes the sentence with punctuation when you release the record key. Download it to use it (a stopped download resumes where it left off). ReazonSpeech is also used for the text shown while you speak'}"
                        TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="1,0,0,8" />
             <StackPanel x:Name="Models" Spacing="{StaticResource SettingsCardSpacing}" />
 
-            <TextBlock Text="そのほか" Style="{StaticResource SectionHeader}" />
-            <tk:SettingsCard Header="マイクの許可" Description="録音できないときは、Windows の設定で「デスクトップ アプリがマイクにアクセスできるようにする」をオンにしてください">
+            <TextBlock Text="{local:L Ja='そのほか', En='Other'}" Style="{StaticResource SectionHeader}" />
+            <tk:SettingsCard Header="{local:L Ja='マイクの許可', En='Microphone permission'}"
+                             Description="{local:L Ja='録音できないときは、Windows の設定で「デスクトップ アプリがマイクにアクセスできるようにする」をオンにしてください', En='If recording does not work, turn on Let desktop apps access your microphone in Windows Settings'}">
                 <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE1D6;" /></tk:SettingsCard.HeaderIcon>
-                <HyperlinkButton Content="マイクの設定を開く" NavigateUri="ms-settings:privacy-microphone" />
+                <HyperlinkButton Content="{local:L Ja='マイクの設定を開く', En='Open microphone settings'}" NavigateUri="ms-settings:privacy-microphone" />
             </tk:SettingsCard>
         </StackPanel>
     </ScrollViewer>

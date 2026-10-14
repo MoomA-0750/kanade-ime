@@ -32,7 +32,7 @@ public sealed partial class VoicePage : Page
         Models.Children.Clear();
         foreach (var model in VoiceModel.All)
         {
-            var use = new RadioButton { GroupName = "final", IsChecked = store.VoiceFinal == model.Id, IsEnabled = model.IsReady, Content = "使う", MinWidth = 0 };
+            var use = new RadioButton { GroupName = "final", IsChecked = store.VoiceFinal == model.Id, IsEnabled = model.IsReady, Content = Lang.T("使う", "Use"), MinWidth = 0 };
             use.Checked += (_, _) =>
             {
                 if (loading) return;
@@ -45,7 +45,7 @@ public sealed partial class VoicePage : Page
             var card = new SettingsCard
             {
                 Header = model.Name,
-                Description = $"{model.Description}（{model.Size}）",
+                Description = Lang.T($"{model.Description}（{model.Size}）", $"{model.DescriptionEn} ({model.Size})"),
                 HeaderIcon = new FontIcon { Glyph = "" },
                 Content = actions,
             };
@@ -54,7 +54,7 @@ public sealed partial class VoicePage : Page
                 var downloading = Downloads.ContainsKey(model.Id);
                 progress.Visibility = downloading ? Visibility.Visible : Visibility.Collapsed;
                 use.IsEnabled = model.IsReady && !downloading;
-                action.Content = downloading ? "止める" : model.IsReady ? "消す" : "落とす";
+                action.Content = downloading ? Lang.T("止める", "Stop") : model.IsReady ? Lang.T("消す", "Delete") : Lang.T("落とす", "Download");
             }
             action.Click += async (_, _) =>
             {
@@ -67,7 +67,7 @@ public sealed partial class VoicePage : Page
                 {
                     if (store.VoiceFinal == model.Id)
                     {
-                        await Show("使っているモデルは消せません", "ほかのモデルを「使う」にしてから消してください。");
+                        await Show(Lang.T("使っているモデルは消せません", "This model is in use"), Lang.T("ほかのモデルを「使う」にしてから消してください。", "Choose Use on another model first, then delete this one."));
                         return;
                     }
                     model.Delete();
@@ -86,7 +86,7 @@ public sealed partial class VoicePage : Page
                 }
                 catch (Exception ex)
                 {
-                    await Show("落とせませんでした", ex.Message);
+                    await Show(Lang.T("落とせませんでした", "Download failed"), ex.Message);
                 }
                 finally
                 {
@@ -101,6 +101,6 @@ public sealed partial class VoicePage : Page
 
     private async Task Show(string title, string message)
     {
-        await new ContentDialog { XamlRoot = XamlRoot, Title = title, Content = message, CloseButtonText = "閉じる" }.ShowAsync();
+        await new ContentDialog { XamlRoot = XamlRoot, Title = title, Content = message, CloseButtonText = Lang.T("閉じる", "Close") }.ShowAsync();
     }
 }

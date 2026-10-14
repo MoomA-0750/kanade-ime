@@ -8,8 +8,8 @@ namespace Kanade.Settings.Pages;
 public sealed partial class PairPage : Page
 {
     private string path = Store.UserDictionaryFile;
-    private string keyLabel = "読み";
-    private string valueLabel = "単語";
+    private string keyLabel = Lang.T("読み", "Reading");
+    private string valueLabel = Lang.T("単語", "Word");
     private List<PairEntry> all = new();
 
     public PairPage()
@@ -22,15 +22,16 @@ public sealed partial class PairPage : Page
         if (e.Parameter as string == "snippets")
         {
             path = Store.SnippetsFile;
-            keyLabel = "打つ文字";
-            valueLabel = "置き換える文";
-            Title.Text = "スニペット";
-            Description.Text = "打った文字がキーと一致した瞬間に、文に置き換えます（日本語オフでも効きます）。例: 「->」→「→」、「@@」→ メールアドレス。改行は \\n と書きます";
+            keyLabel = Lang.T("打つ文字", "Typed text");
+            valueLabel = Lang.T("置き換える文", "Replacement");
+            Title.Text = Lang.T("スニペット", "Snippets");
+            Description.Text = Lang.T("打った文字がキーと一致した瞬間に、文に置き換えます（日本語オフでも効きます）。例: 「->」→「→」、「@@」→ メールアドレス。改行は \\n と書きます",
+                "As soon as what you type matches a key, it is replaced with the text (also when Japanese is off). Examples: -> becomes →, @@ becomes your email address. Write \\n for a line break");
         }
         else
         {
-            Title.Text = "ユーザー辞書";
-            Description.Text = "読みと単語を登録すると、変換の候補の先頭に出ます";
+            Title.Text = Lang.T("ユーザー辞書", "User dictionary");
+            Description.Text = Lang.T("読みと単語を登録すると、変換の候補の先頭に出ます", "Words you add here are shown first among the conversion candidates for their reading");
         }
         KeyHeader.Text = keyLabel;
         ValueHeader.Text = valueLabel;
@@ -62,11 +63,11 @@ public sealed partial class PairPage : Page
         var dialog = new ContentDialog
         {
             XamlRoot = XamlRoot,
-            Title = entry == null ? "足す" : "直す",
+            Title = entry == null ? Lang.T("足す", "Add") : Lang.T("直す", "Edit"),
             Content = new StackPanel { Spacing = 12, MinWidth = 360, Children = { key, value } },
-            PrimaryButtonText = "保存",
-            SecondaryButtonText = entry != null ? "消す" : "",
-            CloseButtonText = "やめる",
+            PrimaryButtonText = Lang.T("保存", "Save"),
+            SecondaryButtonText = entry != null ? Lang.T("消す", "Delete") : "",
+            CloseButtonText = Lang.T("やめる", "Cancel"),
             DefaultButton = ContentDialogButton.Primary,
         };
         void Validate() => dialog.IsPrimaryButtonEnabled =

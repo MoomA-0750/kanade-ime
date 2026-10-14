@@ -35,5 +35,6 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="..\..\docs\WINDOWS-USAGE.md" Link="WINDOWS-USAGE.md" LogicalName="WINDOWS-USAGE.md" />
+    <EmbeddedResource Include="..\..\docs\WINDOWS-USAGE.en.md" Link="WINDOWS-USAGE.en.md" LogicalName="WINDOWS-USAGE.en.md" WithCulture="false" />
   </ItemGroup>
 </Project>

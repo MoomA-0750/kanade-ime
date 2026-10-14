@@ -18,14 +18,14 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <AutoSuggestBox x:Name="Search" PlaceholderText="探す" QueryIcon="Find" TextChanged="OnSearch" Width="320" HorizontalAlignment="Left" />
+            <AutoSuggestBox x:Name="Search" PlaceholderText="{local:L Ja='探す', En='Search'}" QueryIcon="Find" TextChanged="OnSearch" Width="320" HorizontalAlignment="Left" />
             <Button Grid.Column="1" Style="{StaticResource AccentButtonStyle}" Click="OnAdd">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <FontIcon Glyph="&#xE710;" FontSize="14" />
-                    <TextBlock Text="足す" />
+                    <TextBlock Text="{local:L Ja='足す', En='Add'}" />
                 </StackPanel>
             </Button>
-            <ToggleButton x:Name="TextMode" Grid.Column="2" Content="テキストで編集" Click="OnTextMode" />
+            <ToggleButton x:Name="TextMode" Grid.Column="2" Content="{local:L Ja='テキストで編集', En='Edit as text'}" Click="OnTextMode" />
         </Grid>
         <!-- 一覧（押すと直す・消す） -->
         <Grid x:Name="ListPane" Grid.Row="3" CornerRadius="8" BorderThickness="1"
@@ -65,7 +65,7 @@
             </Grid.RowDefinitions>
             <TextBox x:Name="Editor" AcceptsReturn="True" TextWrapping="NoWrap" FontFamily="Cascadia Mono, Consolas, Yu Gothic UI"
                      ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto" />
-            <Button Grid.Row="1" Content="保存" Style="{StaticResource AccentButtonStyle}" Click="OnSaveText" />
+            <Button Grid.Row="1" Content="{local:L Ja='保存', En='Save'}" Style="{StaticResource AccentButtonStyle}" Click="OnSaveText" />
         </Grid>
     </Grid>
 </Page>

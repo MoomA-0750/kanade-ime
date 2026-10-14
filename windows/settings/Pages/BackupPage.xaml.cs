@@ -25,7 +25,7 @@ public sealed partial class BackupPage : Page
     private async void OnExport(object sender, RoutedEventArgs e)
     {
         var picker = new FileSavePicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary, SuggestedFileName = $"kanade-settings-{DateTime.Now:yyyyMMdd}" };
-        picker.FileTypeChoices.Add("Kanade の設定", new List<string> { ".json" });
+        picker.FileTypeChoices.Add(Lang.T("Kanade の設定", "Kanade settings"), new List<string> { ".json" });
         WinRT.Interop.InitializeWithWindow.Initialize(picker, MainWindow.Handle);
         var file = await picker.PickSaveFileAsync();
         if (file == null) return;

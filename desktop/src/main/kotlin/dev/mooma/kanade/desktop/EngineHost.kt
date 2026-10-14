@@ -42,7 +42,7 @@ class EngineHost(
     @Volatile var onMenu: (String) -> Unit = {}
 
     /** 設定の画面からの頼みごと（"import-android"・"export-android"・"clear-learning"）。成功したかと、出す文を返す */
-    @Volatile var onAdmin: (String, String) -> Pair<Boolean, String> = { _, _ -> false to "できません" }
+    @Volatile var onAdmin: (String, String) -> Pair<Boolean, String> = { _, _ -> false to Ui.t("できません", "Not available") }
 
     /** エンジンのロックの中で動かす（設定の読み直しなど、キーの処理と重ならないように） */
     fun <T> locked(block: () -> T): T = synchronized(lock, block)
@@ -171,7 +171,7 @@ class EngineHost(
             activate(client)
             val commands = run(engine.commitAll())
             recording = v.start { partial -> synchronized(lock) { if (recording) indicate("🎤 $partial") } }
-            indicate(if (recording) "🎤" else "マイクを使えません", if (recording) 0 else 2000)
+            indicate(if (recording) "🎤" else Ui.t("マイクを使えません", "Microphone unavailable"), if (recording) 0 else 2000)
             return reply(id, commands, true)
         }
         if (!recording) {
@@ -179,7 +179,7 @@ class EngineHost(
             return reply(id, emptyList(), true)
         }
         recording = false
-        indicate("🎤 認識中")
+        indicate(Ui.t("🎤 認識中", "🎤 Recognizing"))
         v.stop { text ->
             synchronized(lock) {
                 indicate(null)

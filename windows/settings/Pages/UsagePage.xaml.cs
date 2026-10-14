@@ -10,7 +10,7 @@ public sealed partial class UsagePage : Page
     public UsagePage()
     {
         InitializeComponent();
-        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("WINDOWS-USAGE.md");
+        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(Lang.English ? "WINDOWS-USAGE.en.md" : "WINDOWS-USAGE.md");
         if (stream == null) return;
         using var reader = new StreamReader(stream);
         foreach (var raw in reader.ReadToEnd().Replace("\r\n", "\n").Split('\n'))
@@ -28,7 +28,7 @@ public sealed partial class UsagePage : Page
                 var bullet = item.StartsWith("- ");
                 block = new TextBlock
                 {
-                    Text = bullet ? "・" + item[2..] : item,
+                    Text = bullet ? (Lang.English ? "• " : "・") + item[2..] : item,
                     TextWrapping = TextWrapping.Wrap,
                     Margin = new Thickness(indent * 8, 0, 0, 0),
                     Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[bullet ? "TextFillColorPrimaryBrush" : "TextFillColorSecondaryBrush"],
