@@ -1,5 +1,5 @@
-# to-fu の画面に、実際の画面の座標（2560x1600）でクリックやキーを送る。MCP の computer_click は縦の換算がずれるので、こちらを使う。
-# 例: -x 2336 -y 1563 -button right（タスクバーの「あ」を右クリック）、-vk 123 -hold 2500（F12 を2.5秒押す）。対話のセッションで動かす（ssh からでは届かない）
+# to-fu の画面に、実際の画面の座標でクリックやキーを送る（解像度は変わることがある。-info で確かめる）。MCP の computer_click は縦の換算がずれるので、こちらを使う。
+# 例: -x 2336 -y 1563 -button right（タスクバーの「あ」を右クリック）、-vk 123 -hold 2500（F12 を2.5秒押す）。MCP の computer_run_command から動かす（ssh やタスクスケジューラからではカーソルが動かなかった）
 param([int]$x = -1, [int]$y = -1, [string]$button = "", [switch]$info, [int]$vk = 0, [int]$hold = 100)
 Add-Type @"
 using System;using System.Runtime.InteropServices;
