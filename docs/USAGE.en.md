@@ -189,6 +189,7 @@ A history of text and images you've copied. Tap an item to paste it; long-press 
 - Up to the 30 newest unpinned items are kept. Items older than "Keep items for" in settings (no limit, 1 hour, 1 day, 1 week, or 30 days) are deleted automatically. Pinned items are kept
 - Copies marked as sensitive, such as passwords, are not kept. You can turn history off with "Keep copy history" in settings
 - In input fields that don't accept images directly, Kanade puts the image on the clipboard and lets you know. Long-press the field to paste it
+- With a physical keyboard, press Ctrl+Alt+V to open it. If the on-screen keyboard isn't shown, a list in the same style as the candidate window appears near the cursor (newest first, pinned items last). Choose with ↑↓ and press Enter (or Space), or press a number to paste; Esc closes it. Typing any other character closes it and types as usual. Meta (Windows key)+V also opens it, but the device may take that shortcut before it reaches the keyboard
 
 ## Voice input
 

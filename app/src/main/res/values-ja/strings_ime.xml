@@ -29,6 +29,8 @@
     <string name="ime_clipboard_edit">編集</string>
     <string name="ime_clipboard_edit_title">コピーした文字を編集</string>
     <string name="ime_clipboard_edit_missing">この項目は見つかりませんでした（期限で消えたか、削除されました）。</string>
+    <string name="ime_clipboard_pick_empty">コピーの履歴はまだありません。</string>
+    <string name="ime_clipboard_image_item">画像</string>
 
     <!-- EmojiPanelView -->
     <string name="ime_emoji_search">絵文字を検索</string>

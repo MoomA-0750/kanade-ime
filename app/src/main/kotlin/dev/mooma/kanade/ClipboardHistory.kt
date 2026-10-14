@@ -116,6 +116,14 @@ class ClipboardHistory(private val context: Context) {
         return kept
     }
 
+    /** パッケージ名 → アプリの名前（開くたびに引き直さない） */
+    private val appLabels = HashMap<String, String?>()
+
+    fun appLabel(packageName: String): String? = appLabels.getOrPut(packageName) {
+        val pm = context.packageManager
+        runCatching { pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString() }.getOrNull()
+    }
+
     fun imageFile(item: Item): File? = item.image?.let { File(dir, it) }
 
     /** 画像をほかのアプリに渡すための URI（[ClipboardImageProvider]） */

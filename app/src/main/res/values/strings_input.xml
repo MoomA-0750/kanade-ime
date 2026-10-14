@@ -49,7 +49,7 @@
     <string name="input_flick_toggle_title">Toggle input</string>
     <string name="input_flick_toggle_summary">Pressing the same key repeatedly moves to the next character (あ→い→う). When off, only flicks are used.</string>
     <string name="input_clipboard_title">Clipboard</string>
-    <string name="input_clipboard_description">Swipe down on the あ/A key (on the keypad, swipe ☺) to see the history of copied text and images. Tap to paste; long-press to pin, edit, crop, or delete. Each card shows the app the keyboard was connected to when you copied. Copies marked as sensitive, such as passwords, are not kept.</string>
+    <string name="input_clipboard_description">Swipe down on the あ/A key (on the keypad, swipe ☺; on a physical keyboard, press Ctrl+Alt+V) to see the history of copied text and images. Tap to paste; long-press to pin, edit, crop, or delete. Each card shows the app the keyboard was connected to when you copied. Copies marked as sensitive, such as passwords, are not kept.</string>
     <string name="input_clipboard_history">Keep copy history</string>
     <string name="input_clipboard_expiry">Keep items for</string>
     <string name="input_clipboard_expiry_never">No limit (latest 30 items)</string>

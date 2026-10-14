@@ -37,13 +37,7 @@ class ClipboardPanelView(
     private val currentSensitive: () -> String? = { null },
     private val onEdit: (ClipboardHistory.Item) -> Unit = {},
 ) : FrameLayout(context) {
-    /** パッケージ名 → アプリの名前（開くたびに引き直さない） */
-    private val appLabels = HashMap<String, String?>()
-
-    private fun appLabel(packageName: String): String? = appLabels.getOrPut(packageName) {
-        val pm = context.packageManager
-        runCatching { pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString() }.getOrNull()
-    }
+    private fun appLabel(packageName: String): String? = history.appLabel(packageName)
 
     private val palette = KeyboardPalette.of(context)
     private val density = resources.displayMetrics.density

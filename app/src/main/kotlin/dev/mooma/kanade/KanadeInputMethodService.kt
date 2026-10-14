@@ -285,8 +285,102 @@ class KanadeInputMethodService : InputMethodService() {
         if (!committed) {
             ignoreNextClip = true
             clipboardManager.setPrimaryClip(android.content.ClipData.newUri(contentResolver, "Kanade", uri))
-            clipboardPanel?.showMessage(getString(R.string.ime_clipboard_image_not_accepted))
+            val message = getString(R.string.ime_clipboard_image_not_accepted)
+            if (host?.mode == InputViewHost.Mode.CLIPBOARD && isInputViewShown) clipboardPanel?.showMessage(message)
+            else showIndicatorText(message, 4000)
         }
+    }
+
+    /**
+     * 物理キーボードから呼ぶクリップボードの一覧（Meta+V か Ctrl+Alt+V）。画面キーボードを出していなければ、
+     * 候補の窓と同じ重ねる窓に、新しい順（ピン留めは後ろ）に1行ずつ出す。開いている間は [clipPickKey] がキーを受ける
+     */
+    private var clipPick: List<ClipboardHistory.Item>? = null
+    private var clipPickSelected = 0
+
+    private fun isClipboardShortcut(event: KeyEvent): Boolean {
+        if (event.keyCode != KeyEvent.KEYCODE_V || event.isShiftPressed) return false
+        val meta = event.isMetaPressed && !event.isCtrlPressed && !event.isAltPressed
+        val ctrlAlt = event.isCtrlPressed && event.isAltPressed && !event.isMetaPressed
+        return meta || ctrlAlt
+    }
+
+    private fun openClipPick() {
+        if (isInputViewShown && host != null) {
+            showClipboard()
+            return
+        }
+        apply(engine.commitAll())
+        if (!settings.clipboardHistory) {
+            showIndicatorText(getString(R.string.ime_clipboard_history_off), 2500)
+            return
+        }
+        val items = clipboardHistory.all().let { all -> all.filter { !it.pinned }.sortedByDescending { it.time } + all.filter { it.pinned } }
+        if (items.isEmpty()) {
+            showIndicatorText(getString(R.string.ime_clipboard_pick_empty), 2500)
+            return
+        }
+        clipPick = items
+        clipPickSelected = 0
+        showClipPick()
+    }
+
+    private fun showClipPick() {
+        val items = clipPick ?: return
+        val lines = items.map { item ->
+            item.text?.let { t -> t.trim().replace(Regex("\\s*\\n\\s*"), " ⏎ ").take(CLIP_LINE_CHARS) }
+                ?: getString(R.string.ime_clipboard_image_item)
+        }
+        val pinned = getString(R.string.ime_clipboard_section_pinned)
+        val labels = items.map { if (it.pinned) pinned else it.source?.let { s -> clipboardHistory.appLabel(s) ?: s } }
+        showBar { it.showCandidates(lines, clipPickSelected, getString(R.string.ime_clipboard_title), labels) }
+    }
+
+    private fun closeClipPick() {
+        if (clipPick == null) return
+        clipPick = null
+        hideBar()
+    }
+
+    private fun pickClip(index: Int) {
+        val item = clipPick?.getOrNull(index) ?: return
+        closeClipPick()
+        pasteClip(item)
+    }
+
+    /** 一覧を開いている間のキー。使ったら true。使わないキー（文字など）は一覧を閉じて、ふだんどおりに処理させる */
+    private fun clipPickKey(event: KeyEvent): Boolean {
+        val items = clipPick ?: return false
+        val n = items.size
+        fun select(i: Int) {
+            clipPickSelected = i
+            showClipPick()
+        }
+        when (event.keyCode) {
+            KeyEvent.KEYCODE_DPAD_DOWN -> select((clipPickSelected + 1) % n)
+            KeyEvent.KEYCODE_DPAD_UP -> select((clipPickSelected - 1 + n) % n)
+            KeyEvent.KEYCODE_PAGE_DOWN -> select(minOf(clipPickSelected + CandidateBar.PAGE, n - 1))
+            KeyEvent.KEYCODE_PAGE_UP -> select(maxOf(clipPickSelected - CandidateBar.PAGE, 0))
+            KeyEvent.KEYCODE_MOVE_HOME -> select(0)
+            KeyEvent.KEYCODE_MOVE_END -> select(n - 1)
+            KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_SPACE -> pickClip(clipPickSelected)
+            KeyEvent.KEYCODE_ESCAPE -> closeClipPick()
+            in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_9 -> {
+                val i = clipPickSelected / CandidateBar.PAGE * CandidateBar.PAGE + (event.keyCode - KeyEvent.KEYCODE_1)
+                if (i < n) pickClip(i)
+            }
+            else -> {
+                // 修飾キーだけ（Meta+V の Meta を離す前など）は閉じない。もう一度 Meta+V で閉じる
+                if (KeyEvent.isModifierKey(event.keyCode)) return false
+                if (isClipboardShortcut(event)) {
+                    closeClipPick()
+                    return true
+                }
+                closeClipPick()
+                return false
+            }
+        }
+        return true
     }
 
     /** 文字の項目を編集の画面で開く（キーボードはその画面の入力欄で使う） */
@@ -830,6 +924,10 @@ class KanadeInputMethodService : InputMethodService() {
 
     /** 候補の窓で候補を指で選んだ */
     private fun onCandidateTapped(index: Int) {
+        if (clipPick != null) {
+            main.post { pickClip(index) }
+            return
+        }
         if (lastGlide != null) {
             // 帯を押した処理の途中で帯を消して出し直すと出なくなるので、押した処理が終わってから置き換える
             main.post { if (!replaceGlide(index)) handle(KeyInput.SelectCandidate(index)) }
@@ -955,6 +1053,17 @@ class KanadeInputMethodService : InputMethodService() {
     private fun handleKeyDown(event: KeyEvent): Boolean {
         val keyCode = event.keyCode
         if (secureField) return false
+        if (clipPick != null && clipPickKey(event)) {
+            consumedDown += keyCode
+            log(event, "clipboard")
+            return true
+        }
+        if (isClipboardShortcut(event)) {
+            if (event.repeatCount == 0) openClipPick()
+            consumedDown += keyCode
+            log(event, "clipboard")
+            return true
+        }
         if (keyCode == settings.voiceKey) {
             // 押している間だけ録音する（押しっぱなしの繰り返しは無視）。短く押すと聞き続ける
             if (event.repeatCount == 0) voiceKey(true)
@@ -1502,6 +1611,7 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     private fun hideBar() {
+        clipPick = null
         overlay?.hide()
         if (barShown) {
             barShown = false
@@ -1552,6 +1662,9 @@ class KanadeInputMethodService : InputMethodService() {
 
         /** 自分が確定してから、選択範囲の通知を古いものとして扱う時間 */
         const val STALE_SELECTION_MS = 300L
+
+        /** クリップボードの一覧の1行に出す文字数（長い文は頭だけ） */
+        const val CLIP_LINE_CHARS = 80
 
         /** 話しながら途中の文字を出し直す間隔 */
         const val PARTIAL_INTERVAL_MS = 600L
