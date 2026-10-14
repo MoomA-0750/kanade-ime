@@ -166,6 +166,23 @@ class KanadeSettings(context: Context) {
         }
         set(value) = prefs.edit().putString(KEY_CLIPBOARD_SHORTCUT, value?.encode() ?: "").apply()
 
+    /**
+     * 物理キーボードのクリップボードのパネルの位置と大きさ（画面の座標、px）。位置が -1 ならカーソルの近くに出す、
+     * 大きさが 0 なら自動（幅は画面に合わせ、高さは中身に合わせる）。パネルの下のつまみで動かす・変えると残る
+     */
+    var clipboardOverlayX: Int
+        get() = prefs.getInt(KEY_CLIP_OVERLAY_X, -1)
+        set(value) = prefs.edit().putInt(KEY_CLIP_OVERLAY_X, value).apply()
+    var clipboardOverlayY: Int
+        get() = prefs.getInt(KEY_CLIP_OVERLAY_Y, -1)
+        set(value) = prefs.edit().putInt(KEY_CLIP_OVERLAY_Y, value).apply()
+    var clipboardOverlayWidth: Int
+        get() = prefs.getInt(KEY_CLIP_OVERLAY_W, 0)
+        set(value) = prefs.edit().putInt(KEY_CLIP_OVERLAY_W, value).apply()
+    var clipboardOverlayHeight: Int
+        get() = prefs.getInt(KEY_CLIP_OVERLAY_H, 0)
+        set(value) = prefs.edit().putInt(KEY_CLIP_OVERLAY_H, value).apply()
+
     var lastJapanese: Boolean
         get() = prefs.getBoolean(KEY_LAST_MODE, false)
         set(value) = prefs.edit().putBoolean(KEY_LAST_MODE, value).apply()
@@ -228,6 +245,10 @@ class KanadeSettings(context: Context) {
         const val KEY_CLIPBOARD_HISTORY = "clipboard_history"
         const val KEY_CLIPBOARD_EXPIRY = "clipboard_expiry_hours"
         const val KEY_CLIPBOARD_SHORTCUT = "clipboard_shortcut"
+        const val KEY_CLIP_OVERLAY_X = "clipboard_overlay_x"
+        const val KEY_CLIP_OVERLAY_Y = "clipboard_overlay_y"
+        const val KEY_CLIP_OVERLAY_W = "clipboard_overlay_width"
+        const val KEY_CLIP_OVERLAY_H = "clipboard_overlay_height"
         const val KEY_SPOKEN_PUNCT = "spoken_punctuation"
         const val KEY_VOICE_FINAL = "voice_final"
         const val KEY_PUNCTUATION = "punctuation"

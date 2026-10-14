@@ -328,7 +328,7 @@ class KanadeInputMethodService : InputMethodService() {
                     editClip(item)
                 },
             )
-            ClipboardOverlay(ctx, anchor, panel).also { clipOverlay = it }
+            ClipboardOverlay(ctx, anchor, panel, settings).also { clipOverlay = it }
         }
         o.panel.showMessage(if (settings.clipboardHistory) null else getString(R.string.ime_clipboard_history_off))
         runCatching { o.show() }.onFailure { log("clipboard overlay failed: $it") }
