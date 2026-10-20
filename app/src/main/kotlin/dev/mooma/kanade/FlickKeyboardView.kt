@@ -167,19 +167,29 @@ class FlickKeyboardView(
 
     init {
         setOnApplyWindowInsetsListener { _, insets ->
-            val t = android.view.WindowInsets.Type.navigationBars() or android.view.WindowInsets.Type.tappableElement()
-            val bottom = insets.getInsets(t).bottom
-            if (bottom != bottomInset) {
-                bottomInset = bottom
-                requestLayout()
-            }
+            updateBottomInset(insets)
             insets
         }
     }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        refreshInsets()
+    }
+
+    /** 窓の今の余白を読み直す（キーボードを出すたびに呼ぶ） */
+    fun refreshInsets() {
+        rootWindowInsets?.let { updateBottomInset(it) }
         requestApplyInsets()
+    }
+
+    private fun updateBottomInset(insets: android.view.WindowInsets) {
+        val bottom = NavBarInsets.bottom(insets)
+        if (bottom != bottomInset) {
+            NavBarInsets.onChanged?.invoke("flick bottom $bottomInset->$bottom ${NavBarInsets.describe(insets)}")
+            bottomInset = bottom
+            requestLayout()
+        }
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {

@@ -255,15 +255,20 @@ class SoftKeyboardView(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        refreshInsets()
+    }
+
+    /** 窓の今の余白を読み直す（キーボードを出すたびに呼ぶ。余白の知らせが来ないまま古い値が残らないように） */
+    fun refreshInsets() {
         rootWindowInsets?.let { updateBottomInset(it) }
         requestApplyInsets()
     }
 
     /** ナビゲーションバー（ボタン・ジェスチャーの線）と、押せる要素の分の下の高さを取る */
     private fun updateBottomInset(insets: android.view.WindowInsets) {
-        val t = android.view.WindowInsets.Type.navigationBars() or android.view.WindowInsets.Type.tappableElement()
-        val bottom = maxOf(insets.getInsets(t).bottom, insets.getInsets(android.view.WindowInsets.Type.navigationBars()).bottom)
+        val bottom = NavBarInsets.bottom(insets)
         if (bottom != bottomInset) {
+            NavBarInsets.onChanged?.invoke("qwerty bottom $bottomInset->$bottom ${NavBarInsets.describe(insets)}")
             bottomInset = bottom
             requestLayout()
         }

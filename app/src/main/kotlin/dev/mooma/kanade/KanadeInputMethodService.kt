@@ -81,6 +81,7 @@ class KanadeInputMethodService : InputMethodService() {
         super.onCreate()
         settings = KanadeSettings(this)
         keyLog = KeyLog(this)
+        NavBarInsets.onChanged = ::log
         clipboardHistory = ClipboardHistory(this).apply { expiryMillis = { settings.clipboardExpiryHours * 3_600_000L } }
         clipboardManager.addPrimaryClipChangedListener(clipListener)
         candidateSource = ConversionResources.candidateSource(this)
@@ -94,6 +95,7 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     override fun onDestroy() {
+        NavBarInsets.onChanged = null
         clipboardManager.removePrimaryClipChangedListener(clipListener)
         overlay?.hide()
         clipOverlay?.hide()
@@ -856,6 +858,13 @@ class KanadeInputMethodService : InputMethodService() {
     private fun softVoice(down: Boolean) {
         if (secureField) return
         voiceKey(down)
+    }
+
+    override fun onWindowShown() {
+        super.onWindowShown()
+        // 隠している間に届いた余白（ナビゲーションバーが見えていない扱いなど）が残らないよう、出すたびに読み直す
+        keyboardView?.refreshInsets()
+        flickView?.refreshInsets()
     }
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
