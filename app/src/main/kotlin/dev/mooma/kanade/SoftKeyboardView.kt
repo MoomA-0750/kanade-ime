@@ -233,10 +233,10 @@ class SoftKeyboardView(
     private val handler = Handler(Looper.getMainLooper())
 
     /** 画面の下のナビゲーションバー（ジェスチャーの線・切り替えボタン）の高さ。その分だけ下を空ける */
-    private var bottomInset = 0
+    private val bottomInset = BottomInsetTracker(this, "qwerty")
 
     /** キーの下に空けている高さ（絵文字パネルも同じだけ空ける） */
-    val bottomSpace: Int get() = if (floating) 0 else bottomInset + (extraBottomDp * density).toInt()
+    val bottomSpace: Int get() = if (floating) 0 else bottomInset.value + (extraBottomDp * density).toInt()
 
     /** 浮かせているとき（下の余白を取らない） */
     var floating = false
@@ -248,31 +248,18 @@ class SoftKeyboardView(
 
     init {
         setOnApplyWindowInsetsListener { _, insets ->
-            updateBottomInset(insets)
+            bottomInset.update(insets)
             insets
         }
     }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        refreshInsets()
+        bottomInset.refresh()
     }
 
-    /** 窓の今の余白を読み直す（キーボードを出すたびに呼ぶ。余白の知らせが来ないまま古い値が残らないように） */
-    fun refreshInsets() {
-        rootWindowInsets?.let { updateBottomInset(it) }
-        requestApplyInsets()
-    }
-
-    /** ナビゲーションバー（ボタン・ジェスチャーの線）と、押せる要素の分の下の高さを取る */
-    private fun updateBottomInset(insets: android.view.WindowInsets) {
-        val bottom = NavBarInsets.bottom(insets)
-        if (bottom != bottomInset) {
-            NavBarInsets.onChanged?.invoke("qwerty bottom $bottomInset->$bottom ${NavBarInsets.describe(insets)}")
-            bottomInset = bottom
-            requestLayout()
-        }
-    }
+    /** 窓の今の余白を読み直す（キーボードを出すたびに呼ぶ） */
+    fun refreshInsets() = bottomInset.refresh()
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec)

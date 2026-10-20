@@ -120,8 +120,8 @@ class FlickKeyboardView(
             field = value
             requestLayout()
         }
-    private var bottomInset = 0
-    val bottomSpace: Int get() = if (floating) 0 else bottomInset + (extraBottomDp * density).toInt()
+    private val bottomInset = BottomInsetTracker(this, "flick")
+    val bottomSpace: Int get() = if (floating) 0 else bottomInset.value + (extraBottomDp * density).toInt()
 
     /** 浮かせているとき（下の余白を取らない） */
     var floating = false
@@ -167,30 +167,18 @@ class FlickKeyboardView(
 
     init {
         setOnApplyWindowInsetsListener { _, insets ->
-            updateBottomInset(insets)
+            bottomInset.update(insets)
             insets
         }
     }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        refreshInsets()
+        bottomInset.refresh()
     }
 
     /** 窓の今の余白を読み直す（キーボードを出すたびに呼ぶ） */
-    fun refreshInsets() {
-        rootWindowInsets?.let { updateBottomInset(it) }
-        requestApplyInsets()
-    }
-
-    private fun updateBottomInset(insets: android.view.WindowInsets) {
-        val bottom = NavBarInsets.bottom(insets)
-        if (bottom != bottomInset) {
-            NavBarInsets.onChanged?.invoke("flick bottom $bottomInset->$bottom ${NavBarInsets.describe(insets)}")
-            bottomInset = bottom
-            requestLayout()
-        }
-    }
+    fun refreshInsets() = bottomInset.refresh()
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), (4 * rowHeight + gap * 2).toInt() + bottomSpace)
