@@ -50,6 +50,7 @@ class KeyMapper(var triggers: Set<ToggleTrigger>) {
             KeyEvent.KEYCODE_DPAD_LEFT -> if (event.isShiftPressed) KeyInput.ShiftLeft else KeyInput.Left
             KeyEvent.KEYCODE_DPAD_RIGHT -> if (event.isShiftPressed) KeyInput.ShiftRight else KeyInput.Right
             KeyEvent.KEYCODE_ESCAPE -> KeyInput.Escape
+            KeyEvent.KEYCODE_TAB -> if (event.isShiftPressed) KeyInput.Other else KeyInput.Tab
             KeyEvent.KEYCODE_MOVE_HOME -> if (event.isShiftPressed) KeyInput.Other else KeyInput.Home
             KeyEvent.KEYCODE_MOVE_END -> if (event.isShiftPressed) KeyInput.Other else KeyInput.End
             KeyEvent.KEYCODE_FORWARD_DEL -> KeyInput.DeleteForward

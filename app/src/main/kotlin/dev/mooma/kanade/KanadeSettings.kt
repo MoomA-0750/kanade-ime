@@ -36,6 +36,11 @@ class KanadeSettings(context: Context) {
         get() = prefs.getBoolean(KEY_LIVE, true)
         set(value) = prefs.edit().putBoolean(KEY_LIVE, value).apply()
 
+    /** 入力中に、読みの先を予測した候補を候補の窓に出す（既定は出さない） */
+    var prediction: Boolean
+        get() = prefs.getBoolean(KEY_PREDICTION, false)
+        set(value) = prefs.edit().putBoolean(KEY_PREDICTION, value).apply()
+
     /** 未確定文字列をうまく出せないアプリ（端末など）。ここに入れたアプリでは、入力中の文字を候補欄に出す */
     var previewInBarPackages: Set<String>
         get() = prefs.getString(KEY_PREVIEW_PACKAGES, null)?.split(',', ' ', '\n')?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet()
@@ -219,6 +224,7 @@ class KanadeSettings(context: Context) {
 
     fun engineSettings() = EngineSettings(
         fullWidthSymbols = fullWidthSymbols, liveConversion = liveConversion, punctuation = punctuation, pairBrackets = pairBrackets,
+        prediction = prediction,
     )
 
     private companion object {
@@ -227,6 +233,7 @@ class KanadeSettings(context: Context) {
         const val KEY_KEYLOG = "key_log"
         const val KEY_LAST_MODE = "last_japanese"
         const val KEY_LIVE = "live_conversion"
+        const val KEY_PREDICTION = "prediction"
         const val KEY_SOFT_KEYBOARD = "soft_keyboard"
         const val KEY_SOFT_KEYBOARD_HEIGHT = "soft_keyboard_height"
         const val KEY_SOFT_KEYBOARD_BOTTOM = "soft_keyboard_bottom"

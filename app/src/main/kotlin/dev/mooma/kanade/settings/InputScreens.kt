@@ -66,6 +66,8 @@ fun ColumnScope.InputScreen() {
     Section(stringResource(R.string.input_conversion_title)) {
         var live by rememberPref({ settings.liveConversion }, { settings.liveConversion = it })
         SwitchRow(stringResource(R.string.input_live_conversion_title), live, { live = it }, stringResource(R.string.input_live_conversion_summary))
+        var prediction by rememberPref({ settings.prediction }, { settings.prediction = it })
+        SwitchRow(stringResource(R.string.input_prediction_title), prediction, { prediction = it }, stringResource(R.string.input_prediction_summary))
         var learning by rememberPref({ settings.learningEnabled }, { settings.learningEnabled = it })
         SwitchRow(stringResource(R.string.input_learning_title), learning, { learning = it }, stringResource(R.string.input_learning_summary))
         var confirm by remember { mutableStateOf(false) }

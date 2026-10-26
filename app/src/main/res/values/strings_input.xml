@@ -19,6 +19,8 @@
     <string name="input_conversion_title">Conversion</string>
     <string name="input_live_conversion_title">Live conversion</string>
     <string name="input_live_conversion_summary">Shows the converted result as you type.</string>
+    <string name="input_prediction_title">Predictions</string>
+    <string name="input_prediction_summary">Shows words that complete what you are typing (きーぼ → キーボード) in the candidate window. Tap one, or choose with Tab and press Enter.</string>
     <string name="input_learning_title">Learn</string>
     <string name="input_learning_summary">Candidates you picked before appear higher next time.</string>
     <string name="input_clear_learning">Clear learning</string>

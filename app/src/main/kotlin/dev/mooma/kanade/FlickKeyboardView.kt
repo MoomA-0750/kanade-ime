@@ -134,6 +134,17 @@ class FlickKeyboardView(
     /** 日本語入力中か（「あa1」のキーの表示に使う。かなの配列のときだけ意味がある） */
     var japanese = true
 
+    /**
+     * 変換中か（IME が変換を始めた・終えたときに入れる）。変換中は Tab のキーを「文節」のキーにする:
+     * 左右に払うと文節を縮める・伸ばす、タップと右上で次の文節、左上で前の文節、上下は候補（Shift がなくても文節を直せるように）
+     */
+    var converting = false
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
+
     /** 聞き続けるモード中（🎤 のキーの色を変える） */
     var voiceActive = false
         set(value) {
@@ -256,7 +267,12 @@ class FlickKeyboardView(
                 "enter" -> R.drawable.sym_keyboard_return
                 else -> null
             }
-            if (icon != null) {
+            if (fn == "tab" && converting) {
+                labelPaint.color = ink
+                labelPaint.textSize = 15 * resources.displayMetrics.scaledDensity
+                drawText(canvas, context.getString(R.string.ime_flick_segment), cx, cy, labelPaint)
+                labelPaint.textSize = 20 * resources.displayMetrics.scaledDensity
+            } else if (icon != null) {
                 drawIcon(canvas, icon, cx, cy, minOf(22 * density, cell.rect.height() * 0.45f), ink)
             } else {
                 labelPaint.color = ink
@@ -274,7 +290,17 @@ class FlickKeyboardView(
                 drawIcon(canvas, R.drawable.sym_select_all, cell.rect.left + 10 * density, cy, 11 * density, palette.dim)
                 drawIcon(canvas, R.drawable.sym_redo, cell.rect.right - 10 * density, cy, 11 * density, palette.dim)
             }
-            if (fn == "tab") {
+            if (fn == "tab" && converting) {
+                // 左右に縮める・伸ばす、左上・右上に前後の文節、上下に候補
+                val dx = cell.rect.width() / 2 - 9 * density
+                val dy = cell.rect.height() / 2 - 9 * density
+                drawText(canvas, context.getString(R.string.ime_flick_segment_shrink), cx - dx, cy, smallPaint)
+                drawText(canvas, context.getString(R.string.ime_flick_segment_extend), cx + dx, cy, smallPaint)
+                drawIcon(canvas, R.drawable.sym_arrow_back, cx - dx, cy - dy, 11 * density, palette.dim)
+                drawIcon(canvas, R.drawable.sym_arrow_forward, cx + dx, cy - dy, 11 * density, palette.dim)
+                drawIcon(canvas, R.drawable.sym_arrow_upward, cx, cy - dy, 11 * density, palette.dim)
+                drawIcon(canvas, R.drawable.sym_arrow_downward, cx, cy + dy, 11 * density, palette.dim)
+            } else if (fn == "tab") {
                 val dx = cell.rect.width() / 2 - 9 * density
                 val dy = cell.rect.height() / 2 - 9 * density
                 for ((code, d) in TAB_CORNERS) {
@@ -456,7 +482,7 @@ class FlickKeyboardView(
                 if (fn == "tab") {
                     if (t.tabCode != code) return
                 } else if (t.dir != FlickTables.Dir.TAP) return
-                actions.key(code)
+                if (fn == "tab") sendTab(code) else actions.key(code)
                 t.repeated = true
                 handler.postAtTime(this, id, android.os.SystemClock.uptimeMillis() + 50)
             }
@@ -477,7 +503,7 @@ class FlickKeyboardView(
                         FlickTables.Dir.UP -> actions.key(KeyEvent.KEYCODE_C, CTRL)
                         FlickTables.Dir.DOWN -> actions.key(KeyEvent.KEYCODE_V, CTRL)
                     }
-                    "tab" -> actions.key(t.tabCode)
+                    "tab" -> sendTab(t.tabCode)
                     "backspace" -> actions.key(KeyEvent.KEYCODE_DEL)
                     "space" -> actions.key(KeyEvent.KEYCODE_SPACE)
                     "enter" -> actions.key(KeyEvent.KEYCODE_ENTER)
@@ -499,6 +525,21 @@ class FlickKeyboardView(
                 }
                 typeKey(index, dir)
             }
+        }
+    }
+
+    /** Tab のキーを払った（[code] は払った向きのキー）。変換中は文節を直すキーに置き換える（[converting]） */
+    private fun sendTab(code: Int) {
+        if (!converting) {
+            actions.key(code)
+            return
+        }
+        when (code) {
+            KeyEvent.KEYCODE_DPAD_LEFT -> actions.key(KeyEvent.KEYCODE_DPAD_LEFT, SHIFT)
+            KeyEvent.KEYCODE_DPAD_RIGHT -> actions.key(KeyEvent.KEYCODE_DPAD_RIGHT, SHIFT)
+            KeyEvent.KEYCODE_MOVE_HOME -> actions.key(KeyEvent.KEYCODE_DPAD_LEFT)
+            KeyEvent.KEYCODE_TAB, KeyEvent.KEYCODE_MOVE_END -> actions.key(KeyEvent.KEYCODE_DPAD_RIGHT)
+            else -> actions.key(code)
         }
     }
 

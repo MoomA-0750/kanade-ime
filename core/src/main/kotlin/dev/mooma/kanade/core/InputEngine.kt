@@ -12,6 +12,8 @@ sealed interface KeyInput {
     /** Shift+Space。変換中は前の候補へ */
     data object ShiftSpace : KeyInput
     data object Escape : KeyInput
+    /** Tab。予測の候補を出しているときは、その中の選択を進める。それ以外は [Other] と同じ */
+    data object Tab : KeyInput
     /** 上下の矢印。変換中は候補の選択を動かす */
     data object Up : KeyInput
     data object Down : KeyInput
@@ -65,6 +67,8 @@ sealed interface ImeCommand {
         val anchorOffset: Int = 0,
         /** 候補ごとの説明（「ユーザー辞書」「全角」など）。[candidates] と同じ長さか空 */
         val labels: List<String?> = emptyList(),
+        /** 入力中の予測の候補（数字で選べないので番号を付けない。[selected] は -1 なら未選択） */
+        val prediction: Boolean = false,
     ) : ImeCommand
     /**
      * 直接入力中のスニペット: カーソルの前が [expected] なら消して [replacement] を入れる。
@@ -100,6 +104,10 @@ data class EngineSettings(
     val punctuation: String = "、。",
     /** 開き括弧を打ったら閉じ括弧も入れ、カーソルを中に置く（[Brackets]） */
     val pairBrackets: Boolean = true,
+    /** 入力中に、読みの先を予測した候補（「きーぼ」→ キーボード）を候補の窓に出す */
+    val prediction: Boolean = false,
+    /** 予測の候補の数 */
+    val predictionCount: Int = 5,
 )
 
 /** 文節（読みと、いま選んでいる表記） */
@@ -126,6 +134,9 @@ interface CandidateSource {
 
     /** 文節で、最初に出した候補と違うものを選んで確定した（学習する） */
     fun learn(reading: String, surface: String) {}
+
+    /** 入力中の読みの先を予測した候補（よい順） */
+    fun predict(reading: String, n: Int): List<String> = emptyList()
 }
 
 /**
@@ -196,6 +207,18 @@ class InputEngine(
     private val segs = mutableListOf<Seg>()
     private var focus = 0
 
+    /** 予測の候補（入力中に候補の窓に出しているもの）と、Tab で選んでいる位置（-1 なら未選択） */
+    private var predictions: List<String> = emptyList()
+    private var predictionSelected = -1
+    private var predictionsFor: String? = null
+
+    /** 再変換のときの、選んでいた元の文字。変換中に Esc を押すと元に戻す */
+    private var reconvertOriginal: String? = null
+
+    /** 確定した表記→読み（再変換で、選んだ文字の読みを引く）。文全体と文節に分けて、新しいものを後ろに置く */
+    private val committedReadings = LinkedHashMap<String, String>()
+    private val segmentReadings = LinkedHashMap<String, String>()
+
     /** 文節の候補の並べ替えの依頼（文全体として採点し、前後を外して戻す） */
     private class SegRerank(val id: Long, val index: Int, val prefix: String, val suffix: String)
 
@@ -258,11 +281,139 @@ class InputEngine(
 
     private fun textBeforeCaret() = units.take(caret).joinToString("") { it.text } + romaji.pending
 
-    fun handle(input: KeyInput): EngineResult = when (input) {
-        is KeyInput.SetJapanese -> setMode(input.on)
-        KeyInput.ToggleJapanese -> setMode(!japanese)
-        else -> if (japanese) handleJapanese(input) else handleDirect(input)
+    fun handle(input: KeyInput): EngineResult {
+        val result = when (input) {
+            is KeyInput.SetJapanese -> setMode(input.on)
+            KeyInput.ToggleJapanese -> setMode(!japanese)
+            else -> if (japanese) handleJapanese(input) else handleDirect(input)
+        }
+        return result.copy(commands = result.commands + predictionView())
     }
+
+    /**
+     * 予測の候補の窓を、いまの入力に合わせて出す・隠す。変換中・括弧を選んでいる間は変換の候補の窓に任せる
+     */
+    private fun predictionView(): List<ImeCommand> {
+        if (isConverting || bracketChoice >= 0) {
+            predictions = emptyList()
+            predictionsFor = null
+            predictionSelected = -1
+            return emptyList()
+        }
+        val r = reading
+        val active = settings.prediction && isComposing && !caretInside && r.length >= 2
+        if (!active) {
+            val wasShown = predictions.isNotEmpty()
+            predictions = emptyList()
+            predictionsFor = null
+            predictionSelected = -1
+            return if (wasShown) listOf(ImeCommand.HideCandidates) else emptyList()
+        }
+        if (r == predictionsFor) return emptyList()
+        predictionsFor = r
+        predictionSelected = -1
+        val wasShown = predictions.isNotEmpty()
+        val now = composingText
+        predictions = candidateSource?.predict(r, settings.predictionCount).orEmpty().filter { it != now }
+        if (predictions.isEmpty()) return if (wasShown) listOf(ImeCommand.HideCandidates) else emptyList()
+        return listOf(ImeCommand.ShowCandidates(predictions, -1, prediction = true))
+    }
+
+    /** 予測の候補を確定する */
+    private fun commitPrediction(index: Int): EngineResult {
+        val text = predictions[index]
+        reset()
+        leftContext = (leftContext + text).takeLast(MAX_CONTEXT)
+        return EngineResult(listOf(ImeCommand.Commit(text), ImeCommand.HideCandidates), consumed = true)
+    }
+
+    /**
+     * 確定済みの文字（アプリで選んだもの）を変換し直す。読みが分からなければ null（何もしない）。
+     * アプリ側は、選んでいる範囲を未確定文字列が置き換える（setComposingText は選択範囲を置き換える）
+     */
+    fun reconvert(selected: String): List<ImeCommand>? {
+        if (!japanese || isComposing || selected.isEmpty() || selected.length > MAX_CONTEXT) return null
+        val pieces = piecesOf(selected) ?: return null
+        val source = candidateSource ?: return null
+        val r = pieces.joinToString("") { it.reading }
+        units.clear()
+        r.forEach { units += KanaUnit(it.toString(), rawOf(it.toString())) }
+        caret = units.size
+        if (pieces.none { it.known }) {
+            // かなだけ: ふつうに変換を始める
+            val commands = startConversion()
+            if (!isConverting) {
+                reset()
+                return null
+            }
+            reconvertOriginal = selected
+            return commands + conversionView()
+        }
+        // 確定したときの文節の区切りと表記のまま始める（元の表記が各文節の最初の候補。Space で次へ）
+        segs.clear()
+        for (p in pieces) {
+            if (p.known) {
+                val pinned = source.pinned(p.reading)
+                segs += Seg(p.reading, (listOf(p.surface) + pinned + source.segmentCandidates(p.reading, settings.candidateCount)).distinct(), pinned)
+                    .apply { reranked = true }
+            } else {
+                val conv = source.convert(p.reading, 1).firstOrNull() ?: Conversion(listOf(Segment(p.reading, p.surface)))
+                for (s in conv.segments) segs += newSeg(s.reading, s.surface, source)
+            }
+        }
+        focus = 0
+        showReading = false
+        reconvertOriginal = selected
+        return conversionView()
+    }
+
+    /** 再変換で読みを決めた区切り。[known] は確定したときに覚えた文節（でなければ、かななどをそのまま読みにしたもの） */
+    private class Piece(val surface: String, val reading: String, val known: Boolean)
+
+    /**
+     * [text] を、確定したときに覚えた文節と、かな・記号など字から読めるものに分ける（区切りの少ない分け方）。
+     * 分けられなければ、文全体として覚えたものを使う。漢字などで覚えていない文字があれば null
+     */
+    private fun piecesOf(text: String): List<Piece>? {
+        val best = arrayOfNulls<List<Piece>>(text.length + 1)
+        best[0] = emptyList()
+        fun offer(end: Int, list: List<Piece>) {
+            val cur = best[end]
+            if (cur == null || cur.size > list.size) best[end] = list
+        }
+        for (i in text.indices) {
+            val so = best[i] ?: continue
+            val c = text[i]
+            if (!CharWidth.isIdeographic(c)) {
+                val r = CharWidth.toHiragana(c.toString())
+                val last = so.lastOrNull()
+                offer(i + 1, if (last != null && !last.known) so.dropLast(1) + Piece(last.surface + c, last.reading + r, false) else so + Piece(c.toString(), r, false))
+            }
+            for ((surface, r) in segmentReadings) {
+                if (surface.isEmpty() || !text.startsWith(surface, i)) continue
+                offer(i + surface.length, so + Piece(surface, r, true))
+            }
+        }
+        best[text.length]?.let { return it }
+        return committedReadings[text]?.let { listOf(Piece(text, it, true)) }
+    }
+
+    /**
+     * [text] の読み。確定したときに覚えた表記（文節か文全体）をつないで作る。かな・記号などはそのまま読みにする。
+     * 漢字などで覚えていない文字があれば null
+     */
+    fun readingOf(text: String): String? = piecesOf(text)?.joinToString("") { it.reading }
+
+    /** 確定した表記の読みを覚えるか（学習しないよう求める入力欄では false） */
+    var rememberReadings = true
+
+    private fun remember(surface: String, r: String, map: LinkedHashMap<String, String> = committedReadings) {
+        if (!rememberReadings || surface.isEmpty() || r.isEmpty() || surface == r) return
+        map.remove(surface)
+        map[surface] = r
+        while (map.size > MAX_REMEMBERED) map.remove(map.keys.first())
+    }
+
 
     /** 入力欄が変わったなど、直接入力の打鍵の並びが途切れたとき */
     fun resetDirectTyped() {
@@ -313,13 +464,19 @@ class InputEngine(
         if (!isConverting && !showReading && settings.liveConversion) refreshCandidates()
         val text = composingText
         val wasConverting = isConverting
+        val wasPredicting = predictions.isNotEmpty()
         if (wasConverting) {
             val source = candidateSource
             for (seg in segs) if (seg.userChosen && seg.selected != 0) source?.learn(seg.reading, seg.surface)
+            for (seg in segs) remember(seg.surface, seg.reading, segmentReadings)
+        } else {
+            // ライブ変換のまま確定したときは、その変換の文節を覚える
+            conversions.firstOrNull { it.text == text }?.segments?.forEach { remember(it.surface, it.reading, segmentReadings) }
         }
+        remember(text, reading)
         reset()
         leftContext = (leftContext + text).takeLast(MAX_CONTEXT)
-        return listOfNotNull(ImeCommand.Commit(text), ImeCommand.HideCandidates.takeIf { wasConverting })
+        return listOfNotNull(ImeCommand.Commit(text), ImeCommand.HideCandidates.takeIf { wasConverting || wasPredicting })
     }
 
     /** 未確定を捨てる（入力欄が閉じられたとき） */
@@ -337,6 +494,10 @@ class InputEngine(
         segRerank = null
         showReading = false
         bracketChoice = -1
+        predictions = emptyList()
+        predictionsFor = null
+        predictionSelected = -1
+        reconvertOriginal = null
         requestId++
     }
 
@@ -409,7 +570,15 @@ class InputEngine(
                 moveCaret(input)
                 showReading = false
             }
-            KeyInput.Enter -> return EngineResult(commitAll(), consumed = true)
+            KeyInput.Enter -> {
+                if (predictionSelected in predictions.indices) return commitPrediction(predictionSelected)
+                return EngineResult(commitAll(), consumed = true)
+            }
+            KeyInput.Tab -> {
+                if (predictions.isEmpty()) return EngineResult(commitAll(), consumed = false)
+                predictionSelected = (predictionSelected + 1) % predictions.size
+                return EngineResult(listOf(ImeCommand.ShowCandidates(predictions, predictionSelected, prediction = true)), consumed = true)
+            }
             KeyInput.Escape -> {
                 reset()
                 return EngineResult(listOf(ImeCommand.SetComposing("")), consumed = true)
@@ -425,7 +594,10 @@ class InputEngine(
                 return EngineResult(commands + conversionView(), consumed = true)
             }
             is KeyInput.ConvertWidth -> convertWidth(input.target)
-            is KeyInput.SelectCandidate -> return EngineResult(emptyList(), consumed = true)
+            is KeyInput.SelectCandidate -> {
+                if (input.index in predictions.indices) return commitPrediction(input.index)
+                return EngineResult(emptyList(), consumed = true)
+            }
             KeyInput.Other -> return EngineResult(commitAll(), consumed = false)
             is KeyInput.SetJapanese, KeyInput.ToggleJapanese -> error("handled above")
         }
@@ -531,7 +703,16 @@ class InputEngine(
             // 変換中の Home・End・Delete は何もしない
             KeyInput.Home, KeyInput.End, KeyInput.DeleteForward -> {}
             KeyInput.Enter -> return EngineResult(commitAll(), consumed = true)
-            KeyInput.Escape, KeyInput.Backspace -> {
+            KeyInput.Escape -> reconvertOriginal?.let { original ->
+                // 再変換をやめたら、元の文字に戻す
+                reset()
+                return EngineResult(listOf(ImeCommand.Commit(original), ImeCommand.HideCandidates), consumed = true)
+            } ?: run {
+                stopConverting(commands)
+                commands += ImeCommand.SetComposing(composingText)
+                return EngineResult(commands, consumed = true)
+            }
+            KeyInput.Backspace -> {
                 stopConverting(commands)
                 commands += ImeCommand.SetComposing(composingText)
                 return EngineResult(commands, consumed = true)
@@ -542,7 +723,7 @@ class InputEngine(
                 commands += ImeCommand.SetComposing(composingText)
                 return EngineResult(commands, consumed = true)
             }
-            KeyInput.Other -> return EngineResult(commitAll(), consumed = false)
+            KeyInput.Other, KeyInput.Tab -> return EngineResult(commitAll(), consumed = false)
             // 変換中は置き換えない（確定してから、ふつうに打ち直してもらう）
             is KeyInput.ReplaceLast -> return EngineResult(emptyList(), consumed = true)
             is KeyInput.SetJapanese, KeyInput.ToggleJapanese -> error("handled above")
@@ -789,6 +970,9 @@ class InputEngine(
 
         /** 候補を数字で選ぶときの1頁の件数 */
         const val PAGE = 9
+
+        /** 再変換のために覚えておく、確定した表記の数 */
+        private const val MAX_REMEMBERED = 300
 
         /** 直接入力で覚えておく打鍵の数（スニペットのキーの長さの上限） */
         private const val MAX_TYPED = 64

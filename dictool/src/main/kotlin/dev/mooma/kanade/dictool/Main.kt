@@ -71,6 +71,7 @@ fun main(args: Array<String>) {
         "build" -> build(File(args[1]), File(args[2]))
         "eval" -> evaluate(File(args[1]), File(args[2]))
         "convert" -> convert(File(args[1]), args.drop(2))
+        "predict" -> predict(File(args[1]), args.drop(2))
         "zenz" -> zenzTry(File(args[1]), File(args[2]), File(args[3]), args.drop(4))
         "eval-context" -> evaluateContext(File(args[1]), File(args[2]), File(args[3]), File(args[4]))
         "whisper" -> whisperTry(File(args[1]), File(args[2]), args.drop(3).map(::File))
@@ -420,6 +421,24 @@ fun convert(outDir: File, inputs: List<String>) {
             val segs = segmenter?.segments(c.words)?.joinToString(" / ") { it.surface } ?: ""
             println("  ${c.cost}\t${c.text}\t${c.words.joinToString("|") { it.surface }}\t文節: $segs")
         }
+    }
+}
+
+/** 予測の候補と文節の候補を出して、かかった時間を見る（予測の重みを決めるため） */
+fun predict(outDir: File, inputs: List<String>) {
+    val converter = loadConverter(outDir)
+    val segmenter = Segmenter(PosTable.read(java.nio.ByteBuffer.wrap(File(outDir, "pos.kpos").readBytes())))
+    val source = dev.mooma.kanade.core.convert.DictionaryCandidateSource(converter, segmenter)
+    repeat(3) { source.predict("きーぼ", 5) }
+    for (input in inputs) {
+        var t = System.nanoTime()
+        val p = source.predict(input, 5)
+        val pm = (System.nanoTime() - t) / 1e6
+        t = System.nanoTime()
+        val seg = source.segmentCandidates(input, 10)
+        val sm = (System.nanoTime() - t) / 1e6
+        println("$input 予測 (${"%.1f".format(pm)}ms): ${p.joinToString(" / ")}")
+        println("  文節の候補 ${seg.size} 件 (${"%.1f".format(sm)}ms): ${seg.take(40).joinToString(" ")}")
     }
 }
 

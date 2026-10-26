@@ -33,6 +33,18 @@ You can choose the punctuation that `,` and `.` produce under "Input and convers
 | Shift+←→ | Starts conversion and shrinks or extends the first segment |
 | F6–F10, Ctrl+U/I/O/P/T | Converts to hiragana, katakana, half-width katakana, full-width alphanumerics, or half-width alphanumerics |
 | Esc | Cancels everything |
+| Tab | While predictions are shown, selects the next prediction (press Enter to insert it) |
+
+### Predictions
+
+Turn on Settings → Input and conversion → Predictions to see words that complete what you are typing in the candidate window (きーぼ → キーボード, ありがと → ありがとう, ありがとうございます). Earlier segments stay as converted and only the last word is completed (きょうはきーぼ → 今日はキーボード). Tap a prediction, or pick one with Tab and press Enter. Off by default.
+
+## Reconversion
+
+Select text that Kanade committed and press Space (or the Henkan key on a physical keyboard) to convert it again. Conversion starts with the segments and spellings you committed, so you can change just the segment you want. Esc restores the original text.
+
+- Readings come from what Kanade remembered when you committed (the latest 300). Hiragana, katakana, and symbols are read as they are. Kanji typed with another keyboard, or before Kanade was restarted, have no known reading, so Space works as usual (replaces the selection with a space)
+- Nothing is remembered in fields that ask not to learn (such as incognito mode)
 
 ## English spellings for katakana words
 
@@ -61,7 +73,7 @@ When you type an opening bracket such as 「 or （ in Japanese input, Kanade al
 | Esc, Backspace | Cancels conversion and goes back to kana |
 
 Labels such as "User dictionary", "Hiragana", "Katakana", "Symbol", "Emoji", "Full-width", and "Half-width" appear to the right of candidates.
-Every dictionary word with that reading appears as a candidate, including symbols ("やじるし" → "→") and emoji ("えがお" → "😀").
+Every dictionary word with that reading appears as a candidate, including symbols ("やじるし" → "→") and emoji ("えがお" → "😀"). When a segment is a word plus a particle (かんじが), every dictionary word for the word's reading is offered with the rest attached (漢字が, 感じが, 幹事が, 監事が, …).
 Readings such as "きょう" (today), "あした" (tomorrow), and "きのう" (yesterday) also offer dates (2026/10/03, 10月3日（土）, 令和8年10月3日, etc.), "いま" (now) offers the time, and "ことし" (this year) and "らいねん" (next year) offer the year.
 
 ## Learning
@@ -149,7 +161,7 @@ On the Glide and 12-key layouts, when you tap near the edge between keys, Kanade
 Works the same way as Unexpected Keyboard, and shortcuts work as-is.
 
 - Swipe a key toward a corner or up, down, left, or right to enter the small character printed there (on the top row, numbers are at the top right and symbols at the top left; the second row also has symbols at the top right and top left)
-- Shift, Ctrl, Alt, and Fn apply to the next keystroke only. Press twice to lock them (press again to release). While active, the key becomes pill-shaped
+- Shift, Ctrl, Alt, and Fn apply to the next keystroke only. Press twice to lock them (press again to release). While active, the key becomes pill-shaped. Switching layouts (to Glide or the 12-key) releases them
 - You can also hold a modifier while pressing another key (hold Ctrl and press a to select all; hold Shift and swipe Space left to select one character at a time). Modifier presses and releases are sent to the app too, so Shift+arrow selection and app shortcuts work just like on a physical keyboard
 - Swipe Ctrl up to switch to the 12-key layout, or down to float the keyboard (same position and directions as "あa1" on 12-key)
 - Swipe Alt up for Meta (⌘, the equivalent of the Windows key)
@@ -172,6 +184,7 @@ A 12-key layout that works like Gboard's. Tap the center character of a key for 
 - The mic key records only while you hold it (same as the mic on QWERTY). A short tap keeps listening
 - The left column is ↶, ☺, mic, and あa1; the right column is Backspace, Tab, Space (converts while composing), and Enter
 - The Tab key works like Tab on QWERTY: swipe up/down/left/right for arrows, or to a corner for Home, End, PgUp, and PgDn. Arrows and PgUp/PgDn repeat while you keep holding after the swipe
+- During conversion, the Tab key becomes the "Seg" key: swipe left to shrink the selected segment and right to extend it (Shift+←→ on a physical keyboard). Tap or swipe to the top-right for the next segment, the top-left for the previous one, and up/down for the previous/next candidate. After shrinking a segment, picking a candidate moves on to the next segment
 - On wide screens (such as the inner screen of a Fold), the keyboard splits into left and right halves, just like Gboard
 
 ### Emoji

@@ -72,8 +72,13 @@ class CandidateBar(context: Context, private val onSelect: (Int) -> Unit = {}) :
         addView(footer, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
     }
 
-    /** 候補の一覧。数字は選んでいる候補がいる頁（9件ずつ）にだけ付ける（数字キーで選べるもの） */
-    fun showCandidates(candidates: List<String>, selected: Int, preview: String? = null, labels: List<String?> = emptyList()) {
+    /**
+     * 候補の一覧。数字は選んでいる候補がいる頁（9件ずつ）にだけ付ける（数字キーで選べるもの）。
+     * [numbered] が false（入力中の予測の候補。数字キーは文字として打つ）なら、数字も「n/全体」も出さない
+     */
+    fun showCandidates(
+        candidates: List<String>, selected: Int, preview: String? = null, labels: List<String?> = emptyList(), numbered: Boolean = true,
+    ) {
         previewOnly = false
         this.preview.isSingleLine = true
         this.preview.ellipsize = TextUtils.TruncateAt.START
@@ -83,7 +88,7 @@ class CandidateBar(context: Context, private val onSelect: (Int) -> Unit = {}) :
         for ((i, row) in rows.withIndex()) {
             val n = i - pageStart
             val number = if (n in 0 until PAGE) "${n + 1}" else " "
-            texts[i].text = "$number  ${candidates[i]}"
+            texts[i].text = if (numbered) "$number  ${candidates[i]}" else candidates[i]
             texts[i].setTypeface(null, if (i == selected) Typeface.BOLD else Typeface.NORMAL)
             val label = labels.getOrNull(i)
             labelViews[i].text = label?.let(::localizeLabel).orEmpty()
@@ -91,7 +96,7 @@ class CandidateBar(context: Context, private val onSelect: (Int) -> Unit = {}) :
             row.setBackgroundColor(if (i == selected) selectedBg else Color.TRANSPARENT)
         }
         scroll.visibility = View.VISIBLE
-        footer.visibility = View.VISIBLE
+        footer.visibility = if (numbered) View.VISIBLE else View.GONE
         footer.text = "${selected + 1}/${candidates.size}"
         // 選んでいる候補が見える位置までスクロールする
         scroll.post {

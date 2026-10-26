@@ -55,4 +55,7 @@
     <string name="ime_mode_ja">Japanese</string>
     <string name="ime_mode_en">English</string>
     <string name="ime_mode_num">Numbers &amp; symbols</string>
+    <string name="ime_flick_segment">Seg</string>
+    <string name="ime_flick_segment_shrink">−</string>
+    <string name="ime_flick_segment_extend">+</string>
 </resources>

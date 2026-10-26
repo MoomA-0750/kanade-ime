@@ -16,6 +16,10 @@ class UserDictionary(private val entries: List<Pair<String, String>>) {
 
     fun lookup(reading: String): List<String> = byReading[reading].orEmpty()
 
+    /** [prefix] で始まり、それより長い読みの語（読み, 語）。予測の候補に使う */
+    fun withPrefix(prefix: String): List<Pair<String, String>> =
+        entries.filter { it.first.length > prefix.length && it.first.startsWith(prefix) }
+
     companion object {
         val EMPTY = UserDictionary(emptyList())
 

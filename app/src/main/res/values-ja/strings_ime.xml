@@ -54,4 +54,7 @@
     <string name="ime_mode_ja">日本語</string>
     <string name="ime_mode_en">英語</string>
     <string name="ime_mode_num">数字・記号</string>
+    <string name="ime_flick_segment">文節</string>
+    <string name="ime_flick_segment_shrink">縮</string>
+    <string name="ime_flick_segment_extend">伸</string>
 </resources>

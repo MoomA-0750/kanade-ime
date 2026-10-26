@@ -133,7 +133,38 @@ class KanaKanjiConverter(
         return dictionary.entriesOf(hit.second).map { dictionary.surface(it, reading) }.distinct()
     }
 
+    /**
+     * [prefix] で始まり、それより長い読みの辞書の語（予測の候補）。コストに、読みが長くなった分の重みを足して小さい順。
+     * 1文字の読みや、当てはまる読みが多すぎるときは引かない（短い読みから全部を見ると遅く、候補も当たらない）
+     */
+    fun predictWords(prefix: String, n: Int): List<Pair<String, String>> {
+        if (prefix.length < PREDICT_MIN_LENGTH) return emptyList()
+        val range = dictionary.prefixRange(prefix)
+        if (range.isEmpty() || range.last - range.first > PREDICT_MAX_READINGS) return emptyList()
+        val best = PriorityQueue<Triple<Int, String, String>>(compareByDescending { it.first })
+        for (r in range) {
+            val extra = dictionary.readingLengthOf(r) - prefix.length
+            if (extra <= 0) continue
+            var reading: String? = null
+            for (e in dictionary.entriesOf(r)) {
+                val score = dictionary.cost(e) + extra * PREDICT_LENGTH_PENALTY
+                if (best.size >= n * 2 && score >= best.peek().first) continue
+                val rd = reading ?: dictionary.reading(r).also { reading = it }
+                best += Triple(score, rd, dictionary.surface(e, rd))
+                if (best.size > n * 2) best.poll()
+            }
+        }
+        // 表記が同じものは、よいほうだけ残す
+        return best.sortedBy { it.first }.distinctBy { it.third }.take(n).map { it.second to it.third }
+    }
+
     companion object {
+        const val PREDICT_MIN_LENGTH = 2
+        /** これより多くの読みが当てはまる接頭辞では予測しない */
+        const val PREDICT_MAX_READINGS = 30000
+        /** 予測で、読みが1文字長くなるごとに足すコスト（短い語を先に出す） */
+        const val PREDICT_LENGTH_PENALTY = 400
+
         /** ユーザー辞書の語のコスト。Mozc の一般名詞（多くは 3000〜8000）より十分小さくする */
         const val USER_WORD_COST = 1000
 

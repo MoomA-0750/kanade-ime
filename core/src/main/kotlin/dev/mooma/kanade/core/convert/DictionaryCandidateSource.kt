@@ -70,11 +70,13 @@ class DictionaryCandidateSource(
      * 全角英数・記号を含む候補には半角のもの（逆も）をすぐ後ろに足す（「＋」と「+」、「！」と「!」）
      */
     override fun segmentCandidates(reading: String, n: Int): List<String> {
-        val lattice = converter.convert(reading, maxOf(n, LATTICE_CANDIDATES)).map { it.text }
+        val nBest = converter.convert(reading, maxOf(n, LATTICE_CANDIDATES))
+        val lattice = nBest.map { it.text }
         // 括弧1文字の文節には、ほかの括弧も出す（フリックの「や」で打った（ から「 『 【 などへ）
         val base = userDictionary.lookup(reading) + lattice.take(SYMBOL_POSITION) + reading + CharWidth.toKatakana(reading) +
             dev.mooma.kanade.core.Brackets.alternatives(reading) + english.lookup(reading) +
-            dates.lookup(reading) + symbols.lookup(reading) + emoji.lookup(reading) + lattice.drop(SYMBOL_POSITION) + converter.exactWords(reading)
+            dates.lookup(reading) + symbols.lookup(reading) + emoji.lookup(reading) + lattice.drop(SYMBOL_POSITION) + converter.exactWords(reading) +
+            headVariants(nBest.firstOrNull())
         // 日付・時刻には全角/半角の別の形を足さない（数字が多く、候補が倍に膨らむため）
         val dateSet = dates.lookup(reading).toSet()
         return base.flatMap { listOf(it) + if (it in dateSet) emptyList() else widthVariant(it) }.distinct()
@@ -99,6 +101,35 @@ class DictionaryCandidateSource(
         else -> null
     }
 
+    /**
+     * 1位が「語＋後ろ（助詞など）」に分かれるとき、先頭の語の読みの辞書の語すべてに後ろを付けたもの
+     * （「かんじが」→ 漢字が・感じが・幹事が…。文節の中の欲しい漢字が N-best に入らないことがあるため）
+     */
+    private fun headVariants(top: Candidate?): List<String> {
+        val words = top?.words ?: return emptyList()
+        if (words.size < 2) return emptyList()
+        val tail = words.drop(1).joinToString("") { it.surface }
+        return converter.exactWords(words[0].reading).map { it + tail }
+    }
+
+    /**
+     * 入力中の読みの先を予測した候補（「きーぼ」→ キーボード）。読み全体で見つからなければ、1位の変換の最後の文節の読みで探し、
+     * 前の文節はそのままの表記を付ける（「きょうはきーぼ」→ 今日はキーボード）
+     */
+    override fun predict(reading: String, n: Int): List<String> {
+        fun words(prefix: String): List<String> {
+            val user = (userDictionary.withPrefix(prefix) + converter.learnedDictionary.withPrefix(prefix))
+                .sortedBy { it.first.length }.map { it.second }
+            return (user + converter.predictWords(prefix, n).map { it.second }).distinct().take(n)
+        }
+        words(reading).takeIf { it.isNotEmpty() }?.let { return it }
+        val top = convert(reading, 1).firstOrNull() ?: return emptyList()
+        if (top.segments.size < 2) return emptyList()
+        val last = top.segments.last()
+        val head = top.segments.dropLast(1).joinToString("") { it.surface }
+        return words(last.reading).map { head + it }
+    }
+
     override fun pinned(reading: String): List<String> =
         (userDictionary.lookup(reading) + listOfNotNull(learning?.lookup(reading))).distinct()
 
@@ -108,7 +139,7 @@ class DictionaryCandidateSource(
         val TIME_READINGS = setOf("いま", "じこく", "げんざいじこく")
 
         /** 文節の候補でラティスから取る数（同じ読みの辞書の語は、これとは別に全部足す） */
-        const val LATTICE_CANDIDATES = 30
+        const val LATTICE_CANDIDATES = 60
     }
 
     private fun widthVariant(s: String): List<String> = when {

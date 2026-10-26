@@ -87,6 +87,21 @@ class SystemDictionary(buffer: ByteBuffer) {
         return result
     }
 
+    /** [prefix] で始まる読みの添字の範囲（読みは辞書順なので連続する）。予測の候補に使う */
+    fun prefixRange(prefix: CharSequence): IntRange {
+        var lo = 0
+        var hi = readingCount
+        for (depth in prefix.indices) {
+            if (lo >= hi) break
+            val c = prefix[depth]
+            lo = lowerBound(lo, hi, depth, c)
+            hi = upperBound(lo, hi, depth, c)
+        }
+        return lo until hi
+    }
+
+    fun readingLengthOf(index: Int): Int = readingLength(index)
+
     private fun readingStart(i: Int) = buf.getInt(readingOffsetsPos + 4 * i)
     private fun readingLength(i: Int) = buf.getInt(readingOffsetsPos + 4 * (i + 1)) - readingStart(i)
 

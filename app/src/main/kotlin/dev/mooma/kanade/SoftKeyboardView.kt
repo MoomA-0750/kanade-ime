@@ -95,6 +95,7 @@ class SoftKeyboardView(
             if (field == value) return
             field = value
             page = Page.LETTERS
+            clearModifiers()
             rows = buildRows()
             invalidate()
         }
@@ -771,6 +772,18 @@ class SoftKeyboardView(
             }
             else -> Latch.ONCE
         }
+    }
+
+    /**
+     * 修飾キーの状態（1打だけ・固定・押したまま）を全部外す。配列を替えたとき（グライド・フルキー・テンキーの行き来）に呼ぶ
+     * （固定したままほかの配列で打って戻ると、思わぬショートカットになるため）
+     */
+    fun clearModifiers() {
+        if (mods.isEmpty() && held.isEmpty()) return
+        mods.clear()
+        held.clear()
+        lastModTap = null
+        invalidate()
     }
 
     private fun consumeOnceModifiers() {

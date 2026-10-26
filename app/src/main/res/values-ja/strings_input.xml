@@ -19,6 +19,8 @@
     <string name="input_conversion_title">変換</string>
     <string name="input_live_conversion_title">ライブ変換</string>
     <string name="input_live_conversion_summary">打つたびに変換した結果を出します。</string>
+    <string name="input_prediction_title">予測の候補</string>
+    <string name="input_prediction_summary">打っている途中で、続きを予測した語（「きーぼ」→ キーボード）を候補の窓に出します。指で押すか、Tab で選んで Enter で入れます。</string>
     <string name="input_learning_title">学習する</string>
     <string name="input_learning_summary">前に選んだ候補を、次から上に出します。</string>
     <string name="input_clear_learning">学習を消す</string>

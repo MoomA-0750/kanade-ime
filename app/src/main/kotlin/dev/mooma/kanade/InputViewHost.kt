@@ -30,6 +30,8 @@ class InputViewHost(
     /** フリック配列を使うか（使わなければ QWERTY） */
     var flickLayout = false
         set(value) {
+            // 配列を替えたら、QWERTY で固定していた修飾キーは外す
+            if (field != value) qwerty.clearModifiers()
             field = value
             show(mode)
         }

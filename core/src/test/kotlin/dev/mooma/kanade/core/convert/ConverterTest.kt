@@ -23,6 +23,8 @@ class ConverterTest {
         WordEntry("わたる", 1, 1, 3000, "渡る"),
         WordEntry("てすと", 1, 1, 3000, "てすと"),
         WordEntry("てすと", 1, 1, 2000, "テスト"),
+        WordEntry("てすとけーす", 1, 1, 3000, "テストケース"),
+        WordEntry("てすとちゅう", 1, 1, 6000, "テスト中"),
     )
 
     private fun dictionary(): SystemDictionary {
@@ -155,5 +157,45 @@ class ConverterTest {
         assertEquals("橋を渡る", c.convert("はしをわたる", 1).single().text)
         c.userDictionary = dev.mooma.kanade.core.dict.UserDictionary.parse("わたる 亘る")
         assertEquals("橋を亘る", c.convert("はしをわたる", 1).single().text)
+    }
+
+    @Test
+    fun predictionsCompleteTheReading() {
+        val c = KanaKanjiConverter(dictionary(), connection(), unknownPosId = 1)
+        // 読みが長くなる語だけを、コストの小さい順に
+        assertEquals(
+            listOf("てすと" to "テスト", "てすと" to "てすと", "てすとけーす" to "テストケース", "てすとちゅう" to "テスト中"),
+            c.predictWords("てす", 5),
+        )
+        assertEquals(emptyList(), c.predictWords("て", 5))
+        assertEquals(emptyList(), c.predictWords("てすとけーす", 5))
+    }
+
+    @Test
+    fun predictionsKeepEarlierSegments() {
+        val source = DictionaryCandidateSource(
+            KanaKanjiConverter(dictionary(), connection(), unknownPosId = 1),
+            Segmenter(dev.mooma.kanade.core.dict.PosTable(ByteArray(3))),
+        )
+        assertEquals("テストケース", source.predict("てすと", 5).first())
+        // 読み全体では見つからないので、最後の文節（てすと）の先を予測し、前の文節はそのまま
+        assertTrue(source.predict("はしをてすと", 5).all { it.endsWith("テストケース") || it.endsWith("テスト中") })
+    }
+
+    @Test
+    fun segmentCandidatesIncludeEveryWordOfTheHead() {
+        val words = listOf(
+            WordEntry("かんじ", 1, 1, 3000, "漢字"),
+            WordEntry("かんじ", 1, 1, 3100, "感じ"),
+            WordEntry("かんじ", 1, 1, 9000, "幹事"),
+            WordEntry("が", 2, 2, 500, "が"),
+        )
+        val out = ByteArrayOutputStream()
+        DictionaryBuilder.write(words, out)
+        val source = DictionaryCandidateSource(
+            KanaKanjiConverter(SystemDictionary(ByteBuffer.wrap(out.toByteArray())), connection(), unknownPosId = 1),
+            Segmenter(dev.mooma.kanade.core.dict.PosTable(ByteArray(3))),
+        )
+        assertTrue(listOf("漢字が", "感じが", "幹事が").all { it in source.segmentCandidates("かんじが", 3) })
     }
 }

@@ -31,6 +31,10 @@ object CharWidth {
         )
     }
 
+    /** 漢字（読みを字から決められない文字）。々・〆 も含める */
+    fun isIdeographic(c: Char) = c in '\u4E00'..'\u9FFF' || c in '\u3400'..'\u4DBF' || c in '\uF900'..'\uFAFF' ||
+        c == '々' || c == '〆' || c == 'ヶ' || Character.isSurrogate(c)
+
     fun hasFullWidthAscii(s: String) = s.any { it in '\uFF01'..'\uFF5E' }
 
     fun hasHalfWidthAscii(s: String) = s.any { it in '!'..'~' }

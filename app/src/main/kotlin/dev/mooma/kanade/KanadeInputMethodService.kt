@@ -764,7 +764,8 @@ class KanadeInputMethodService : InputMethodService() {
             when (command) {
                 is ImeCommand.SetComposing -> panel.setSearchComposing(command.text)
                 is ImeCommand.Commit -> panel.commitSearch(command.text)
-                is ImeCommand.ShowCandidates -> panel.showSearchCandidates(command.candidates, command.selected)
+                // 絵文字の検索の欄では、予測の候補は出さない（検索の候補の行は変換の候補だけ）
+                is ImeCommand.ShowCandidates -> if (!command.prediction) panel.showSearchCandidates(command.candidates, command.selected)
                 ImeCommand.HideCandidates -> panel.hideSearchCandidates()
                 is ImeCommand.RequestRerank -> requestRerank(command)
                 is ImeCommand.ModeChanged -> {
@@ -955,6 +956,9 @@ class KanadeInputMethodService : InputMethodService() {
         // 学習しないよう求める入力欄（シークレットモードなど）では学習を止める
         candidateSource?.learningPaused = secureField ||
             ((attribute?.imeOptions ?: 0) and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0
+        // 再変換のための読みも、学習しない入力欄では覚えない
+        engine.rememberReadings = candidateSource?.learningPaused != true
+        hasSelection = attribute != null && attribute.initialSelStart != attribute.initialSelEnd
         // アプリごとの挙動（カーソルが出ないなど）を調べるため、入力欄の情報を記録する
         log(
             "start-input pkg=${attribute?.packageName} restarting=$restarting type=0x${Integer.toHexString(attribute?.inputType ?: 0)} " +
@@ -1024,6 +1028,7 @@ class KanadeInputMethodService : InputMethodService() {
         candidatesStart: Int, candidatesEnd: Int,
     ) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        hasSelection = newSelStart != newSelEnd && candidatesStart == -1
         // クリックなどで未確定文字列が外から確定・消去されたら、こちらの状態も捨てる
         // （帯に出しているときはアプリに未確定文字列がないので、この判定はしない）
         log("selection old=$oldSelStart,$oldSelEnd new=$newSelStart,$newSelEnd composing=$candidatesStart,$candidatesEnd")
@@ -1064,6 +1069,11 @@ class KanadeInputMethodService : InputMethodService() {
         }
         // 聞き続けるモードの途中の文字を入力欄に出していたら、キーがそれに効かないよう先に消す（話している間は出し直す）
         clearVoiceInField()
+        if (reconvertKey(event)) {
+            consumedDown += keyCode
+            log(event, "reconvert")
+            return true
+        }
         val input = mapper.onKeyDown(event)
         if (input == null) {
             val consume = keyCode == KeyEvent.KEYCODE_ALT_RIGHT && mapper.consumesRightAlt()
@@ -1081,6 +1091,32 @@ class KanadeInputMethodService : InputMethodService() {
             return true
         }
         return false
+    }
+
+    /** アプリで文字を選んでいる（入力中の文字ではない）。再変換に使う */
+    private var hasSelection = false
+
+    /**
+     * 再変換: 日本語入力中に、アプリで確定済みの文字を選んで Space（物理キーボードは変換キーも）を押すと、選んだ文字を変換し直す。
+     * 読みは Kanade が確定したときに覚えたもの（とかな）から引く。読めなければ何もせず、キーはふだんどおり
+     */
+    private fun reconvertKey(event: KeyEvent): Boolean {
+        val code = event.keyCode
+        val space = code == KeyEvent.KEYCODE_SPACE && !event.isShiftPressed && !event.isCtrlPressed && !event.isAltPressed && !event.isMetaPressed
+        if (!space && code != KeyEvent.KEYCODE_HENKAN) return false
+        if (!hasSelection || engine.isComposing || previewInBar || emojiSearching || event.repeatCount > 0) return false
+        if (!engine.japanese && code != KeyEvent.KEYCODE_HENKAN) return false
+        val ic = currentInputConnection ?: return false
+        val selected = ic.getSelectedText(0)?.toString() ?: return false
+        if (engine.readingOf(selected) == null) return false
+        if (!engine.japanese) handle(KeyInput.SetJapanese(true))
+        engine.leftContext = ic.getTextBeforeCursor(InputEngine.MAX_CONTEXT, 0)?.toString().orEmpty()
+        engine.rightContext = ic.getTextAfterCursor(InputEngine.MAX_CONTEXT, 0)?.toString().orEmpty()
+        val commands = engine.reconvert(selected) ?: return false
+        // 未確定文字列は、選んでいる範囲を置き換えて入る
+        apply(commands)
+        hasSelection = false
+        return true
     }
 
     private fun handleKeyUp(event: KeyEvent): Boolean {
@@ -1118,6 +1154,8 @@ class KanadeInputMethodService : InputMethodService() {
 
     private fun apply(commands: List<ImeCommand>) {
         if (commands.isEmpty()) return
+        // テンキーの Tab のキーを、変換中は文節を直すキーにする
+        flickView?.converting = engine.isConverting
         if (emojiSearching) {
             applyToSearch(commands)
             return
@@ -1154,7 +1192,10 @@ class KanadeInputMethodService : InputMethodService() {
                     ensureSourceFor(command.japanese)
                 }
                 is ImeCommand.ShowCandidates -> showBar(command.anchorOffset) {
-                    it.showCandidates(command.candidates, command.selected, if (previewInBar) engine.composingText else null, command.labels)
+                    it.showCandidates(
+                        command.candidates, command.selected, if (previewInBar) engine.composingText else null, command.labels,
+                        numbered = !command.prediction,
+                    )
                 }
                 ImeCommand.HideCandidates -> if (previewInBar && engine.isComposing) {
                     showBar { it.showPreview(engine.composingText) }
