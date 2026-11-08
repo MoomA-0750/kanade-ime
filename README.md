@@ -35,4 +35,8 @@ Samsung DeX で物理キーボードを使うための Android 日本語 IME。W
 - [docs/THIRD-PARTY.md](docs/THIRD-PARTY.md) — 取り込んでいる第三者のもの（辞書・モデル・ライブラリ）とライセンス
 - [docs/BUILD.md](docs/BUILD.md) — ビルドとエミュレータでの確認の手順
 
-リポジトリはローカルのみ。GitHub へは本人の確認なしに push しない。
+リポジトリは https://github.com/MoomA-0750/kanade-ime （公開）。push は本人に確かめてから行う。
+
+## ライセンス
+
+Kanade のコードは MIT（[LICENSE](LICENSE)）。取り込んでいる第三者のもの（辞書・モデル・ライブラリ・アイコン）は、それぞれのライセンスに従う（[docs/THIRD-PARTY.md](docs/THIRD-PARTY.md)）。
