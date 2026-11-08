@@ -2,6 +2,7 @@
 # Linux 版の配布物を、使う機械（aarch64 / x86_64）の上で組み立てる。scripts/linux.sh bundle で作った束を展開した中で動かす。
 # ネイティブ（zenz・whisper・fcitx5 のアドオン）はこの機械向けにビルドする（-mcpu=native。別の CPU の機械では遅いか動かない）。
 # 要るもの: cmake・C/C++ のコンパイラ・fcitx5 の開発用のヘッダー（Arch は fcitx5 に入っている）・curl。JDK はなければ落とす
+# 設定の画面の QML 版（qt/kanade-settings-qt）は、Qt 6.5 以上（qt6-base・qt6-declarative）と libxkbcommon の開発用のファイルがあるときだけ組む
 # 出力: dist/Kanade-linux-<arch>/ と dist/Kanade-linux-<arch>.tar.gz
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -45,6 +46,15 @@ cmake -S linux/fcitx5 -B "$CACHE/build-fcitx5" -DCMAKE_BUILD_TYPE=Release -DCMAK
 cmake --build "$CACHE/build-fcitx5" -j"$JOBS" 2>&1 | grep -E "error|Built target" || true
 test -f "$CACHE/build-fcitx5/kanade.so"
 
+QT_BUILT=0
+if cmake -S linux/settings/qt -B "$CACHE/build-settings-qt" -DCMAKE_BUILD_TYPE=Release -DKANADE_TESTS=OFF >/dev/null 2>&1; then
+  echo "設定の画面の QML 版をビルドする"
+  cmake --build "$CACHE/build-settings-qt" -j"$JOBS" 2>&1 | grep -E "error|Built target kanade-settings-qt" || true
+  [ -x "$CACHE/build-settings-qt/kanade-settings-qt" ] && QT_BUILT=1
+else
+  echo "Qt 6 の開発用のファイルがないので、設定の画面の QML 版は組まない（GTK 版だけ）"
+fi
+
 NAME="Kanade-linux-$ARCH"
 D="$ROOT/dist/$NAME"
 rm -rf "$D"
@@ -56,7 +66,12 @@ cp -r engine/lib "$D/lib"
 cp "$CACHE/build-zenz/libkanade_zenz.so" "$CACHE/build-whisper/libkanade_whisper.so" "$D/native/"
 cp "$CACHE/build-fcitx5/kanade.so" linux/fcitx5/kanade.conf "$D/fcitx5/"
 cp linux/fcitx5/kanade-addon.conf "$D/fcitx5/"
-cp linux/settings/kanade-settings.py linux/settings/dev.mooma.kanade.Settings.desktop "$D/settings/"
+cp linux/settings/kanade-settings-gtk.py linux/settings/dev.mooma.kanade.Settings.desktop "$D/settings/"
+cp linux/settings/kanade-settings "$D/bin/kanade-settings"
+if [ "$QT_BUILT" = 1 ]; then
+  mkdir -p "$D/qt"
+  install -m755 "$CACHE/build-settings-qt/kanade-settings-qt" "$D/qt/kanade-settings-qt"
+fi
 cp data/* "$D/data/"
 cp linux/install.sh linux/uninstall.sh docs/THIRD-PARTY.md "$D/"
 [ -f docs/LINUX-USAGE.md ] && cp docs/LINUX-USAGE.md "$D/"
@@ -67,12 +82,13 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 exec "$ROOT/runtime/bin/java" $KANADE_JAVA_OPTS -Xmx512m -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 \
   -Dkanade.settings="$ROOT/bin/kanade-settings" -cp "$ROOT/lib/*" dev.mooma.kanade.desktop.MainKt "$@"
 SH
-cat > "$D/bin/kanade-settings" <<'SH'
+# 設定の画面の入口は bin/kanade-settings（選び役。GTK 版と QML 版のどちらかに置き換わる）
+cat > "$D/bin/kanade-settings-gtk" <<'SH'
 #!/bin/sh
-# 設定の画面（GTK4・libadwaita。python-gobject と libadwaita が要る）。引数は開くページ（input・voice・dictionary・snippets・backup・usage）
+# 設定の画面の GTK 版（GTK4・libadwaita。python-gobject と libadwaita が要る）。引数は開くページ（input・voice・dictionary・snippets・backup・usage）
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-exec python3 "$ROOT/settings/kanade-settings.py" "$@"
+exec python3 "$ROOT/settings/kanade-settings-gtk.py" "$@"
 SH
-chmod +x "$D/bin/kanade-engine" "$D/bin/kanade-settings" "$D/install.sh" "$D/uninstall.sh"
+chmod +x "$D/bin/kanade-engine" "$D/bin/kanade-settings" "$D/bin/kanade-settings-gtk" "$D/install.sh" "$D/uninstall.sh"
 tar -C "$ROOT/dist" -czf "$ROOT/dist/$NAME.tar.gz" "$NAME"
 du -sh "$D" "$ROOT/dist/$NAME.tar.gz"

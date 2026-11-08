@@ -3,20 +3,42 @@
 #   エンジン: ~/.local/share/kanade（設定は ~/.config/kanade、記録は ~/.local/state/kanade/engine.log）
 #   fcitx5 のアドオン: ~/.local/share/kanade/fcitx5/kanade.so と ~/.local/share/fcitx5/{addon,inputmethod}/kanade.conf（sudo は要らない。
 #   アドオンの設定の Library に .so の場所をフルパスで書くと、fcitx5 は利用者のフォルダーからも読む）
-#   設定の画面: ~/.local/share/kanade/bin/kanade-settings（アプリの一覧にも「Kanade の設定」を足す。python-gobject と libadwaita が要る）
+#   設定の画面: ~/.local/share/kanade/bin/kanade-settings（選び役。アプリの一覧にも「Kanade の設定」を足す）。
+#   本体に入るのは GTK 版（bin/kanade-settings-gtk。python-gobject と libadwaita が要る）
 #   --voice: 音声入力のモデル（日本語の parakeet-ja 656MB・ReazonSpeech 73MB と、英語の parakeet-tdt v3 670MB）も落とす
 #   --add-im: fcitx5 の入力方式の一覧に Kanade を足す（既定の入力方式は変えない）
+#   --qt: 設定の画面の QML 版（~/.local/share/kanade/qt/kanade-settings-qt。qt6-base・qt6-declarative が要る）だけを入れる。
+#     本体を入れたあとに別に動かす。入れると GNOME 以外（Hyprland・Omarchy・KDE など）では QML 版が開く。外すのは uninstall.sh --qt
 set -euo pipefail
 cd "$(dirname "$0")"
-VOICE=0; ADD_IM=0
+VOICE=0; ADD_IM=0; QT=0
 for a in "$@"; do
   case "$a" in
     --voice) VOICE=1 ;;
     --add-im) ADD_IM=1 ;;
-    *) echo "使い方: install.sh [--voice] [--add-im]"; exit 2 ;;
+    --qt) QT=1 ;;
+    *) echo "使い方: install.sh [--voice] [--add-im] | install.sh --qt"; exit 2 ;;
   esac
 done
 DEST=${XDG_DATA_HOME:-$HOME/.local/share}/kanade
+
+if [ "$QT" = 1 ]; then
+  # QML 版だけ（エンジンと fcitx5 には触らない）
+  if [ ! -x qt/kanade-settings-qt ]; then
+    echo "この配布物には QML 版が入っていません（組むときに Qt 6 の開発用のファイルが要ります）"; exit 1
+  fi
+  if [ ! -x "$DEST/bin/kanade-settings" ]; then
+    echo "先に本体を入れてください（install.sh）"; exit 1
+  fi
+  rm -rf "$DEST/qt"
+  mkdir -p "$DEST/qt"
+  install -m755 qt/kanade-settings-qt "$DEST/qt/kanade-settings-qt"
+  echo "設定の画面の QML 版 -> $DEST/qt/kanade-settings-qt"
+  if ldd "$DEST/qt/kanade-settings-qt" 2>/dev/null | grep -q "not found"; then
+    echo "QML 版には Qt 6（6.5 以上）の Qt Quick が要ります（Arch: pacman -S qt6-base qt6-declarative qt6-wayland）"
+  fi
+  exit 0
+fi
 
 # 動いているエンジンを止める（新しいものは、次のキーでアドオンが起こす）
 pkill -f 'dev.mooma.kanade.desktop.MainKt serve' 2>/dev/null || true
@@ -30,11 +52,16 @@ cp THIRD-PARTY.md "$DEST/"
 [ -f LINUX-USAGE.md ] && cp LINUX-USAGE.md "$DEST/"
 cp uninstall.sh "$DEST/"
 echo "エンジン -> $DEST"
+if [ -d "$DEST/qt" ] && [ -x qt/kanade-settings-qt ]; then
+  echo "設定の画面の QML 版も入れ直すなら install.sh --qt"
+elif [ ! -d "$DEST/qt" ] && [ -x qt/kanade-settings-qt ]; then
+  echo "設定の画面の QML 版（Hyprland・Omarchy・KDE 向け）を入れるなら install.sh --qt"
+fi
 APPS=${XDG_DATA_HOME:-$HOME/.local/share}/applications
 mkdir -p "$APPS"
 sed "s|@BIN@|$DEST/bin|" settings/dev.mooma.kanade.Settings.desktop > "$APPS/dev.mooma.kanade.Settings.desktop"
 if ! python3 -c 'import gi; gi.require_version("Adw", "1")' 2>/dev/null; then
-  echo "設定の画面には python-gobject と libadwaita が要ります（Arch: pacman -S python-gobject libadwaita、Debian・Ubuntu: apt install python3-gi gir1.2-adw-1）"
+  echo "設定の画面の GTK 版には python-gobject と libadwaita が要ります（Arch: pacman -S python-gobject libadwaita、Debian・Ubuntu: apt install python3-gi gir1.2-adw-1）"
 fi
 
 FCITX_USER=${XDG_DATA_HOME:-$HOME/.local/share}/fcitx5

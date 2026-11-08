@@ -5,8 +5,10 @@ Windows 版の設定の画面（windows/settings、WinUI 3）と同じ中身を�
 設定・ユーザー辞書・スニペットのファイルの書式はエンジン（desktop/…/DesktopStore.kt）と同じで、
 書き換えるとエンジンが 2 秒ほどで読み直す。項目を足すときは DesktopStore.kt と両方を直す。
 Android 版の設定の読み込み・書き出し・学習の消去は、エンジンへソケットで頼む（docs/WINDOWS-PROTOCOL.md の admin）。
+QML 版（linux/settings/qt、Omarchy・Hyprland など向け）も同じ中身を持つ。項目や文言を変えるときは両方を直す。
+入口の kanade-settings（選び役）が、GNOME では GTK 版、それ以外では QML 版を開く。
 
-  kanade-settings [input|voice|dictionary|snippets|backup|usage]   開くページ
+  kanade-settings-gtk [input|voice|dictionary|snippets|backup|usage]   開くページ
 """
 import os
 import socket
