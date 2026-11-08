@@ -5,6 +5,9 @@ import dev.mooma.kanade.core.dict.PosTable
 
 /** ラティスの経路（語の並び）を文節にまとめる。内容語で新しい文節を始め、付属語は前に付ける */
 class Segmenter(private val pos: PosTable) {
+    /** 品詞 [id] で終わる語を予測の候補に出してよいか（[PosTable.predictable]） */
+    fun predictable(id: Int): Boolean = pos.predictable(id)
+
     fun segments(words: List<Word>): List<Segment> {
         val result = ArrayList<Segment>()
         val reading = StringBuilder()

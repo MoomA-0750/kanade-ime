@@ -162,7 +162,7 @@ class DictionaryCandidateSource(
         fun words(prefix: String): List<Pair<String, String>> {
             val user = (userDictionary.withPrefix(prefix) + converter.learnedDictionary.withPrefix(prefix))
                 .sortedBy { it.first.length }
-            return (user + converter.predictWords(prefix, n)).distinctBy { it.second }.take(n)
+            return (user + converter.predictWords(prefix, n, segmenter::predictable)).distinctBy { it.second }.take(n)
         }
         words(reading).takeIf { it.isNotEmpty() }?.let { return it }
         val top = convert(reading, 1).firstOrNull() ?: return emptyList()

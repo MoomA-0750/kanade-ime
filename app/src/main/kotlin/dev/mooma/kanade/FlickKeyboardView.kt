@@ -246,7 +246,7 @@ class FlickKeyboardView(
             fn == "voice" && voiceActive -> palette.voice to palette.onVoice
             fn == "enter" -> palette.accent to palette.onAccent
             fn != null -> palette.functionKey to palette.text
-            isSpecialChars(slot) -> palette.functionKey to palette.text
+            // 「小゛゜」「a/A」も文字のキーと同じ色（本人の指示。文字を打つキーとして並びに溶け込ませる）
             else -> palette.key to palette.text
         }
         keyPaint.color = fill
@@ -334,9 +334,6 @@ class FlickKeyboardView(
             key.char(FlickTables.Dir.DOWN)?.let { drawText(canvas, shown(it), cx, cy + dy, smallPaint) }
         }
     }
-
-    private fun isSpecialChars(slot: Slot) =
-        slot is Slot.Chars && layout.table[slot.index].label.let { it == FlickTables.DAKUTEN || it == FlickTables.CASE }
 
     /** 英字の大文字の状態を表示にも反映する */
     private fun shown(s: String) = if (layout == Layout.ALPHABET && upper && s.length == 1 && s[0].isLetter()) s.uppercase() else s

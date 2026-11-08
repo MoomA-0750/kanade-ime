@@ -248,4 +248,28 @@ class ConverterTest {
         val texts = source.convert("かつこう", 3).map { it.text }
         assertTrue(texts.take(3).any { it == "勝つ高" || it == "かつこう" || it.all { c -> c in "かつこう勝高" } })
     }
+
+    @Test
+    fun predictionsSkipConjugationFragments() {
+        val pos = dev.mooma.kanade.core.dict.PosTable.fromMozcIdDef(listOf(
+            "0 BOS/EOS,*,*,*,*,*,*",
+            "1 名詞,一般,*,*,*,*,*",
+            "2 動詞,自立,*,*,五段・ラ行,連用タ接続,乗る",
+            "3 動詞,自立,*,*,五段・ラ行,基本形,乗る",
+            "4 形容詞,自立,*,*,形容詞・イ段,連用テ接続,よろしい",
+        ))
+        assertTrue(pos.predictable(1) && pos.predictable(3) && pos.predictable(4))
+        assertTrue(!pos.predictable(2))
+        // 品詞の印は文節の区切り方を変えない
+        assertEquals(dev.mooma.kanade.core.dict.PosTable.Kind.CONTENT, pos.kind(2))
+        val words = listOf(
+            WordEntry("きどう", 1, 1, 3000, "起動"),
+            WordEntry("きどうにのっ", 2, 2, 3000, "軌道に乗っ"),
+            WordEntry("きどうにのる", 3, 3, 3500, "軌道に乗る"),
+        )
+        val out = ByteArrayOutputStream()
+        DictionaryBuilder.write(words, out)
+        val c = KanaKanjiConverter(SystemDictionary(ByteBuffer.wrap(out.toByteArray())), connection(), unknownPosId = 1)
+        assertEquals(listOf("軌道に乗る"), c.predictWords("きど", 5, pos::predictable).map { it.second }.filter { it.startsWith("軌道") })
+    }
 }

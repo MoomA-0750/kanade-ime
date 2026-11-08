@@ -210,9 +210,10 @@ class KanaKanjiConverter(
 
     /**
      * [prefix] で始まり、それより長い読みの辞書の語（予測の候補）。コストに、読みが長くなった分の重みを足して小さい順。
+     * 品詞が [predictable] でない語（活用の途中の形。辞書には「軌道に乗っ」のような形も1語として入っている）は出さない。
      * 1文字の読みや、当てはまる読みが多すぎるときは引かない（短い読みから全部を見ると遅く、候補も当たらない）
      */
-    fun predictWords(prefix: String, n: Int): List<Pair<String, String>> {
+    fun predictWords(prefix: String, n: Int, predictable: (Int) -> Boolean = { true }): List<Pair<String, String>> {
         if (prefix.length < PREDICT_MIN_LENGTH) return emptyList()
         val range = dictionary.prefixRange(prefix)
         if (range.isEmpty() || range.last - range.first > PREDICT_MAX_READINGS) return emptyList()
@@ -222,6 +223,7 @@ class KanaKanjiConverter(
             if (extra <= 0) continue
             var reading: String? = null
             for (e in dictionary.entriesOf(r)) {
+                if (!predictable(dictionary.rid(e))) continue
                 val score = dictionary.cost(e) + extra * PREDICT_LENGTH_PENALTY
                 if (best.size >= n * 2 && score >= best.peek().first) continue
                 val rd = reading ?: dictionary.reading(r).also { reading = it }

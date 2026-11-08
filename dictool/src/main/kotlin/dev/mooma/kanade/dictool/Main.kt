@@ -19,7 +19,7 @@ import kotlin.system.exitProcess
 /** Mozc OSS 辞書の取得元。版を固定する（上げるときはここを変え、評価をやり直す） */
 const val MOZC_COMMIT = "a069a88d4cb5c011de0f9aebb6c149a1c808d904"
 /** 辞書の生成物の版（2: pos.kpos、3: symbol.ksym、4: 記号と絵文字を分けた emoji.ksym） */
-const val BUILD_REVISION = 4
+const val BUILD_REVISION = 5
 
 /** 逐次の音声認識に使う sherpa-onnx の Android 用ライブラリ（onnxruntime を静的に含む AAR）。版とハッシュを固定する */
 const val SHERPA_AAR_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-static-link-onnxruntime-1.13.8.aar"
