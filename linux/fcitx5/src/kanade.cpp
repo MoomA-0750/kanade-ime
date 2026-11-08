@@ -447,7 +447,7 @@ private:
             } else if (type == "cands" && c.size() >= 3) {
                 showCandidates(ic, c);
             } else if (type == "hidecands") {
-                panel.setCandidateList(nullptr);
+                hideCandidates(ic);
             } else if (type == "indicator" && c.size() >= 2) {
                 panel.setAuxUp(fcitx::Text(c[1]));
                 int ms = c.size() >= 3 ? toInt(c[2]) : 0;
@@ -546,7 +546,7 @@ private:
             list->append<KanadeCandidate>(this, i, c[at], at + 1 < c.size() ? c[at + 1] : "");
         }
         if (list->totalSize() == 0) {
-            ic->inputPanel().setCandidateList(nullptr);
+            hideCandidates(ic);
             return;
         }
         if (selected >= 0) list->setGlobalCursorIndex(selected - page * PAGE);
@@ -596,6 +596,12 @@ private:
         send({"commitall", std::to_string(id)});
         waitFor(id);
         composing_ = false;
+    }
+
+    // 候補の窓を閉じる。頁の表示（「1/3」）も一緒に消す（残すと、カーソルの下に頁の表示だけが出続ける）
+    void hideCandidates(fcitx::InputContext *ic) {
+        ic->inputPanel().setCandidateList(nullptr);
+        ic->inputPanel().setAuxDown(fcitx::Text());
     }
 
     void clearPanel(fcitx::InputContext *ic) {
