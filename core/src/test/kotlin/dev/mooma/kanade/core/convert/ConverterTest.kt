@@ -198,4 +198,54 @@ class ConverterTest {
         )
         assertTrue(listOf("漢字が", "感じが", "幹事が").all { it in source.segmentCandidates("かんじが", 3) })
     }
+
+    @Test
+    fun convertWithPrefixFollowsTheModelsPrefix() {
+        val c = KanaKanjiConverter(dictionary(), connection(), unknownPosId = 1)
+        assertEquals("橋を渡る", c.convert("はしをわたる", 1).first().text)
+        // 接頭辞の途中で語が切れても、語の中で終わってもよい
+        assertEquals("箸を渡る", c.convertWithPrefix("はしをわたる", "箸")?.text)
+        assertEquals("端を渡る", c.convertWithPrefix("はしをわたる", "端を渡")?.text)
+        assertEquals("は市を渡る", c.convertWithPrefix("はしをわたる", "は市")?.text)
+        assertNull(c.convertWithPrefix("はしをわたる", "犬"))
+    }
+
+    private fun typoSource(): DictionaryCandidateSource {
+        val words = listOf(
+            WordEntry("がっこう", 1, 1, 3000, "学校"),
+            WordEntry("かつ", 1, 1, 5000, "勝つ"),
+            WordEntry("こう", 1, 1, 5000, "高"),
+            WordEntry("てんき", 1, 1, 3000, "天気"),
+            WordEntry("でんき", 1, 1, 2900, "電気"),
+        )
+        val out = ByteArrayOutputStream()
+        DictionaryBuilder.write(words, out)
+        return DictionaryCandidateSource(
+            KanaKanjiConverter(SystemDictionary(ByteBuffer.wrap(out.toByteArray())), connection(), unknownPosId = 1),
+            Segmenter(dev.mooma.kanade.core.dict.PosTable(ByteArray(3))),
+        )
+    }
+
+    @Test
+    fun flickTyposAreCorrectedOnlyWhenTurnedOn() {
+        val source = typoSource()
+        assertEquals("勝つ高", source.convert("かつこう", 3).first().text)
+        assertTrue(source.segmentCandidates("かつこう", 10).none { it == "学校" })
+        source.typoCorrection = true
+        // 「か」の濁点と「っ」の付け忘れを直す。文節の読みは打ったままの読み
+        val top = source.convert("かつこう", 3).first()
+        assertEquals("学校", top.text)
+        assertEquals("かつこう", top.segments.joinToString("") { it.reading })
+        assertTrue("学校" in source.segmentCandidates("かつこう", 10))
+        // 打ったままでも語になるなら、少し良いだけの語へは直さない（てんき → 電気 にしない）
+        assertEquals("天気", source.convert("てんき", 3).first().text)
+    }
+
+    @Test
+    fun topThreeKeepsWhatWasTyped() {
+        val source = typoSource()
+        source.typoCorrection = true
+        val texts = source.convert("かつこう", 3).map { it.text }
+        assertTrue(texts.take(3).any { it == "勝つ高" || it == "かつこう" || it.all { c -> c in "かつこう勝高" } })
+    }
 }

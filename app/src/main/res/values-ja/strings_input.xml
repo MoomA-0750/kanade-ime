@@ -113,4 +113,12 @@
     <string name="input_swipe_distance_note">キーの幅に対して、どれだけ指を動かしたら払い（数字・記号）にするかです。文字を打ったつもりが記号や数字になるときは大きくしてください。</string>
     <string name="input_tap_correction">タップのずれを補う</string>
     <string name="input_tap_correction_note">グライドとテンキーで、キーの境目あたりを触ったときは、入力中の語のあとに来やすい文字のキーにします。キーの真ん中あたりを触ったときは、そのキーのままです。</string>
+    <string name="input_zenz_mode_label">zenz の使い方</string>
+    <string name="input_zenz_mode_rerank">並べ替え</string>
+    <string name="input_zenz_mode_correct">確かめて直す</string>
+    <string name="input_zenz_mode_rerank_note">辞書の上位10件を zenz が採点して並べ替えます。</string>
+    <string name="input_zenz_mode_correct_note">azooKey の Zenzai と同じ方式です。辞書の1位を zenz が確かめ、違うと見た所から辞書を探し直します。正解の多さは並べ替えと同じくらいで、計算はずっと少なく済みます。</string>
+    <string name="input_zenz_profile_label">変換のプロフィール</string>
+    <string name="input_zenz_profile_hint">例: プログラマ。技術の話が多い</string>
+    <string name="input_zenz_profile_summary">自分のことを zenz に伝え、合う語を選ばせます（25文字まで。いま %1$d 文字）。空なら使いません。</string>
 </resources>

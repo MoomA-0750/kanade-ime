@@ -252,6 +252,56 @@ JNIEXPORT jfloatArray JNICALL Java_dev_mooma_kanade_zenz_ZenzNative_score(JNIEnv
     return result;
 }
 
+// prompt に続けて candidate を出すとき、各位置でモデルが一番に選ぶトークン（argmax）が candidate と一致するかを見る
+// （Zenzai の検証）。戻り値の先頭のバイトが 0 なら最後（文末記号）まで一致した、またはモデルが途中で文を終えたがった。
+// 1 なら、ずれた位置までの candidate の表記＋モデルが選んだトークンの UTF-8 が続く。中断・失敗なら null。
+// softmax は取らない（argmax は logits のままで決まる）
+JNIEXPORT jbyteArray JNICALL Java_dev_mooma_kanade_zenz_ZenzNative_verify(JNIEnv *env, jobject, jlong handle,
+                                                                          jbyteArray promptBytes, jbyteArray candidateBytes) {
+    auto *z = reinterpret_cast<Zenz *>(handle);
+    const int n_vocab = llama_vocab_n_tokens(z->vocab);
+    const llama_token eos = llama_vocab_eos(z->vocab);
+    z->abort = false;
+    std::vector<llama_token> tokens = tokenize(*z, to_string(env, promptBytes));
+    if (tokens.empty()) return nullptr;
+    const int P = static_cast<int>(tokens.size());
+    std::vector<llama_token> cand = tokenize(*z, to_string(env, candidateBytes));
+    tokens.insert(tokens.end(), cand.begin(), cand.end());
+    // 位置 P-1+j の logits が candidate の j 番目（j == 長さなら文末記号）を当てる
+    int offset = decode(*z, tokens, P - 1);
+    if (offset < 0) return nullptr;
+    std::string out(1, '\0');
+    char piece[64];
+    for (size_t j = 0; j <= cand.size(); j++) {
+        const float *logits = llama_get_logits_ith(z->ctx, P - 1 + static_cast<int>(j) - offset);
+        llama_token want = j < cand.size() ? cand[j] : eos;
+        // 候補の途中では文末記号を選ばせない（読みがまだ残っているので、文はそこで終われない。
+        // 終えたがったときは、文末記号の次に選ぶ字で直す。「また後で寝」→「また後でね」）
+        llama_token best = -1;
+        for (int t = 0; t < n_vocab; t++) {
+            if (t == eos && j < cand.size()) continue;
+            if (best < 0 || logits[t] > logits[best]) best = t;
+        }
+        if (best == want) continue;
+        if (best == eos) break;  // 候補が終わった所で、モデルはまだ続けたがった。読みは使い切っているので直さない
+        out[0] = 1;
+        for (size_t i = 0; i <= j; i++) {
+            llama_token t = i < j ? cand[i] : best;
+            int len = llama_token_to_piece(z->vocab, t, piece, sizeof(piece), 0, false);
+            if (len > 0) out.append(piece, static_cast<size_t>(len));
+        }
+        break;
+    }
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(out.size()));
+    env->SetByteArrayRegion(result, 0, static_cast<jsize>(out.size()), reinterpret_cast<const jbyte *>(out.data()));
+    return result;
+}
+
+JNIEXPORT void JNICALL Java_dev_mooma_kanade_zenz_ZenzNative_setThreads(JNIEnv *, jobject, jlong handle, jint threads) {
+    auto *z = reinterpret_cast<Zenz *>(handle);
+    if (z) llama_set_n_threads(z->ctx, threads, threads);
+}
+
 // prompt に続けて文末記号まで貪欲に生成した UTF-8 のバイト列。中断されたら null。
 JNIEXPORT jbyteArray JNICALL Java_dev_mooma_kanade_zenz_ZenzNative_greedy(JNIEnv *env, jobject, jlong handle,
                                                                          jbyteArray promptBytes, jint maxTokens) {

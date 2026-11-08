@@ -7,4 +7,6 @@ internal object ZenzNative {
     external fun cancel(handle: Long)
     external fun score(handle: Long, prompt: ByteArray, candidates: Array<ByteArray>): FloatArray?
     external fun greedy(handle: Long, prompt: ByteArray, maxTokens: Int): ByteArray?
+    external fun verify(handle: Long, prompt: ByteArray, candidate: ByteArray): ByteArray?
+    external fun setThreads(handle: Long, threads: Int)
 }

@@ -32,9 +32,11 @@ $D fetch .cache && $D build .cache/mozc-<コミット> .cache/out      # 辞書�
 $D convert .cache/out きょうはいいてんきですね                      # 辞書だけで変換
 scripts/build-host-zenz.sh                                           # 手元用の libkanade_zenz.so
 $D eval-zenz .cache/out eval/daily.tsv .cache/models/zenz-v3.2-xsmall-Q5_K_M.gguf .cache/host-zenz/libkanade_zenz.so 10
+$D eval-zenzai .cache/out eval/daily.tsv .cache/models/zenz-v3.2-xsmall-Q5_K_M.gguf .cache/host-zenz/libkanade_zenz.so   # 並べ替えと Zenzai の方式（確かめて直す）を比べる
+$D typo .cache/out しやしん ちよつと                                  # テンキーの打ち間違いを直した候補
 ```
 
-- 作業機は VM で CPU に AVX2 が見えないので、zenz の時間は参考にならない（正解率は正しい）。速度は Fold 7 で測る
+- 作業機は VM で CPU に AVX2 が見えないので、zenz の時間は参考にならない（正解率は正しい）。速度は Fold 7 で測る（設定の「テストとログ」→「評価セットで測る」。結果は `adb logcat -s KanadeBench` にも出る）
 
 ## 音声認識（手元）
 

@@ -32,6 +32,11 @@ class ZenzReranker(private val library: File, private val model: File, private v
         return Reranker(m).rerank(request.leftContext, request.reading, request.candidates, rightContext = request.rightContext)?.candidates
     }
 
+    override fun rankPredictions(request: ImeCommand.RequestPredictionRank): List<String>? {
+        val m = model() ?: return null
+        return Reranker(m).rankPredictions(request.leftContext, request.items)
+    }
+
     override fun cancel() {
         zenz?.cancel()
     }

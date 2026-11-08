@@ -13,15 +13,23 @@ import java.io.Closeable
 class ZenzModel private constructor(private var handle: Long) : LanguageModel, Closeable {
     private val lock = Any()
 
+    /** 変換のプロフィール（「プログラマ。技術の話が多い」など。v3 から。空なら付けない）。プロンプトの先頭に置く */
+    @Volatile var profile: String = ""
+
+    /** 推論に使うスレッドの数 */
+    fun setThreads(threads: Int) = synchronized(lock) {
+        if (handle != 0L) ZenzNative.setThreads(handle, threads)
+    }
+
     override fun score(leftContext: String, reading: String, candidates: List<String>, rightContext: String): FloatArray? = synchronized(lock) {
         if (handle == 0L) return null
-        val prompt = prompt(leftContext, reading, rightContext).encodeToByteArray()
+        val prompt = prompt(leftContext, reading, rightContext, profile).encodeToByteArray()
         return ZenzNative.score(handle, prompt, candidates.map { normalize(it).encodeToByteArray() }.toTypedArray())
     }
 
     override fun generate(leftContext: String, reading: String, rightContext: String): String? = synchronized(lock) {
         if (handle == 0L) return null
-        val prompt = prompt(leftContext, reading, rightContext).encodeToByteArray()
+        val prompt = prompt(leftContext, reading, rightContext, profile).encodeToByteArray()
         // 出力はおおむね読みより短い。ずれても打ち切れるよう読みの長さ＋余裕を上限にする
         val bytes = ZenzNative.greedy(handle, prompt, reading.length + 8) ?: return null
         return bytes.decodeToString().takeIf { it.isNotEmpty() && '�' !in it }
@@ -31,11 +39,20 @@ class ZenzModel private constructor(private var handle: Long) : LanguageModel, C
         if (handle == 0L) return null
         // プロンプトは左文脈と読みの始まりの印まで。読み・変換の始まりの印・変換を候補として続ける
         val left = normalize(leftContext).takeLast(MAX_LEFT_CONTEXT)
-        val prompt = ((if (left.isEmpty()) "" else "\uEE02$left") + "\uEE00").encodeToByteArray()
+        val prompt = (profilePart(profile) + (if (left.isEmpty()) "" else "\uEE02$left") + "\uEE00").encodeToByteArray()
         return ZenzNative.score(
             handle, prompt,
             items.map { (reading, output) -> (CharWidth.toKatakana(normalize(reading)) + "\uEE01" + normalize(output)).encodeToByteArray() }.toTypedArray(),
         )
+    }
+
+    override fun verify(leftContext: String, reading: String, candidate: String, rightContext: String): String? = synchronized(lock) {
+        if (handle == 0L) return null
+        val prompt = prompt(leftContext, reading, rightContext, profile).encodeToByteArray()
+        val bytes = ZenzNative.verify(handle, prompt, normalize(candidate).encodeToByteArray()) ?: return null
+        if (bytes.isEmpty() || bytes[0].toInt() == 0) return ""
+        // トークンがバイトの途中で切れていたら（UTF-8 として読めなければ）、直す手がかりにしない
+        return bytes.copyOfRange(1, bytes.size).decodeToString().takeIf { '\uFFFD' !in it } ?: ""
     }
 
     override fun cancel() {
@@ -50,6 +67,9 @@ class ZenzModel private constructor(private var handle: Long) : LanguageModel, C
     companion object {
         const val MAX_LEFT_CONTEXT = 40
 
+        /** プロフィールの長さの上限（azooKey の ZenzPromptBuilder と同じ） */
+        const val MAX_PROFILE = 25
+
         /** [modelPath] の GGUF を読む。ネイティブライブラリは読み込み済みであること */
         fun open(modelPath: String, threads: Int = 4, nCtx: Int = 512): ZenzModel? {
             val h = ZenzNative.init(modelPath.encodeToByteArray(), threads, nCtx)
@@ -57,12 +77,15 @@ class ZenzModel private constructor(private var handle: Long) : LanguageModel, C
         }
 
         /** 右の文脈（カーソルの後ろの文）は v3.2 から。左の文脈のあとに置く（azooKey の ZenzPromptBuilder と同じ並び） */
-        fun prompt(leftContext: String, reading: String, rightContext: String = ""): String {
+        fun prompt(leftContext: String, reading: String, rightContext: String = "", profile: String = ""): String {
             val left = normalize(leftContext).takeLast(MAX_LEFT_CONTEXT)
             val right = normalize(rightContext).take(MAX_LEFT_CONTEXT)
             val context = (if (left.isEmpty()) "" else "$left") + (if (right.isEmpty()) "" else "$right")
-            return context + "" + CharWidth.toKatakana(normalize(reading)) + ""
+            return profilePart(profile) + context + "" + CharWidth.toKatakana(normalize(reading)) + ""
         }
+
+        /** プロフィールは左文脈より前に置く（v3 の並び: プロフィール・話題・文体・設定・左文脈・右文脈・入力） */
+        fun profilePart(profile: String): String = normalize(profile.trim()).take(MAX_PROFILE).let { if (it.isEmpty()) "" else "\uEE03$it" }
 
         /** トークナイザは半角スペースと改行を [UNK] にするので、全角スペースに替え、改行は消す */
         fun normalize(text: String) = text.replace(' ', '　').replace("\n", "").replace("\r", "")

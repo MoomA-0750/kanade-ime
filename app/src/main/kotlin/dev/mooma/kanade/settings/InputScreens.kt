@@ -68,6 +68,20 @@ fun ColumnScope.InputScreen() {
         SwitchRow(stringResource(R.string.input_live_conversion_title), live, { live = it }, stringResource(R.string.input_live_conversion_summary))
         var prediction by rememberPref({ settings.prediction }, { settings.prediction = it })
         SwitchRow(stringResource(R.string.input_prediction_title), prediction, { prediction = it }, stringResource(R.string.input_prediction_summary))
+        Text(stringResource(R.string.input_zenz_mode_label))
+        var zenzMode by rememberPref({ settings.zenzMode }, { settings.zenzMode = it })
+        ConnectedChoices(listOf(
+            "CORRECT" to stringResource(R.string.input_zenz_mode_correct),
+            "RERANK" to stringResource(R.string.input_zenz_mode_rerank),
+        ), zenzMode, { zenzMode = it })
+        Note(stringResource(if (zenzMode == "CORRECT") R.string.input_zenz_mode_correct_note else R.string.input_zenz_mode_rerank_note))
+        var profile by rememberPref({ settings.zenzProfile }, { settings.zenzProfile = it })
+        OutlinedTextField(
+            profile, { profile = it.replace("\n", "").take(25) }, Modifier.fillMaxWidth(), singleLine = true,
+            label = { Text(stringResource(R.string.input_zenz_profile_label)) },
+            placeholder = { Text(stringResource(R.string.input_zenz_profile_hint)) },
+            supportingText = { Text(stringResource(R.string.input_zenz_profile_summary, profile.length)) },
+        )
         var learning by rememberPref({ settings.learningEnabled }, { settings.learningEnabled = it })
         SwitchRow(stringResource(R.string.input_learning_title), learning, { learning = it }, stringResource(R.string.input_learning_summary))
         var confirm by remember { mutableStateOf(false) }

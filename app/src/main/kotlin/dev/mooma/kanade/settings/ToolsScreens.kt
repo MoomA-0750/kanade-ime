@@ -68,6 +68,8 @@ fun ColumnScope.ToolsScreen() {
                 }
             }.start()
         }
+        var threads by rememberPref({ settings.zenzThreads }, { settings.zenzThreads = it })
+        SliderRow(stringResource(R.string.app_tools_zenz_threads), threads, 1..8, 1, { threads = it }) { "$it" }
         OutlinedTextField(reading, { reading = it }, Modifier.fillMaxWidth(), placeholder = { Text(stringResource(R.string.app_tools_reading_example)) }, singleLine = true)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Button(onClick = { run { ConversionBench.tryConvert(context, reading.trim()) } }, enabled = !running && reading.isNotBlank()) { Text(stringResource(R.string.app_tools_convert)) }

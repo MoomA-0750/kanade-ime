@@ -38,8 +38,9 @@ class KanaKanjiConverter(
         var best = Int.MAX_VALUE
     }
 
-    fun convert(input: String, n: Int = 10, maxExpansions: Int = 20000): List<Candidate> {
-        if (input.isEmpty()) return emptyList()
+    private class Lattice(val beginAt: Array<ArrayList<Node>>, val endAt: Array<ArrayList<Node>>, val bos: Node, val eos: Node)
+
+    private fun lattice(input: String): Lattice {
         val len = input.length
         val beginAt = Array(len + 1) { ArrayList<Node>() }
         val endAt = Array(len + 1) { ArrayList<Node>() }
@@ -81,6 +82,17 @@ class KanaKanjiConverter(
         }
         val eos = Node(len, len, Word("", "", 0, 0, 0))
         beginAt[len] += eos
+        return Lattice(beginAt, endAt, bos, eos)
+    }
+
+    fun convert(input: String, n: Int = 10, maxExpansions: Int = 20000): List<Candidate> {
+        if (input.isEmpty()) return emptyList()
+        val len = input.length
+        val l = lattice(input)
+        val beginAt = l.beginAt
+        val endAt = l.endAt
+        val bos = l.bos
+        val eos = l.eos
 
         // 前向き: 各ノードの最小コスト
         for (pos in 0..len) {
@@ -127,6 +139,69 @@ class KanaKanjiConverter(
         return results
     }
 
+    /**
+     * 表記が [prefix] で始まる経路のうち、コストが最小のもの（Zenzai の制約付きの探し直し）。なければ null。
+     * 前向きのビタビで、各ノードについて「[prefix] の何文字目まで合ったか」ごとに最小コストを持つ
+     */
+    fun convertWithPrefix(input: String, prefix: String): Candidate? {
+        if (input.isEmpty()) return null
+        val l = lattice(input)
+        val p = prefix.length
+        // ノードごとに、合った文字数 m（0..p）ごとの最小コストと、ひとつ前のノード・その m
+        class State(val cost: IntArray, val prev: Array<Node?>, val prevMatched: IntArray)
+        val states = HashMap<Node, State>()
+        fun stateOf(node: Node) = states.getOrPut(node) {
+            State(IntArray(p + 1) { Int.MAX_VALUE }, arrayOfNulls(p + 1), IntArray(p + 1))
+        }
+        stateOf(l.bos).cost[0] = 0
+        // 合った文字数 m の経路にこの表記を足したときの新しい m。合わなければ -1
+        fun advance(m: Int, surface: String): Int {
+            if (m == p) return p
+            val rest = p - m
+            return if (surface.length <= rest) {
+                if (prefix.regionMatches(m, surface, 0, surface.length)) m + surface.length else -1
+            } else {
+                if (surface.regionMatches(0, prefix, m, rest)) p else -1
+            }
+        }
+        for (pos in 0..input.length) {
+            val prevs = l.endAt[pos]
+            for (node in l.beginAt[pos]) {
+                for (prev in prevs) {
+                    val ps = states[prev] ?: continue
+                    val conn = connection.cost(prev.word.rid, node.word.lid)
+                    for (m in 0..p) {
+                        val c = ps.cost[m]
+                        if (c == Int.MAX_VALUE) continue
+                        val next = advance(m, node.word.surface)
+                        if (next < 0) continue
+                        val total = c + conn + node.word.cost
+                        val ns = stateOf(node)
+                        if (total < ns.cost[next]) {
+                            ns.cost[next] = total
+                            ns.prev[next] = prev
+                            ns.prevMatched[next] = m
+                        }
+                    }
+                }
+            }
+        }
+        val end = states[l.eos] ?: return null
+        if (end.cost[p] == Int.MAX_VALUE) return null
+        val words = ArrayList<Word>()
+        var node: Node? = end.prev[p]
+        var m = end.prevMatched[p]
+        while (node != null && node !== l.bos) {
+            words += node.word
+            val s = states.getValue(node)
+            val prev = s.prev[m]
+            m = s.prevMatched[m]
+            node = prev
+        }
+        words.reverse()
+        return Candidate(words, end.cost[p])
+    }
+
     /** [reading] とちょうど同じ読みの辞書の語（コストの小さい順）。候補を全部出すときに使う */
     fun exactWords(reading: String): List<String> {
         val hit = dictionary.prefixSearch(reading, 0, reading.length).lastOrNull { it.first == reading.length } ?: return emptyList()
@@ -158,7 +233,60 @@ class KanaKanjiConverter(
         return best.sortedBy { it.first }.distinctBy { it.third }.take(n).map { it.second to it.third }
     }
 
+    /**
+     * フリック入力の打ち間違い（濁点・半濁点・小書きの付け忘れや付けすぎ）を直した読みの変換のうち、
+     * 直した数×[TYPO_PENALTY] を足しても、打ったままの読みの変換よりコストが小さいもの（小さい順）。
+     * 直すのは1か所まで、読みが [TYPO_TWO_MAX_LENGTH] 文字以下なら2か所まで（「ちよつと」→ ちょっと）。
+     * azooKey の誤り訂正の表のうちフリック用のもの（タ→ダ、ツ→ッ など）にならう。返す候補のコストは、直したぶんを足したもの
+     */
+    fun typoCorrections(reading: String, n: Int = 3): List<Candidate> {
+        if (reading.length < 2 || reading.length > TYPO_MAX_LENGTH) return emptyList()
+        val original = convert(reading, 1).firstOrNull()?.cost ?: Int.MAX_VALUE
+        val found = HashMap<String, Int>()
+        val words = HashMap<String, Candidate>()
+        // 直した読みを変換し、打ったままより良ければ覚える。直したぶんを足したコストを返す（良くなければ null）
+        fun tryVariant(variant: String, changes: Int): Long? {
+            val best = convert(variant, 1).firstOrNull() ?: return null
+            val score = best.cost.toLong() + changes * TYPO_PENALTY
+            if (score >= original) return null
+            val prev = found[best.text]
+            if (prev == null || score < prev) {
+                found[best.text] = score.toInt()
+                words[best.text] = best
+            }
+            return score
+        }
+        var bestOne: Pair<String, Long>? = null
+        for (i in reading.indices) {
+            for (a in FlickTypos.alternatives(reading[i])) {
+                val one = reading.substring(0, i) + a + reading.substring(i + 1)
+                tryVariant(one, 1)?.let { if (bestOne == null || it < bestOne!!.second) bestOne = one to it }
+                if (reading.length > TYPO_TWO_MAX_LENGTH) continue
+                for (j in i + 1 until reading.length) {
+                    for (b in FlickTypos.alternatives(reading[j])) tryVariant(one.substring(0, j) + b + one.substring(j + 1), 2)
+                }
+            }
+        }
+        // 長い読みでは、一番よかった1か所の直しに、もう1か所だけ足してみる（全部の組を試すと遅いので）
+        bestOne?.takeIf { reading.length > TYPO_TWO_MAX_LENGTH }?.let { (one, _) ->
+            for (j in one.indices) {
+                if (one[j] != reading[j]) continue
+                for (b in FlickTypos.alternatives(one[j])) tryVariant(one.substring(0, j) + b + one.substring(j + 1), 2)
+            }
+        }
+        return found.entries.sortedBy { it.value }.take(n).map { words.getValue(it.key).copy(cost = it.value) }
+    }
+
     companion object {
+        /** 打ち間違いを1か所直すときに足すコスト（Mozc のコストで。名詞の語のコストの差がおよそ数千） */
+        const val TYPO_PENALTY = 2500
+
+        /** 2か所の直しまで探す読みの長さ */
+        const val TYPO_TWO_MAX_LENGTH = 6
+
+        /** これより長い読みでは打ち間違いを探さない（読みの字ごとに変換し直すので） */
+        const val TYPO_MAX_LENGTH = 12
+
         const val PREDICT_MIN_LENGTH = 2
         /** これより多くの読みが当てはまる接頭辞では予測しない */
         const val PREDICT_MAX_READINGS = 30000

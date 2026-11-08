@@ -38,6 +38,12 @@ class DictionaryCandidateSource(
             converter.learnedDictionary = value?.asDictionary() ?: UserDictionary.EMPTY
         }
 
+    /**
+     * フリック入力の打ち間違い（濁点・小書きの付け忘れなど）を直した候補も出す。IME がテンキーのときだけ true にする
+     * （ローマ字やグライドでは、この表の間違いは起きない）
+     */
+    @Volatile var typoCorrection = false
+
     /** 学習が変わった（保存したほうがよい） */
     @Volatile var learningChanged = false
 
@@ -54,7 +60,7 @@ class DictionaryCandidateSource(
     }
 
     override fun convert(reading: String, n: Int): List<Conversion> {
-        val list = converter.convert(reading, n).map { Conversion(segmenter.segments(it.words)) }
+        val list = withTypos(reading, converter.convert(reading, n)).map { Conversion(segmenter.segments(it.words).let { s -> onReading(reading, s) }) }
         // カタカナの語（英語の表記がある）が文節に分かれていたら、1つの文節にまとめる（Space で英語の表記も選べるように）
         val katakana = CharWidth.toKatakana(reading)
         val top = list.firstOrNull() ?: return list
@@ -62,6 +68,35 @@ class DictionaryCandidateSource(
             return listOf(Conversion(listOf(dev.mooma.kanade.core.Segment(reading, katakana)))) + list.drop(1)
         }
         return list
+    }
+
+    /**
+     * 打ち間違いを直した候補を、コスト（直したぶんを足したもの）の順に混ぜる。ただし上位3件には、打ったままの読みの
+     * 変換を少なくとも1つ残す（azooKey と同じ保険。直しが外れても、打ったとおりの候補がすぐ見つかるように）
+     */
+    private fun withTypos(reading: String, nBest: List<Candidate>): List<Candidate> {
+        if (!typoCorrection || nBest.isEmpty()) return nBest
+        val typos = converter.typoCorrections(reading).filter { t -> nBest.none { it.text == t.text } }
+        if (typos.isEmpty()) return nBest
+        val merged = (nBest + typos).sortedBy { it.cost }.toMutableList()
+        if (merged.take(3).none { it in nBest }) {
+            merged.remove(nBest[0])
+            merged.add(2, nBest[0])
+        }
+        return merged
+    }
+
+    /**
+     * 文節の読みを、打った読み [reading] から切り出し直す（打ち間違いを直した候補は、直した読みの文節になっているため。
+     * 直しは1字を1字に替えるだけなので、長さは変わらない）
+     */
+    private fun onReading(reading: String, segments: List<dev.mooma.kanade.core.Segment>): List<dev.mooma.kanade.core.Segment> {
+        var pos = 0
+        return segments.map { s ->
+            val r = reading.substring(pos, (pos + s.reading.length).coerceAtMost(reading.length))
+            pos += s.reading.length
+            if (r == s.reading) s else s.copy(reading = r)
+        }
     }
 
     /**
@@ -73,7 +108,9 @@ class DictionaryCandidateSource(
         val nBest = converter.convert(reading, maxOf(n, LATTICE_CANDIDATES))
         val lattice = nBest.map { it.text }
         // 括弧1文字の文節には、ほかの括弧も出す（フリックの「や」で打った（ から「 『 【 などへ）
-        val base = userDictionary.lookup(reading) + lattice.take(SYMBOL_POSITION) + reading + CharWidth.toKatakana(reading) +
+        // 打ち間違いを直した候補は、打ったままの読みの上位3件とひらがな・カタカナの後ろに置く
+        val typos = if (typoCorrection) converter.typoCorrections(reading).map { it.text } else emptyList()
+        val base = userDictionary.lookup(reading) + lattice.take(SYMBOL_POSITION) + reading + CharWidth.toKatakana(reading) + typos +
             dev.mooma.kanade.core.Brackets.alternatives(reading) + english.lookup(reading) +
             dates.lookup(reading) + symbols.lookup(reading) + emoji.lookup(reading) + lattice.drop(SYMBOL_POSITION) + converter.exactWords(reading) +
             headVariants(nBest.firstOrNull())
@@ -116,19 +153,27 @@ class DictionaryCandidateSource(
      * 入力中の読みの先を予測した候補（「きーぼ」→ キーボード）。読み全体で見つからなければ、1位の変換の最後の文節の読みで探し、
      * 前の文節はそのままの表記を付ける（「きょうはきーぼ」→ 今日はキーボード）
      */
-    override fun predict(reading: String, n: Int): List<String> {
-        fun words(prefix: String): List<String> {
+    override fun predict(reading: String, n: Int): List<String> = predictWithReadings(reading, n).map { it.second }
+
+    override fun predictWithReadings(reading: String, n: Int): List<Pair<String, String>> {
+        fun words(prefix: String): List<Pair<String, String>> {
             val user = (userDictionary.withPrefix(prefix) + converter.learnedDictionary.withPrefix(prefix))
-                .sortedBy { it.first.length }.map { it.second }
-            return (user + converter.predictWords(prefix, n).map { it.second }).distinct().take(n)
+                .sortedBy { it.first.length }
+            return (user + converter.predictWords(prefix, n)).distinctBy { it.second }.take(n)
         }
         words(reading).takeIf { it.isNotEmpty() }?.let { return it }
         val top = convert(reading, 1).firstOrNull() ?: return emptyList()
         if (top.segments.size < 2) return emptyList()
         val last = top.segments.last()
+        val headReading = top.segments.dropLast(1).joinToString("") { it.reading }
         val head = top.segments.dropLast(1).joinToString("") { it.surface }
-        return words(last.reading).map { head + it }
+        return words(last.reading).map { (r, w) -> headReading + r to head + w }
     }
+
+    override fun convertWithPrefix(reading: String, prefix: String): Conversion? =
+        converter.convertWithPrefix(reading, prefix)?.let { Conversion(segmenter.segments(it.words)) }
+
+    override fun isLearned(reading: String, surface: String): Boolean = learning?.lookup(reading) == surface
 
     override fun pinned(reading: String): List<String> =
         (userDictionary.lookup(reading) + listOfNotNull(learning?.lookup(reading))).distinct()

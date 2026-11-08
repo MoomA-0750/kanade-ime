@@ -41,6 +41,25 @@ class KanadeSettings(context: Context) {
         get() = prefs.getBoolean(KEY_PREDICTION, false)
         set(value) = prefs.edit().putBoolean(KEY_PREDICTION, value).apply()
 
+    /**
+     * zenz の使い方。"CORRECT"（既定）は Zenzai の方式で、辞書の1位を確かめ、ずれた所から辞書を探し直す。
+     * "RERANK" は辞書の上位10件を採点して並べ替える。Fold 7 の評価セット 202 文で正解の数は同じ（187）で、
+     * 時間は中央値 5.8ms と 24.7ms だった
+     */
+    var zenzMode: String
+        get() = prefs.getString(KEY_ZENZ_MODE, "CORRECT") ?: "CORRECT"
+        set(value) = prefs.edit().putString(KEY_ZENZ_MODE, value).apply()
+
+    /** 変換のプロフィール（zenz に渡す。25文字まで。空なら渡さない） */
+    var zenzProfile: String
+        get() = prefs.getString(KEY_ZENZ_PROFILE, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_ZENZ_PROFILE, value).apply()
+
+    /** zenz の推論のスレッド数 */
+    var zenzThreads: Int
+        get() = prefs.getInt(KEY_ZENZ_THREADS, DEFAULT_ZENZ_THREADS)
+        set(value) = prefs.edit().putInt(KEY_ZENZ_THREADS, value).apply()
+
     /** 未確定文字列をうまく出せないアプリ（端末など）。ここに入れたアプリでは、入力中の文字を候補欄に出す */
     var previewInBarPackages: Set<String>
         get() = prefs.getString(KEY_PREVIEW_PACKAGES, null)?.split(',', ' ', '\n')?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet()
@@ -228,12 +247,20 @@ class KanadeSettings(context: Context) {
     )
 
     private companion object {
+        /**
+         * Fold 7 で測って決めた（[ConversionBench.runEval] がスレッド数ごとの時間も出す）。並べ替え10件の中央値は
+         * 2本 57.9ms、3本 51.5ms、4本 45.3ms、6本 39.4ms、8本 66.5ms。CPU の数より多ければ CPU の数にする
+         */
+        const val DEFAULT_ZENZ_THREADS = 6
         const val KEY_TRIGGERS = "toggle_triggers"
         const val KEY_FULL_WIDTH = "full_width_symbols"
         const val KEY_KEYLOG = "key_log"
         const val KEY_LAST_MODE = "last_japanese"
         const val KEY_LIVE = "live_conversion"
         const val KEY_PREDICTION = "prediction"
+        const val KEY_ZENZ_MODE = "zenz_mode"
+        const val KEY_ZENZ_PROFILE = "zenz_profile"
+        const val KEY_ZENZ_THREADS = "zenz_threads"
         const val KEY_SOFT_KEYBOARD = "soft_keyboard"
         const val KEY_SOFT_KEYBOARD_HEIGHT = "soft_keyboard_height"
         const val KEY_SOFT_KEYBOARD_BOTTOM = "soft_keyboard_bottom"

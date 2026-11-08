@@ -1,5 +1,6 @@
 package dev.mooma.kanade.core.convert
 
+import dev.mooma.kanade.core.ImeCommand
 import kotlin.math.ln
 
 /**
@@ -24,6 +25,13 @@ interface LanguageModel {
      * 読みが違う候補どうし（グライドの候補）を比べるのに使う。対応しなければ null
      */
     fun scoreReadings(leftContext: String, items: List<Pair<String, String>>): FloatArray? = null
+
+    /**
+     * [candidate] を左から確かめる（Zenzai の検証）。各位置でモデルが一番に選ぶ文字が [candidate] と合えば ""。
+     * 最初にずれたら、そこまでの [candidate] の表記＋モデルが選んだ文字を返す（辞書をその接頭辞で探し直すのに使う）。
+     * 中断なら null。対応しなければ ""（直さない）
+     */
+    fun verify(leftContext: String, reading: String, candidate: String, rightContext: String = ""): String? = ""
 }
 
 /**
@@ -37,6 +45,68 @@ class Reranker(
     private val beta: Float = 1.0f,
 ) {
     data class Result(val candidates: List<String>, val generated: String?)
+
+    companion object {
+        /** Zenzai の方式で、1回の変換で確かめる回数の上限（評価セットで 3 と 5 は同じ正解率だった） */
+        const val CORRECT_LIMIT = 3
+    }
+
+    /**
+     * IME からの依頼をこなす。[correctLimit] が 0 より大きく、文全体の依頼で [constrained] があれば、Zenzai の方式で
+     * 辞書の1位を直し、それを先頭にして辞書の順のまま返す（並べ替えはしない）。そうでなければ上位を並べ替える。中断なら null
+     */
+    fun rerank(request: ImeCommand.RequestRerank, correctLimit: Int, constrained: ((String) -> String?)?): List<String>? {
+        val first = request.candidates.firstOrNull()
+        if (correctLimit > 0 && request.sentence && constrained != null && first != null) {
+            val top = correct(request.leftContext, request.reading, first, correctLimit, request.rightContext, constrained) ?: return null
+            return (listOf(top) + request.candidates).distinct()
+        }
+        return rerank(request.leftContext, request.reading, request.candidates, rightContext = request.rightContext)?.candidates
+    }
+
+    /**
+     * Zenzai の方式で1位を直す。[start] をモデルに確かめさせ、ずれたら、モデルが選んだ接頭辞で辞書を探し直した文
+     * （[constrained]。その接頭辞で始まる経路がなければ null）を次の候補にする。合格するか、[limit] 回確かめたら止める。
+     * 出す文はいつも辞書の経路なので、読みと表記がずれない。中断なら null
+     */
+    fun correct(
+        leftContext: String,
+        reading: String,
+        start: String,
+        limit: Int,
+        rightContext: String = "",
+        constrained: (String) -> String?,
+    ): String? = drafts(leftContext, reading, start, limit, rightContext, constrained)?.last()
+
+    /** [correct] で試した文（最初の [start] から、最後に出すものまで）。中断なら null */
+    fun drafts(
+        leftContext: String,
+        reading: String,
+        start: String,
+        limit: Int,
+        rightContext: String = "",
+        constrained: (String) -> String?,
+    ): List<String>? {
+        val tried = arrayListOf(start)
+        repeat(limit) {
+            val prefix = model.verify(leftContext, reading, tried.last(), rightContext) ?: return null
+            if (prefix.isEmpty()) return tried
+            val next = constrained(prefix) ?: return tried
+            if (next in tried) return tried
+            tried += next
+        }
+        return tried
+    }
+
+    /**
+     * 予測の候補（読みと表記の組）を、左の文脈に続けて出てくる確率で並べ替える。辞書の順位も
+     * 「− β·ln(1+元の順位)」で残す。モデルが対応しない・中断なら null
+     */
+    fun rankPredictions(leftContext: String, items: List<Pair<String, String>>): List<String>? {
+        if (items.size < 2) return items.map { it.second }
+        val scores = model.scoreReadings(leftContext, items) ?: return null
+        return items.indices.sortedByDescending { scores[it] - beta * ln(1f + it) }.map { items[it].second }.distinct()
+    }
 
     fun rerank(
         leftContext: String,

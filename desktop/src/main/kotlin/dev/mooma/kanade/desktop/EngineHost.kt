@@ -17,6 +17,9 @@ interface Client {
 fun interface RerankService {
     fun rerank(request: ImeCommand.RequestRerank): List<String>?
 
+    /** 予測の候補（読みと表記の組）を並べ替えた表記。できなければ null */
+    fun rankPredictions(request: ImeCommand.RequestPredictionRank): List<String>? = null
+
     /** 計算中のものを止める（新しい依頼が来たとき。別のスレッドから呼ぶ） */
     fun cancel() {}
 }
@@ -196,11 +199,16 @@ class EngineHost(
 
     /** 命令のうち、DLL に送らずエンジンで済ませるもの（候補の窓・並べ替え）を片付け、残りを返す */
     private fun run(commands: List<ImeCommand>): List<ImeCommand> = commands.filter { c ->
-        if (c is ImeCommand.RequestRerank) {
-            requestRerank(c)
-            false
-        } else {
-            true
+        when (c) {
+            is ImeCommand.RequestRerank -> {
+                requestRerank(c)
+                false
+            }
+            is ImeCommand.RequestPredictionRank -> {
+                requestPredictionRank(c)
+                false
+            }
+            else -> true
         }
     }
 
@@ -224,6 +232,18 @@ class EngineHost(
             synchronized(lock) {
                 val target = active ?: return@execute
                 val commands = run(engine.onReranked(request.id, ranked))
+                if (commands.isNotEmpty()) target.send(reply(0, commands, false))
+            }
+        }
+    }
+
+    private fun requestPredictionRank(request: ImeCommand.RequestPredictionRank) {
+        val service = reranker ?: return
+        rerankExecutor.execute {
+            val ranked = runCatching { service.rankPredictions(request) }.getOrNull() ?: return@execute
+            synchronized(lock) {
+                val target = active ?: return@execute
+                val commands = run(engine.onPredictionsRanked(request.id, ranked))
                 if (commands.isNotEmpty()) target.send(reply(0, commands, false))
             }
         }

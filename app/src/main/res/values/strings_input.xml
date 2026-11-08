@@ -113,4 +113,12 @@
     <string name="input_swipe_distance_note">How far you must move your finger (as a share of the key width) before a touch counts as a swipe for numbers and symbols. Raise it if you often get symbols when you meant to type letters.</string>
     <string name="input_tap_correction">Correct off-target taps</string>
     <string name="input_tap_correction_note">On the Glide and 12-key layouts, when you tap near the edge between keys, Kanade picks the key whose character is more likely to come next in the word you\'re typing. Taps near the middle of a key are never changed.</string>
+    <string name="input_zenz_mode_label">How zenz is used</string>
+    <string name="input_zenz_mode_rerank">Rerank</string>
+    <string name="input_zenz_mode_correct">Check and fix</string>
+    <string name="input_zenz_mode_rerank_note">Scores the top 10 dictionary conversions with zenz and reorders them.</string>
+    <string name="input_zenz_mode_correct_note">Like azooKey\'s Zenzai: zenz checks the top dictionary conversion and, where it disagrees, the dictionary searches again from that point. About as accurate as reranking with far less computation.</string>
+    <string name="input_zenz_profile_label">Conversion profile</string>
+    <string name="input_zenz_profile_hint">e.g. Programmer. Talks about tech.</string>
+    <string name="input_zenz_profile_summary">Tells zenz about you so it can choose fitting words (up to 25 characters, %1$d used). Leave empty to not use it.</string>
 </resources>

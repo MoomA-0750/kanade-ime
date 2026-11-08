@@ -102,4 +102,7 @@
     <string name="app_backup_error_open_file">ファイルを開けませんでした</string>
     <string name="app_backup_error_not_kanade">Kanade の設定のファイルではありません</string>
     <string name="app_backup_error_newer_version">新しい Kanade で書き出したファイルです。Kanade を新しくしてから読み込んでください</string>
+    <string name="app_tools_zenz_threads">推論のスレッド数（zenz）</string>
+    <string name="app_bench_eval_zenz_correct">確かめて直す（Zenzai）: %1$s、%2$s</string>
+    <string name="app_bench_eval_threads">並べ替え（%1$d スレッド）: %2$s</string>
 </resources>

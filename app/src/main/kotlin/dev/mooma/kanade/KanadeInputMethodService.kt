@@ -768,6 +768,7 @@ class KanadeInputMethodService : InputMethodService() {
                 is ImeCommand.ShowCandidates -> if (!command.prediction) panel.showSearchCandidates(command.candidates, command.selected)
                 ImeCommand.HideCandidates -> panel.hideSearchCandidates()
                 is ImeCommand.RequestRerank -> requestRerank(command)
+                is ImeCommand.RequestPredictionRank -> requestPredictionRank(command)
                 is ImeCommand.ModeChanged -> {
                     settings.lastJapanese = command.japanese
                     updateStatusIcon()
@@ -936,6 +937,7 @@ class KanadeInputMethodService : InputMethodService() {
             InputConnection.CURSOR_UPDATE_IMMEDIATE or InputConnection.CURSOR_UPDATE_MONITOR,
         )
         engine.settings = settings.engineSettings()
+        applyZenzSettings()
         mapper.triggers = settings.toggleTriggers
         // 設定画面でユーザー辞書・スニペットが変わっていたら読み直す
         val v = userDictionaryStore.version()
@@ -1147,6 +1149,8 @@ class KanadeInputMethodService : InputMethodService() {
             engine.leftContext = if (previewInBar || emojiSearching) "" else currentInputConnection?.getTextBeforeCursor(InputEngine.MAX_CONTEXT, 0)?.toString().orEmpty()
             engine.rightContext = if (previewInBar || emojiSearching) "" else currentInputConnection?.getTextAfterCursor(InputEngine.MAX_CONTEXT, 0)?.toString().orEmpty()
         }
+        // フリックの打ち間違いを直す候補は、画面のテンキーで打っているときだけ（物理キーボードやグライドでは起きない間違いのため）
+        candidateSource?.typoCorrection = isInputViewShown && host?.flickLayout == true
         val result = engine.handle(input)
         apply(result.commands)
         return result.consumed
@@ -1203,6 +1207,7 @@ class KanadeInputMethodService : InputMethodService() {
                     hideBar()
                 }
                 is ImeCommand.RequestRerank -> requestRerank(command)
+                is ImeCommand.RequestPredictionRank -> requestPredictionRank(command)
                 is ImeCommand.ReplaceBeforeCursor -> {
                     // 直接入力のスニペット。カーソルの前が本当にキーのときだけ消す（カーソルを動かしていたら、打った文字だけ入れる）
                     val before = ic?.getTextBeforeCursor(command.expected.length, 0)?.toString()
@@ -1228,17 +1233,51 @@ class KanadeInputMethodService : InputMethodService() {
         }
     }
 
+    /** zenz の設定（プロフィール・スレッド数・使い方）を、読み込んだモデルと並べ替えに入れる */
+    private fun applyZenzSettings() {
+        val profile = settings.zenzProfile
+        val threads = settings.zenzThreads.coerceIn(1, Runtime.getRuntime().availableProcessors())
+        zenzCorrect = settings.zenzMode == "CORRECT"
+        zenzThread.execute {
+            val model = zenz ?: return@execute
+            model.profile = profile
+            if (threads != zenzThreadsApplied) {
+                model.setThreads(threads)
+                zenzThreadsApplied = threads
+            }
+        }
+    }
+
+    /** Zenzai の方式で1位を直す（設定の「確かめて直す」） */
+    @Volatile private var zenzCorrect = false
+    @Volatile private var latestPrediction = 0L
+    private var zenzThreadsApplied = 0
+
     /** 並べ替えを裏で回す。新しい要求が来たら、走っている古い推論は止める */
     private fun requestRerank(request: ImeCommand.RequestRerank) {
         latestRerank = request.id
         zenz?.cancel()
+        val source = candidateSource
+        val correct = zenzCorrect
         zenzThread.execute {
             if (request.id != latestRerank) return@execute
             val model = zenz ?: return@execute
             val ranked = runCatching {
-                Reranker(model).rerank(request.leftContext, request.reading, request.candidates, rightContext = request.rightContext)
+                val constrained = source?.let { s -> { prefix: String -> s.convertWithPrefix(request.reading, prefix)?.text } }
+                Reranker(model).rerank(request, if (correct) Reranker.CORRECT_LIMIT else 0, constrained)
             }.getOrNull() ?: return@execute
-            main.post { apply(engine.onReranked(request.id, ranked.candidates)) }
+            main.post { apply(engine.onReranked(request.id, ranked)) }
+        }
+    }
+
+    /** 予測の候補を zenz で並べ替える。新しい予測が出たら、エンジンが古い結果を捨てる */
+    private fun requestPredictionRank(request: ImeCommand.RequestPredictionRank) {
+        latestPrediction = request.id
+        zenzThread.execute {
+            if (request.id != latestPrediction) return@execute
+            val model = zenz ?: return@execute
+            val ranked = runCatching { Reranker(model).rankPredictions(request.leftContext, request.items) }.getOrNull() ?: return@execute
+            main.post { apply(engine.onPredictionsRanked(request.id, ranked)) }
         }
     }
 

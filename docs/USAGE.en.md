@@ -37,7 +37,22 @@ You can choose the punctuation that `,` and `.` produce under "Input and convers
 
 ### Predictions
 
-Turn on Settings → Input and conversion → Predictions to see words that complete what you are typing in the candidate window (きーぼ → キーボード, ありがと → ありがとう, ありがとうございます). Earlier segments stay as converted and only the last word is completed (きょうはきーぼ → 今日はキーボード). Tap a prediction, or pick one with Tab and press Enter. Off by default.
+Turn on Settings → Input and conversion → Predictions to see words that complete what you are typing in the candidate window (きーぼ → キーボード, ありがと → ありがとう, ありがとうございます). Earlier segments stay as converted and only the last word is completed (きょうはきーぼ → 今日はキーボード). Tap a prediction, or pick one with Tab and press Enter. Off by default. zenz reorders the predictions by how well they fit the preceding text, so the order may change a moment later.
+
+### How zenz is used, and the conversion profile
+
+Conversions come from the dictionary and are corrected by zenz, a small language model. Choose how under Settings → Input and conversion → How zenz is used.
+
+- **Check and fix** (default): zenz checks the dictionary's top conversion and, where it disagrees, the dictionary searches again from that point (the same method as azooKey's Zenzai). Less computation, faster
+- **Rerank**: zenz scores the top 10 dictionary conversions and reorders them
+
+Both are about equally accurate but make different mistakes. Conversions that contain a word you chose yourself and Kanade learned are not changed by zenz.
+
+Write something about yourself in "Conversion profile" (e.g. "プログラマ。技術の話が多い", up to 25 characters) and zenz will lean toward fitting words.
+
+### Typos on the 12-key layout
+
+When you type on the on-screen 12-key layout, Kanade also offers candidates that fix a missing dakuten or small kana (しやしん → 写真, ちよつと → ちょっと). The conversion of exactly what you typed always stays within the top three candidates.
 
 ## Reconversion
 

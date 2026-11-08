@@ -71,6 +71,7 @@ fun main(args: Array<String>) {
         "build" -> build(File(args[1]), File(args[2]))
         "eval" -> evaluate(File(args[1]), File(args[2]))
         "convert" -> convert(File(args[1]), args.drop(2))
+        "typo" -> typo(File(args[1]), args.drop(2))
         "predict" -> predict(File(args[1]), args.drop(2))
         "zenz" -> zenzTry(File(args[1]), File(args[2]), File(args[3]), args.drop(4))
         "eval-context" -> evaluateContext(File(args[1]), File(args[2]), File(args[3]), File(args[4]))
@@ -79,6 +80,7 @@ fun main(args: Array<String>) {
         "tune-glide" -> tuneGlide(File(args[1]), args.getOrNull(2)?.toFloat() ?: 0.25f)
         "eval-tap" -> evaluateTap(File(args[1]), args.getOrNull(2)?.toFloat() ?: 0.3f)
         "eval-glide-zenz" -> evaluateGlideZenz(File(args[1]), File(args[2]), File(args[3]), File(args[4]), args.getOrNull(5)?.toFloat() ?: 0.25f)
+        "eval-zenzai" -> evaluateZenzai(File(args[1]), File(args[2]), File(args[3]), File(args[4]))
         "eval-zenz" -> evaluateZenz(File(args[1]), File(args[2]), File(args[3]), File(args[4]), args.getOrNull(5)?.toInt() ?: 10, args.getOrNull(6)?.toFloat() ?: 1.0f)
         else -> {
             System.err.println(
@@ -534,6 +536,64 @@ fun evaluateZenz(outDir: File, tsv: File, model: File, lib: File, topK: Int, bet
         changed.take(30).forEach { println("  $it") }
         println("並べ替えでも外れた文: ${remaining.size}")
         remaining.forEach { println("  $it") }
+    }
+}
+
+/**
+ * Zenzai の方式（1位を確かめ、ずれたらモデルが選んだ接頭辞で辞書を探し直す）を、並べ替えと比べる。
+ * 「辞書の1位から直す」と「並べ替えの1位から直す」を、確かめる回数の上限ごとに測る
+ */
+fun evaluateZenzai(outDir: File, tsv: File, model: File, lib: File) {
+    val converter = loadConverter(outDir)
+    val cases = loadCases(tsv)
+    openZenz(model, lib).use { zenz ->
+        val reranker = Reranker(zenz)
+        val modes = listOf("並べ替え10件", "直す L=1", "直す L=3", "直す L=5", "並べ替え＋直す L=1", "直す L=3＋辞書3件と試した文を並べ替え", "直す L=1＋辞書3件と試した文を並べ替え")
+        val pass = IntArray(modes.size)
+        val times = List(modes.size) { ArrayList<Double>() }
+        val diffs = ArrayList<String>()
+        for (c in cases) {
+            val dict = converter.convert(c.input, 10).map { it.text }
+            val constrained = { prefix: String -> converter.convertWithPrefix(c.input, prefix)?.text }
+            val tops = ArrayList<String?>()
+            fun timed(i: Int, f: () -> String?) {
+                val t = System.nanoTime()
+                val top = f()
+                times[i] += (System.nanoTime() - t) / 1e6
+                tops += top
+                if (c.passes(listOfNotNull(top))) pass[i]++
+            }
+            timed(0) { reranker.rerank("", c.input, dict)!!.candidates.firstOrNull() }
+            for ((i, limit) in listOf(1 to 1, 2 to 3, 3 to 5)) timed(i) { reranker.correct("", c.input, dict.first(), limit, constrained = constrained) }
+            timed(4) {
+                val ranked = reranker.rerank("", c.input, dict)!!.candidates
+                reranker.correct("", c.input, ranked.first(), 1, constrained = constrained)
+            }
+            for ((i, limit) in listOf(5 to 3, 6 to 1)) timed(i) {
+                val tried = reranker.drafts("", c.input, dict.first(), limit, constrained = constrained)!!
+                reranker.rerank("", c.input, (dict.take(3) + tried).distinct())!!.candidates.firstOrNull()
+            }
+            if (tops.distinct().size > 1) diffs += "${c.input}\t正解 ${c.value}\t" + modes.indices.joinToString(" / ") { "${modes[it]}:${tops[it]}" }
+        }
+        fun med(l: List<Double>) = l.sorted().let { "中央値 ${"%.1f".format(it[it.size / 2])}ms、95% ${"%.1f".format(it[it.size * 95 / 100])}ms" }
+        println("件数 ${cases.size}、モデル ${model.name}")
+        println("辞書だけ  ${cases.count { c -> c.passes(converter.convert(c.input, 1).map { it.text }) }}")
+        for (i in modes.indices) println("${modes[i]}  ${pass[i]}  ${med(times[i])}")
+        println("方式で1位が分かれた文: ${diffs.size}")
+        diffs.forEach { println("  $it") }
+    }
+}
+
+/** フリックの打ち間違いを直した候補を試す */
+fun typo(outDir: File, readings: List<String>) {
+    val converter = loadConverter(outDir)
+    for (r in readings) {
+        val top = converter.convert(r, 1).firstOrNull()
+        repeat(20) { converter.typoCorrections(r) }
+        val t = System.nanoTime()
+        val typos = converter.typoCorrections(r)
+        val ms = (System.nanoTime() - t) / 1e6
+        println("$r: ${top?.text}（${top?.cost}） → " + typos.joinToString(" / ") { "${it.text}（${it.cost}）" } + "  ${"%.1f".format(ms)}ms")
     }
 }
 

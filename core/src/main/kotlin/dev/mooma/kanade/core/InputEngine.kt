@@ -87,7 +87,18 @@ sealed interface ImeCommand {
         val candidates: List<String>,
         /** カーソルの後ろの文（文の途中で打っているとき） */
         val rightContext: String = "",
+        /**
+         * 文全体の変換（ライブ変換）の依頼か。文全体なら、1位を Zenzai の方式で直してよい
+         * （文節の並べ替えは、前後の文節を付けた文の中から選ぶので直さない）
+         */
+        val sentence: Boolean = false,
     ) : ImeCommand
+
+    /**
+     * 予測の候補（読みと表記の組）を言語モデルで並べ替えてほしい。終わったら [InputEngine.onPredictionsRanked] に
+     * [id] とともに表記の並びを返す
+     */
+    data class RequestPredictionRank(val id: Long, val leftContext: String, val items: List<Pair<String, String>>) : ImeCommand
 }
 
 /** [consumed] が false なら、キーを IME で止めずにアプリへ渡す */
@@ -137,6 +148,15 @@ interface CandidateSource {
 
     /** 入力中の読みの先を予測した候補（よい順） */
     fun predict(reading: String, n: Int): List<String> = emptyList()
+
+    /** [predict] と同じ候補を、予測した読みとの組で（言語モデルで並べ替えるため）。読みが分からなければ空の読み */
+    fun predictWithReadings(reading: String, n: Int): List<Pair<String, String>> = predict(reading, n).map { "" to it }
+
+    /** 表記が [prefix] で始まる変換のうち一番よいもの（Zenzai の探し直し）。なければ null */
+    fun convertWithPrefix(reading: String, prefix: String): Conversion? = null
+
+    /** [surface] は、利用者が [reading] の候補から選び直して学習したものか */
+    fun isLearned(reading: String, surface: String): Boolean = false
 }
 
 /**
@@ -144,9 +164,40 @@ interface CandidateSource {
  * Android には依存せず、言語モデルの並べ替えは [ImeCommand.RequestRerank] で外に頼み、結果を [onReranked] で受ける。
  */
 class InputEngine(
-    var settings: EngineSettings = EngineSettings(),
+    settings: EngineSettings = EngineSettings(),
     var candidateSource: CandidateSource? = null,
 ) {
+    /** 設定。変えたら並べ替えの覚えを捨てる（言語モデルの設定が変わっているかもしれないため） */
+    var settings: EngineSettings = settings
+        set(value) {
+            field = value
+            clearRerankCache()
+        }
+
+    /**
+     * 並べ替えの結果の覚え（依頼の中身→結果）。Backspace で前の読みに戻ったときや、同じ文節を選び直したときは、
+     * 言語モデルに頼まずにすぐ使う。結果は依頼の中身だけで決まるので、辞書や学習が変わっても候補の並びが変われば別の鍵になる
+     */
+    private val rerankCache = object : LinkedHashMap<RerankKey, List<String>>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<RerankKey, List<String>>?) = size > RERANK_CACHE_SIZE
+    }
+
+    private data class RerankKey(val leftContext: String, val reading: String, val candidates: List<String>, val rightContext: String)
+
+    /** 結果を待っている依頼（id と鍵）。届いたら覚えに入れる */
+    private var pendingRerank: Pair<Long, RerankKey>? = null
+
+    /** 言語モデルの設定（プロフィールなど）を変えたときに、IME が呼ぶ */
+    fun clearRerankCache() {
+        rerankCache.clear()
+        predictionRankCache.clear()
+    }
+
+    private fun rerankRequest(leftContext: String, reading: String, candidates: List<String>, sentence: Boolean): ImeCommand.RequestRerank {
+        val request = ImeCommand.RequestRerank(requestId, leftContext, reading, candidates, rightContext, sentence)
+        pendingRerank = requestId to RerankKey(leftContext, reading, candidates, rightContext)
+        return request
+    }
     var japanese: Boolean = false
         private set
 
@@ -211,6 +262,14 @@ class InputEngine(
     private var predictions: List<String> = emptyList()
     private var predictionSelected = -1
     private var predictionsFor: String? = null
+
+    /** 予測の候補の並べ替えの依頼（id と、頼んだ組）。覚えは左の文脈と組をまとめた鍵で引く */
+    private var predictionRequestId = 0L
+    private var pendingPrediction: Pair<Long, Pair<String, List<Pair<String, String>>>>? = null
+    private val predictionRankCache = object : LinkedHashMap<Pair<String, List<Pair<String, String>>>, List<String>>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Pair<String, List<Pair<String, String>>>, List<String>>?) =
+            size > RERANK_CACHE_SIZE
+    }
 
     /** 再変換のときの、選んでいた元の文字。変換中に Esc を押すと元に戻す */
     private var reconvertOriginal: String? = null
@@ -314,8 +373,37 @@ class InputEngine(
         predictionSelected = -1
         val wasShown = predictions.isNotEmpty()
         val now = composingText
-        predictions = candidateSource?.predict(r, settings.predictionCount).orEmpty().filter { it != now }
-        if (predictions.isEmpty()) return if (wasShown) listOf(ImeCommand.HideCandidates) else emptyList()
+        // 言語モデルで並べ替えるため、出す数より多めに引く（辞書の順は長さとコストだけなので、並びがおかしいことがある）
+        val items = candidateSource?.predictWithReadings(r, settings.predictionCount * PREDICTION_POOL).orEmpty()
+            .filter { it.second != now }
+        val key = leftContext to items
+        val cached = predictionRankCache[key]
+        predictions = (cached ?: items.map { it.second }).take(settings.predictionCount)
+        predictionRequestId++
+        pendingPrediction = null
+        val commands = mutableListOf<ImeCommand>()
+        commands += if (predictions.isEmpty()) {
+            if (wasShown) ImeCommand.HideCandidates else return emptyList()
+        } else {
+            ImeCommand.ShowCandidates(predictions, -1, prediction = true)
+        }
+        if (cached == null && items.size >= 2 && items.all { it.first.isNotEmpty() }) {
+            pendingPrediction = predictionRequestId to key
+            commands += ImeCommand.RequestPredictionRank(predictionRequestId, leftContext, items)
+        }
+        return commands
+    }
+
+    /** 予測の候補の並べ替えの結果。古い依頼の結果や、もう Tab で選び始めていたら並びを変えない */
+    fun onPredictionsRanked(id: Long, ranked: List<String>): List<ImeCommand> {
+        val pending = pendingPrediction ?: return emptyList()
+        if (pending.first != id || ranked.isEmpty()) return emptyList()
+        pendingPrediction = null
+        predictionRankCache[pending.second] = ranked
+        if (predictions.isEmpty() || predictionSelected >= 0 || isConverting) return emptyList()
+        val next = ranked.take(settings.predictionCount)
+        if (next == predictions) return emptyList()
+        predictions = next
         return listOf(ImeCommand.ShowCandidates(predictions, -1, prediction = true))
     }
 
@@ -436,18 +524,11 @@ class InputEngine(
     /** 並べ替えの結果。古い要求の結果なら何もしない */
     fun onReranked(id: Long, ranked: List<String>): List<ImeCommand> {
         if (id != requestId || ranked.isEmpty()) return emptyList()
+        pendingRerank?.let { (pid, key) -> if (pid == id) rerankCache[key] = ranked }
+        pendingRerank = null
         val sr = segRerank
         if (isConverting && sr != null && sr.id == id) {
-            val seg = segs.getOrNull(sr.index) ?: return emptyList()
-            val mapped = ranked.filter { it.startsWith(sr.prefix) && it.endsWith(sr.suffix) && it.length > sr.prefix.length + sr.suffix.length }
-                .map { it.substring(sr.prefix.length, it.length - sr.suffix.length) }
-            if (mapped.isEmpty()) return emptyList()
-            val current = seg.surface
-            val moved = seg.selected != 0
-            seg.candidates = (seg.pinned + mapped + seg.candidates).distinct()
-            seg.selected = if (moved) seg.candidates.indexOf(current).coerceAtLeast(0) else 0
-            seg.reranked = true
-            return conversionView()
+            return if (applySegmentRanking(sr, ranked)) conversionView() else emptyList()
         }
         if (isConverting) return emptyList()
         candidates = (pinned + ranked).distinct()
@@ -455,6 +536,28 @@ class InputEngine(
         if (editingInside) return emptyList()
         return listOf(ImeCommand.SetComposing(composingText, cursor = composingCursor))
     }
+
+    /** 文節の並べ替えの結果（前後の文節を付けた文）を、その文節の候補に戻して入れる。入れたら true */
+    private fun applySegmentRanking(sr: SegRerank, ranked: List<String>): Boolean {
+        val seg = segs.getOrNull(sr.index) ?: return false
+        val mapped = ranked.filter { it.startsWith(sr.prefix) && it.endsWith(sr.suffix) && it.length > sr.prefix.length + sr.suffix.length }
+            .map { it.substring(sr.prefix.length, it.length - sr.suffix.length) }
+        if (mapped.isEmpty()) return false
+        val current = seg.surface
+        val moved = seg.selected != 0
+        seg.candidates = (seg.pinned + mapped + seg.candidates).distinct()
+        seg.selected = if (moved) seg.candidates.indexOf(current).coerceAtLeast(0) else 0
+        seg.reranked = true
+        return true
+    }
+
+    /**
+     * いまの読みの文全体の変換のうち、表記が [text] のもの。並べ替え・Zenzai の直しで N-best の外の文が1位になったときは、
+     * その表記で辞書を探し直して文節に分ける
+     */
+    private fun conversionOf(text: String): Conversion? =
+        conversions.firstOrNull { it.text == text }
+            ?: candidateSource?.convertWithPrefix(reading, text)?.takeIf { it.text == text }
 
     /** アプリ側の事情（入力欄の切り替えなど）や Enter で、いま出しているものを確定させる */
     fun commitAll(): List<ImeCommand> {
@@ -471,7 +574,7 @@ class InputEngine(
             for (seg in segs) remember(seg.surface, seg.reading, segmentReadings)
         } else {
             // ライブ変換のまま確定したときは、その変換の文節を覚える
-            conversions.firstOrNull { it.text == text }?.segments?.forEach { remember(it.surface, it.reading, segmentReadings) }
+            conversionOf(text)?.segments?.forEach { remember(it.surface, it.reading, segmentReadings) }
         }
         remember(text, reading)
         reset()
@@ -492,6 +595,8 @@ class InputEngine(
         segs.clear()
         focus = 0
         segRerank = null
+        pendingRerank = null
+        pendingPrediction = null
         showReading = false
         bracketChoice = -1
         predictions = emptyList()
@@ -751,7 +856,7 @@ class InputEngine(
         val commands = refreshCandidates().toMutableList()
         val source = candidateSource ?: return commands
         val top = candidates.firstOrNull() ?: return commands
-        val conv = conversions.firstOrNull { it.text == top } ?: Conversion(listOf(Segment(reading, top)))
+        val conv = conversionOf(top) ?: Conversion(listOf(Segment(reading, top)))
         segs.clear()
         for (s in conv.segments) segs += newSeg(s.reading, s.surface, source)
         focus = 0
@@ -794,9 +899,16 @@ class InputEngine(
         val prefix = segs.take(focus).joinToString("") { it.surface }
         val suffix = segs.drop(focus + 1).joinToString("") { it.surface }
         requestId++
-        segRerank = SegRerank(requestId, focus, prefix, suffix)
+        val sr = SegRerank(requestId, focus, prefix, suffix)
         val sentences = seg.candidates.take(settings.candidateCount).map { prefix + it + suffix }
-        return listOf(ImeCommand.RequestRerank(requestId, leftContext, reading, sentences, rightContext))
+        rerankCache[RerankKey(leftContext, reading, sentences, rightContext)]?.let { cached ->
+            segRerank = null
+            pendingRerank = null
+            applySegmentRanking(sr, cached)
+            return emptyList()
+        }
+        segRerank = sr
+        return listOf(rerankRequest(leftContext, reading, sentences, sentence = false))
     }
 
     private fun stopConverting(commands: MutableList<ImeCommand>) {
@@ -819,8 +931,17 @@ class InputEngine(
         val fromDictionary = conversions.map { it.text }.ifEmpty { if (r.isEmpty()) emptyList() else listOf(r) }
         candidates = (pinned + fromDictionary).distinct()
         requestId++
+        pendingRerank = null
         if (fromDictionary.size < 2) return emptyList()
-        return listOf(ImeCommand.RequestRerank(requestId, leftContext, r, fromDictionary, rightContext))
+        // 1位に、利用者が選び直して覚えた語（2文字以上の読み）が入っていれば、言語モデルで動かさない
+        // （azooKey で、直しても Zenzai が元の変換へ戻すのが一番の不満だったため）
+        val top = conversions.firstOrNull()
+        if (top != null && top.segments.any { it.reading.length >= 2 && source.isLearned(it.reading, it.surface) }) return emptyList()
+        rerankCache[RerankKey(leftContext, r, fromDictionary, rightContext)]?.let { cached ->
+            candidates = (pinned + cached).distinct()
+            return emptyList()
+        }
+        return listOf(rerankRequest(leftContext, r, fromDictionary, sentence = true))
     }
 
     /**
@@ -970,6 +1091,12 @@ class InputEngine(
 
         /** 候補を数字で選ぶときの1頁の件数 */
         const val PAGE = 9
+
+        /** 並べ替えの結果を覚えておく数 */
+        private const val RERANK_CACHE_SIZE = 64
+
+        /** 予測の候補を、出す数の何倍引いて言語モデルに並べ替えさせるか */
+        private const val PREDICTION_POOL = 2
 
         /** 再変換のために覚えておく、確定した表記の数 */
         private const val MAX_REMEMBERED = 300

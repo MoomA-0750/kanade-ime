@@ -102,4 +102,7 @@
     <string name="app_backup_error_open_file">Couldn\'t open the file</string>
     <string name="app_backup_error_not_kanade">This isn\'t a Kanade settings file</string>
     <string name="app_backup_error_newer_version">This file was exported by a newer version of Kanade. Update Kanade, then import it</string>
+    <string name="app_tools_zenz_threads">Inference threads (zenz)</string>
+    <string name="app_bench_eval_zenz_correct">Check and fix (Zenzai): %1$s, %2$s</string>
+    <string name="app_bench_eval_threads">Rerank with %1$d threads: %2$s</string>
 </resources>
