@@ -29,8 +29,11 @@ enum class VoiceFinal(val id: String, val path: String, val files: List<String>,
     fun isReady(data: File): Boolean = if (kind == Kind.WHISPER) File(data, path).exists() else files.all { File(File(data, path), it).exists() }
 
     companion object {
-        /** Windows 版の既定（配布物に入っている whisper small） */
-        val DEFAULT = WHISPER_SMALL
+        /**
+         * 既定: Windows 版は配布物に入っている whisper small。Linux 版は Android 版と同じ parakeet-ja
+         * （導入の linux/install.sh --voice で ReazonSpeech と一緒に落とす。設定の画面がないので、いちばん良いものを既定にする）
+         */
+        val DEFAULT = if (System.getProperty("os.name").startsWith("Windows")) WHISPER_SMALL else PARAKEET
 
         fun of(id: String?): VoiceFinal = entries.find { it.id == id } ?: DEFAULT
     }

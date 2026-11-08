@@ -26,6 +26,11 @@ fun main(args: Array<String>) {
         "send" -> sendOverSocket(socket, opts.drop(1))
         "zenz" -> zenzCheck(data, opts.drop(1))
         "voice" -> voiceCheck(data, opts.drop(1))
+        // 設定の画面のない Linux 版で、Android 版の設定の書き出し（JSON）を読む。動いているエンジンは 2 秒ほどで読み直す
+        "import-android" -> {
+            val r = DesktopStore().importAndroid(File(opts.getOrNull(1) ?: error("JSON のファイルを指定してください")))
+            println("設定 ${r.settings} 件、ユーザー辞書・スニペット ${r.files} 件を読み込みました")
+        }
         else -> {
             println(
                 """
@@ -34,12 +39,20 @@ fun main(args: Array<String>) {
                 kanade-engine send [--socket PATH] <キー列>...      動いているエンジンへソケット越しにキー列を流す
                 kanade-engine zenz [--data DIR] <読み>...           zenz を読み、辞書の候補を並べ替えた結果を出す（ネイティブの確認）
                 kanade-engine voice [--data DIR] <wav> | --mic 秒    whisper で wav（16kHz モノラル）を文字にする / マイクで録って文字にする
+                kanade-engine import-android <json>                Android 版の設定の書き出しを読み込む
                 キー列: 文字はそのまま、特別なキーは {Space} {Enter} {BS} {Esc} {F7} {Ctrl+Space} {RAlt} {Henkan} など
                 """.trimIndent(),
             )
             exitProcess(if (opts.isEmpty()) 0 else 2)
         }
     }
+}
+
+/** エンジンの記録: Windows は %LOCALAPPDATA%\Kanade\engine.log、Linux は $XDG_STATE_HOME/kanade/engine.log（ふつうは ~/.local/state/kanade） */
+fun logFile(): File {
+    System.getenv("LOCALAPPDATA")?.let { return File(it, "Kanade\\engine.log") }
+    val state = System.getenv("XDG_STATE_HOME")?.takeIf { it.isNotEmpty() } ?: (System.getProperty("user.home") + "/.local/state")
+    return File(state, "kanade/engine.log")
 }
 
 private fun log(s: String) = System.err.println("[kanade] ${java.time.LocalTime.now().withNano(0)} $s")
@@ -68,9 +81,9 @@ private fun build(data: File): Built {
 
 
 private fun serve(data: File, socket: Path) {
-    // DLL が javaw で起動する（コンソールがない）ので、記録は自分でファイルに書く。1MB を超えたら前のものは捨てる
-    System.getenv("LOCALAPPDATA")?.let { local ->
-        val file = File(local, "Kanade\\engine.log")
+    // DLL・fcitx5 のアドオンが起動する（コンソールがない）ので、記録は自分でファイルに書く。1MB を超えたら前のものは捨てる
+    run {
+        val file = logFile()
         file.parentFile.mkdirs()
         val append = file.length() < 1_000_000
         System.setErr(java.io.PrintStream(java.io.FileOutputStream(file, append), true, Charsets.UTF_8))

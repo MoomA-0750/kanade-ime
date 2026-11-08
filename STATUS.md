@@ -43,6 +43,7 @@
 - テンキーの変換中に Tab のキーで文節を縮める・伸ばす、文節の候補の増量（語＋助詞の文節で同音の語を全部）、配列を替えたら修飾キーの固定を外す、予測の候補（設定、既定はオフ）、確定した文字を選んで Space で再変換（2026-10-26、`docs/decisions.md`）
 - 物理キーボードの Ctrl+Shift+V（設定で変えられる）で、画面キーボードと同じクリップボードのパネルをカーソルの近くに出す（矢印・数字で選んで貼り付け。2026-10-14、`docs/decisions.md`）
 
+- Linux 版（2026-11-08、`docs/decisions.md`）: Windows 版と同じエンジン＋fcitx5 のアドオン（`linux/fcitx5`）。aarch64 の cramgent（Apple M1・Asahi・Hyprland）で組み立てて入れ、ライブ変換・候補の窓・音声入力（parakeet で 8.8 秒の音声を 0.45 秒）を確かめた。本人の指示で cramgent の hazkey を外し、Kanade を既定にした。使い方は `docs/LINUX-USAGE.md`
 - Windows 版（2026-10-04〜05）: 常駐のエンジン（`desktop/`）＋薄い TSF の DLL（`windows/tsf`）。ライブ変換・候補の窓・zenz・音声入力（F12、whisper と ReazonSpeech）・設定の保存と Android 版の設定の読み込み・インストーラーまで。to-fu に入れてある。経緯と仮決定は `docs/WINDOWS-PLAN.md`、使い方は `docs/WINDOWS-USAGE.md`
 
 ## 未完了・次の手順

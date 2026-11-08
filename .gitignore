@@ -12,3 +12,5 @@ models/
 .trash/
 # 取得した辞書・モデルのキャッシュ（scripts と dictool が置く）
 .cache/
+# Linux 版の配布物（scripts/linux.sh・linux/build.sh が作る）
+dist/

@@ -368,3 +368,15 @@ SPEC.md の未決事項に本人が答えた。
   - ユーザー辞書を音声に当てるのは、認識が同じ読みの別の漢字で書いたときだけ効く。Galaxy で「れいや」（本人の辞書の 怜弥）は、認識が「連也」と書き、読みが違うので置き換わらなかった。
 - **言いよどみ**: 規則で消す（えー・えーと・えと・えっと・あのー・うーん など）。既定は切る（整えすぎへの不満が多いという調べから）。Galaxy で「えと今日は…」の「えと」が消えた。
 - 試し方: to-fu の Windows の音声合成（Haruka、PromptBuilder で間を入れる。スクリプトは UTF-8 の BOM 付きでないと PowerShell 5 が文字を読み違える）で見本を作り、デバッグ版の files/voice-inject.wav に置いて、テンキーのマイクを `adb shell input swipe` で押し続けた。
+
+## 2026-11-08 Linux 版（fcitx5、aarch64）
+
+本人の依頼（Linux 版が欲しい、cramgent でも使いたいので aarch64 に）。
+
+- 形: Windows 版のエンジン（desktop）をそのまま使い、TSF の DLL の代わりに fcitx5 のアドオン（C++）を作った。やりとりも同じ（docs/WINDOWS-PROTOCOL.md。エンジンはもとから Linux の AF_UNIX のソケットで待てた）。キーはアドオンが Windows の仮想キーに写すので、エンジンのキーの割り当て（WinKeyMapper）は変えていない。IBus は作っていない（cramgent は fcitx5。作業機の Fedora は IBus だが、頼まれていない）
+- fcitx5 は1つのプロセスなので、エンジンへのつなぎも1本。返事は 300ms 待ち、来なければキーは食べて、遅れて来た返事で書く（Windows 版は素通し。素通しにすると、エンジンが同じキーで入力を始めていたとき二重になる）。3回続けて来なければ切ってキーを素通しにする
+- 日本語と英字の切り替え: はじめは Windows 版と同じくエンジンの中で切り替えるつもりだったが、cramgent では右 Alt が Hyprland の音声入力（押して話す）に取られて届かず、Ctrl+Space は fcitx5 が入力方式の切り替えに使った。fcitx5 の作法（英字は keyboard-us、切り替えは fcitx5）に合わせ、Kanade に入ったらいつも日本語にした
+- 配布物は使う機械の上でビルドする（llama.cpp・whisper.cpp を -mcpu=native。M1 で zenz の1回目 48ms・以後 10ms 前後、parakeet で 8.8 秒の音声を 0.45 秒）。JDK は jlink で java.base と java.desktop だけの実行環境を入れる（Java を入れなくてよい）。配布物は 88MB（tar.gz）。cramgent は 16KB ページだが、sherpa-onnx の aarch64 の onnxruntime も Temurin も動いた
+- 音声の既定のモデルは Linux では parakeet-ja（Android 版と同じ）。設定の画面がないので、導入の `--voice` で parakeet と ReazonSpeech を落とす
+- 確かめ方: Hyprland では wtype の打鍵（仮想キーボード）は入力方式を通らない。uinput の仮のキーボードで打って grim で撮った。切り替え直後の1文字が落ちるように見えたのは、直前の Esc が bash に届いて Esc+a（readline）になっていただけだった
+- cramgent の hazkey: 本人の指示で外した（`pacman -Rns fcitx5-hazkey hazkey-zenzai-model`、設定などは `~/.local/share/Trash/hazkey-20261108184600/`、fcitx5 の前の一覧は `~/.config/fcitx5/profile.before-remove-hazkey`）。fcitx5 の一覧は keyboard-us と Kanade、既定は Kanade

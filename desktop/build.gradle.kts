@@ -39,10 +39,18 @@ tasks.test {
 
 // 話しながらの音声認識（ReazonSpeech）に使う sherpa-onnx の Java 版と Windows のネイティブ（onnxruntime を含む）。
 // Android 版の AAR と同じく、版とハッシュを固定して .cache/ に取る
+// 入れる先は -Pkanade.target で選ぶ（win-x64・linux-aarch64・linux-x64。既定は Windows 版の win-x64）。
+// ネイティブの jar は入れる先の1つだけを入れる（全部入れると配布物が 50MB ほど増える）
 val sherpaVersion = "1.13.8"
+val desktopTarget = (findProperty("kanade.target") as String?) ?: "win-x64"
+val sherpaNatives = mapOf(
+    "win-x64" to "33fbdbd5410e9ba9bdda94aa164ec8f7825bb49246420d8ce9bdd88219d97039",
+    "linux-aarch64" to "5123d2e48ae1a7ce82ba89ce153906c651bf418a63db2f7dff82265e6d49c104",
+    "linux-x64" to "30c93b59381113f9c20aedbbf9fc1ad399158f6bc03dddc0f8934a6e28e069ba",
+)
 val sherpaJars = mapOf(
     "sherpa-onnx-jvm-$sherpaVersion.jar" to "77b7b047fade4eadada96b568eb92615049aaf1dc317c7244e46c1ea38b9a63b",
-    "sherpa-onnx-native-lib-win-x64-$sherpaVersion.jar" to "33fbdbd5410e9ba9bdda94aa164ec8f7825bb49246420d8ce9bdd88219d97039",
+    "sherpa-onnx-native-lib-$desktopTarget-$sherpaVersion.jar" to (sherpaNatives[desktopTarget] ?: error("知らない kanade.target: $desktopTarget")),
 )
 val sherpaDir = rootProject.file(".cache/sherpa-jvm")
 val fetchSherpaJvm by tasks.registering {

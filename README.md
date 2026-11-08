@@ -1,6 +1,6 @@
 # Kanade（kanade-ime）
 
-Samsung DeX で物理キーボードを使うための Android 日本語 IME。Windows 版もある。
+Samsung DeX で物理キーボードを使うための Android 日本語 IME。Windows 版・Linux 版（fcitx5）もある。
 
 - 物理キーボードでの入力を第一にする。物理キーボードがあるときは画面キーボードや余計なポップアップを出さず、無いときだけ画面キーボードを出す
 - かな漢字変換は zenz（Zenzai）などのニューラル言語モデルで行い、ライブ変換を持つ
@@ -21,6 +21,7 @@ Samsung DeX で物理キーボードを使うための Android 日本語 IME。W
 - 物理キーボードがないときだけ出る画面キーボード: 配列はグライド（なぞって入力）・フルキー（払って数字・記号、Ctrl/Alt/Fn/Esc/矢印も）・テンキー（12 キーのフリック）。好きな位置に浮かせるフロート、絵文字パネル（検索つき）、クリップボード（履歴・ピン留め・編集・切り抜き）
 - 設定画面（Material 3 Expressive）、設定・ユーザー辞書・スニペットの書き出しと読み込み、英語と日本語の表示
 - Windows 版: 同じ入力と音声入力（whisper small）を Windows の入力方式として使える。使い方は [docs/WINDOWS-USAGE.md](docs/WINDOWS-USAGE.md)
+- Linux 版: 同じ入力と音声入力（parakeet-ja）を fcitx5 の入力方式として使える（aarch64・x86_64）。使い方は [docs/LINUX-USAGE.md](docs/LINUX-USAGE.md)
 
 主な利用端末は Galaxy Z Fold 7（Snapdragon 8 Elite、One UI 8.5 / Android 16）を DeX で使う形。
 

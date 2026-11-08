@@ -193,10 +193,11 @@ class DesktopStore(val dir: File = defaultDir()) {
         const val KEY_UI_LANGUAGE = "ui_language"
         val UI_LANGUAGES = listOf("auto", "ja", "en")
 
-        /** Windows は %APPDATA%\Kanade、ほかは ~/.config/kanade-desktop */
+        /** Windows は %APPDATA%\Kanade、Linux は $XDG_CONFIG_HOME/kanade（ふつうは ~/.config/kanade） */
         fun defaultDir(): File {
             System.getenv("APPDATA")?.let { return File(it, "Kanade") }
-            return File(System.getProperty("user.home"), ".config/kanade-desktop")
+            val config = System.getenv("XDG_CONFIG_HOME")?.takeIf { it.isNotEmpty() } ?: (System.getProperty("user.home") + "/.config")
+            return File(config, "kanade")
         }
     }
 }

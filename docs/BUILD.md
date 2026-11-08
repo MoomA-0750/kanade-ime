@@ -49,6 +49,13 @@ $D whisper .cache/models/ggml-small-q5_1.bin .cache/host-whisper/libkanade_whisp
 - エミュレータで試すときは、モデルを to-fu で落として `adb push` で `/sdcard/Android/data/dev.mooma.kanade/files/models/` に置ける。エミュレータは `-no-audio` で起動しているのでマイクは無音
 - 見本の音声は to-fu の Windows の音声合成で作れる（PowerShell の `System.Speech`、`Microsoft Haruka Desktop`、16kHz・モノラル・16bit）。間を入れるときは `PromptBuilder.AppendBreak` を使う（SSML の break は読み上げられてしまった）。スクリプトは UTF-8 の BOM 付きで送る（ないと PowerShell 5 が日本語を読み違える）。デバッグ版なら `run-as dev.mooma.kanade cp … files/voice-inject.wav` でマイクの代わりに流せる
 
+## Linux 版（cramgent などの別の機械）
+
+- `scripts/linux.sh build <ssh の相手>`: エンジンの jar（`-Pkanade.target=linux-aarch64` など、相手の CPU に合わせて sherpa-onnx の native を選ぶ）・辞書・ネイティブのソースを束ねて送り、相手で `linux/build.sh` を動かす。JDK（Temurin 21）は手元で gh から落として送る（相手の curl では GitHub が 504 を返した）。相手に要るのは cmake・C/C++・fcitx5 のヘッダー
+- `scripts/linux.sh install <ssh の相手> [--voice] [--add-im]`: 相手で配布物の `install.sh` を動かす（アドオンだけ sudo）
+- 画面での確かめ方（Hyprland）: wtype の打鍵は仮想キーボードなので入力方式を通らない。uinput の仮のキーボード（sudo の python で /dev/uinput に書く）で打ち、grim で撮る。ssh から fcitx5 を起こし直すと Wayland の環境がないまま動くので、`systemctl --user restart <fcitx5 のサービス>` を使う
+- ssh の中の LANG が空だと、エンジンの引数の日本語が化ける（`LANG=en_US.UTF-8` を付ける）。`pkill -f` の模様が ssh の命令の行に入っていると、ssh ごと切れる
+
 ## エミュレータでの確認（to-fu）
 
 作業機は VM で KVM がないので、to-fu（Windows）の Android Studio のエミュレータ（Pixel_10_Pro_Fold、Android 16、x86_64）を ssh 越しに使う。

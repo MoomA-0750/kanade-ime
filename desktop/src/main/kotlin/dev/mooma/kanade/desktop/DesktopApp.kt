@@ -86,7 +86,7 @@ class DesktopApp(
             "snippets" -> "snippets"
             "import-android" -> "backup"
             "log" -> {
-                System.getenv("LOCALAPPDATA")?.let { open(File(it, "Kanade\\engine.log")) }
+                open(logFile())
                 return
             }
             else -> return
@@ -136,7 +136,8 @@ class DesktopApp(
         if (System.getProperty("os.name").startsWith("Windows")) {
             ProcessBuilder("notepad.exe", file.absolutePath).start()
         } else {
-            java.awt.Desktop.getDesktop().open(file)
+            // Linux: xdg-open で、ふだん使うエディタで開く（java.awt.Desktop は Wayland だけの環境で使えないことがある）
+            runCatching { ProcessBuilder("xdg-open", file.absolutePath).start() }.onFailure { log("開けない: ${file.path} $it") }
         }
     }
 }

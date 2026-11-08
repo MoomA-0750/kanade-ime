@@ -49,17 +49,27 @@ class DesktopResources(private val dataDir: File, private val cacheDir: File = d
     }
 
     companion object {
-        /** Windows は %LOCALAPPDATA%\Kanade\data、ほかはリポジトリのビルド結果（app/build/generated/kanadeAssets） */
+        /**
+         * Windows は %LOCALAPPDATA%\Kanade\data。Linux は入れた場所（エンジンの lib の隣）の data があればそこ
+         * （~/.local/share/kanade/data。音声のモデルもここへ落とす）、なければリポジトリのビルド結果（app/build/generated/kanadeAssets）
+         */
         fun defaultDataDir(): File {
             val local = System.getenv("LOCALAPPDATA")
             if (local != null) return File(local, "Kanade\\data")
+            installRoot()?.let { File(it, "data") }?.takeIf { it.isDirectory }?.let { return it }
             return File("app/build/generated/kanadeAssets")
         }
 
         fun defaultCacheDir(): File {
             val local = System.getenv("LOCALAPPDATA")
             if (local != null) return File(local, "Kanade\\cache")
-            return File(System.getProperty("user.home"), ".cache/kanade-desktop")
+            val cache = System.getenv("XDG_CACHE_HOME")?.takeIf { it.isNotEmpty() } ?: (System.getProperty("user.home") + "/.cache")
+            return File(cache, "kanade")
         }
+
+        /** エンジンを入れた場所（lib/ の jar の1つ上）。jar から動いていなければ null */
+        fun installRoot(): File? = runCatching {
+            File(DesktopResources::class.java.protectionDomain.codeSource.location.toURI()).takeIf { it.isFile }?.parentFile?.parentFile
+        }.getOrNull()
     }
 }
