@@ -71,6 +71,7 @@ fun main(args: Array<String>) {
         "build" -> build(File(args[1]), File(args[2]))
         "eval" -> evaluate(File(args[1]), File(args[2]))
         "convert" -> convert(File(args[1]), args.drop(2))
+        "profile" -> profileTry(File(args[1]), File(args[2]), File(args[3]), args[4].split('|'), args.drop(5))
         "typo" -> typo(File(args[1]), args.drop(2))
         "predict" -> predict(File(args[1]), args.drop(2))
         "zenz" -> zenzTry(File(args[1]), File(args[2]), File(args[3]), args.drop(4))
@@ -581,6 +582,24 @@ fun evaluateZenzai(outDir: File, tsv: File, model: File, lib: File) {
         for (i in modes.indices) println("${modes[i]}  ${pass[i]}  ${med(times[i])}")
         println("方式で1位が分かれた文: ${diffs.size}")
         diffs.forEach { println("  $it") }
+    }
+}
+
+/** 変換のプロフィールで結果が変わるか試す（プロフィールは | で区切って複数。空はプロフィールなし） */
+fun profileTry(outDir: File, model: File, lib: File, profiles: List<String>, readings: List<String>) {
+    val converter = loadConverter(outDir)
+    openZenz(model, lib).use { zenz ->
+        val reranker = Reranker(zenz)
+        for (r in readings) {
+            val dict = converter.convert(r, 10).map { it.text }
+            println("$r（辞書 ${dict.take(5).joinToString(" / ")}）")
+            for (p in listOf("") + profiles) {
+                zenz.profile = p
+                val ranked = reranker.rerank("", r, dict)!!.candidates.first()
+                val corrected = reranker.correct("", r, dict.first(), Reranker.CORRECT_LIMIT) { prefix -> converter.convertWithPrefix(r, prefix)?.text }
+                println("  ${p.ifEmpty { "（なし）" }}: 並べ替え $ranked、直す $corrected")
+            }
+        }
     }
 }
 

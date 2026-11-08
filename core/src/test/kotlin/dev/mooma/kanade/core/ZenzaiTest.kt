@@ -157,4 +157,26 @@ class ZenzaiTest {
         e.handle(KeyInput.Backspace)
         assertEquals(emptyList(), e.onPredictionsRanked(req.id, listOf("キーホルダー", "キーボード")))
     }
+
+    @Test
+    fun escapeHidesThePredictionWindow() {
+        val e = engine(settings = EngineSettings(prediction = true))
+        assertTrue(e.type("ki-").any { it is ImeCommand.ShowCandidates })
+        // 取り消すと予測の候補は消える。窓も隠す（隠し忘れると、空の入力欄の下に前の予測が残る）
+        assertTrue(ImeCommand.HideCandidates in e.handle(KeyInput.Escape).commands)
+    }
+
+    @Test
+    fun aTypoCorrectedTopIsNotSentToTheModel() {
+        val source = object : CandidateSource {
+            override fun convert(reading: String, n: Int) = listOf(
+                Conversion(listOf(Segment(reading, "写真")), corrected = true),
+                Conversion(listOf(Segment(reading, "視野心"))),
+            )
+            override fun segmentCandidates(reading: String, n: Int) = listOf("写真", "視野心")
+        }
+        val e = engine(source)
+        assertTrue(e.type("siyasinn").none { it is ImeCommand.RequestRerank })
+        assertEquals("写真", e.composingText)
+    }
 }

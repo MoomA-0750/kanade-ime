@@ -32,6 +32,12 @@ class ZenzReranker(private val library: File, private val model: File, private v
         return Reranker(m).rerank(request.leftContext, request.reading, request.candidates, rightContext = request.rightContext)?.candidates
     }
 
+    /** Zenzai の方式（確かめて直す）で1位を直した並び。いまは試験（`zenz` の命令）だけで使う */
+    fun correct(request: ImeCommand.RequestRerank, constrained: (String) -> String?): List<String>? {
+        val m = model() ?: return null
+        return Reranker(m).rerank(request.copy(sentence = true), Reranker.CORRECT_LIMIT, constrained)
+    }
+
     override fun rankPredictions(request: ImeCommand.RequestPredictionRank): List<String>? {
         val m = model() ?: return null
         return Reranker(m).rankPredictions(request.leftContext, request.items)

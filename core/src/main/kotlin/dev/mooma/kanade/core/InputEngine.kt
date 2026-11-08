@@ -124,8 +124,11 @@ data class EngineSettings(
 /** 文節（読みと、いま選んでいる表記） */
 data class Segment(val reading: String, val surface: String)
 
-/** 文全体の変換結果。文節に分けてある */
-data class Conversion(val segments: List<Segment>) {
+/**
+ * 文全体の変換結果。文節に分けてある。[corrected] は、打ち間違いを直した読みの変換
+ * （言語モデルは打ったままの読みで確かめるので、直したものを打ったままに戻してしまう。そのため言語モデルに回さない）
+ */
+data class Conversion(val segments: List<Segment>, val corrected: Boolean = false) {
     val text: String get() = segments.joinToString("") { it.surface }
 }
 
@@ -263,6 +266,11 @@ class InputEngine(
     private var predictionSelected = -1
     private var predictionsFor: String? = null
 
+    /**
+     * 予測の窓を出しているか。入力を取り消すと [reset] が予測の候補を消すので、窓を隠す知らせを出すためにこちらで覚える
+     */
+    private var predictionWindowShown = false
+
     /** 予測の候補の並べ替えの依頼（id と、頼んだ組）。覚えは左の文脈と組をまとめた鍵で引く */
     private var predictionRequestId = 0L
     private var pendingPrediction: Pair<Long, Pair<String, List<Pair<String, String>>>>? = null
@@ -357,15 +365,18 @@ class InputEngine(
             predictions = emptyList()
             predictionsFor = null
             predictionSelected = -1
+            // 窓は変換の候補・括弧の一覧に替わった
+            predictionWindowShown = false
             return emptyList()
         }
         val r = reading
         val active = settings.prediction && isComposing && !caretInside && r.length >= 2
         if (!active) {
-            val wasShown = predictions.isNotEmpty()
+            val wasShown = predictions.isNotEmpty() || predictionWindowShown
             predictions = emptyList()
             predictionsFor = null
             predictionSelected = -1
+            predictionWindowShown = false
             return if (wasShown) listOf(ImeCommand.HideCandidates) else emptyList()
         }
         if (r == predictionsFor) return emptyList()
@@ -383,10 +394,11 @@ class InputEngine(
         pendingPrediction = null
         val commands = mutableListOf<ImeCommand>()
         commands += if (predictions.isEmpty()) {
-            if (wasShown) ImeCommand.HideCandidates else return emptyList()
+            if (wasShown || predictionWindowShown) ImeCommand.HideCandidates else return emptyList()
         } else {
             ImeCommand.ShowCandidates(predictions, -1, prediction = true)
         }
+        predictionWindowShown = predictions.isNotEmpty()
         if (cached == null && items.size >= 2 && items.all { it.first.isNotEmpty() }) {
             pendingPrediction = predictionRequestId to key
             commands += ImeCommand.RequestPredictionRank(predictionRequestId, leftContext, items)
@@ -937,6 +949,8 @@ class InputEngine(
         // （azooKey で、直しても Zenzai が元の変換へ戻すのが一番の不満だったため）
         val top = conversions.firstOrNull()
         if (top != null && top.segments.any { it.reading.length >= 2 && source.isLearned(it.reading, it.surface) }) return emptyList()
+        // 1位が打ち間違いを直した変換なら、言語モデルに回さない（打ったままの読みで確かめると、打ち間違いのほうへ戻すため）
+        if (top != null && top.corrected) return emptyList()
         rerankCache[RerankKey(leftContext, r, fromDictionary, rightContext)]?.let { cached ->
             candidates = (pinned + cached).distinct()
             return emptyList()

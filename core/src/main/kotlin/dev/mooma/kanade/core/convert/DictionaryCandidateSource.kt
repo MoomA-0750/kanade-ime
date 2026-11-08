@@ -60,7 +60,10 @@ class DictionaryCandidateSource(
     }
 
     override fun convert(reading: String, n: Int): List<Conversion> {
-        val list = withTypos(reading, converter.convert(reading, n)).map { Conversion(segmenter.segments(it.words).let { s -> onReading(reading, s) }) }
+        val nBest = converter.convert(reading, n)
+        val list = withTypos(reading, nBest).map { c ->
+            Conversion(segmenter.segments(c.words).let { s -> onReading(reading, s) }, corrected = c !in nBest)
+        }
         // カタカナの語（英語の表記がある）が文節に分かれていたら、1つの文節にまとめる（Space で英語の表記も選べるように）
         val katakana = CharWidth.toKatakana(reading)
         val top = list.firstOrNull() ?: return list

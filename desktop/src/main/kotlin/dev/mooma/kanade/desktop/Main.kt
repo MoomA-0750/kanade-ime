@@ -146,6 +146,14 @@ private fun zenzCheck(data: File, readings: List<String>) {
         val started = System.nanoTime()
         val ranked = reranker.rerank(dev.mooma.kanade.core.ImeCommand.RequestRerank(1, "", reading, candidates))
         println("$reading: 辞書 $candidates -> zenz $ranked (${(System.nanoTime() - started) / 1_000_000}ms)")
+        val t = System.nanoTime()
+        val corrected = reranker.correct(dev.mooma.kanade.core.ImeCommand.RequestRerank(1, "", reading, candidates)) { prefix ->
+            source.convertWithPrefix(reading, prefix)?.text
+        }
+        println("  確かめて直す -> ${corrected?.firstOrNull()} (${(System.nanoTime() - t) / 1_000_000}ms)")
+        val items = source.predictWithReadings(reading.take(3), 6)
+        val predicted = reranker.rankPredictions(dev.mooma.kanade.core.ImeCommand.RequestPredictionRank(1, "", items))
+        println("  予測（${reading.take(3)}）辞書 ${items.map { it.second }} -> zenz $predicted")
     }
 }
 
