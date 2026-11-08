@@ -491,7 +491,12 @@ private:
                     pos = comma + 1;
                 }
             }
-            if (lengths.size() <= 1) {
+            int focusedStart = -1;
+            if (lengths.size() == 1 && focused == 0) {
+                // 1文節だけの変換
+                preedit.append(text, {fcitx::TextFormatFlag::Underline, fcitx::TextFormatFlag::HighLight});
+                focusedStart = 0;
+            } else if (lengths.size() <= 1) {
                 preedit.append(text, fcitx::TextFormatFlag::Underline);
             } else {
                 size_t units = 0;
@@ -500,12 +505,19 @@ private:
                     units += lengths[i];
                     size_t to = i + 1 == lengths.size() ? text.size() : utf16ToByte(text, units);
                     fcitx::TextFormatFlags flags = fcitx::TextFormatFlag::Underline;
-                    if (static_cast<int>(i) == focused) flags |= fcitx::TextFormatFlag::HighLight;
+                    if (static_cast<int>(i) == focused) {
+                        flags |= fcitx::TextFormatFlag::HighLight;
+                        focusedStart = static_cast<int>(from);
+                    }
                     preedit.append(text.substr(from, to - from), flags);
                 }
             }
+            // 変換中は、カーソルを選んでいる文節の頭に置く。Wayland のアプリ（text-input-v3）へは文節の色分けが届かず、
+            // fcitx5 は「カーソルが強調の頭にあるときだけ、強調の範囲をカーソルの範囲として渡す」ため、こうしないと
+            // どの文節を変換しているか・区切りがどこかがアプリに映らない（mozc と同じ置き方）
             int cursor = c.size() >= 3 ? toInt(c[2], -1) : -1;
-            preedit.setCursor(cursor < 0 ? static_cast<int>(text.size()) : static_cast<int>(utf16ToByte(text, cursor)));
+            if (focusedStart >= 0) preedit.setCursor(focusedStart);
+            else preedit.setCursor(cursor < 0 ? static_cast<int>(text.size()) : static_cast<int>(utf16ToByte(text, cursor)));
         }
         auto &panel = ic->inputPanel();
         if (ic->capabilityFlags().test(fcitx::CapabilityFlag::Preedit)) {

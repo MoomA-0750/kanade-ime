@@ -396,3 +396,11 @@ SPEC.md の未決事項に本人が答えた。
 - cramgent の Superwhisper は、キーがぶつかるのでサービスを止め、自動起動を外した（パッケージと設定は残す。戻すのは `systemctl --user enable --now superwhisper.service`）
 - （続き）右 Alt を押すと Superwhisper が起き上がった（本人）。Omarchy の Hyprland の設定（`default/hypr/bindings/dictation.lua`）が、選ばれた口述の道具（既定 superwhisper）が入っているあいだ「Alt+Space」と「右 Alt の長押し」を `omarchy-dictation` に割り当てていた。前に右 Alt が fcitx5 まで届かなかったのもこれ。本人の指示で Superwhisper を外し（同梱の uninstall.sh と pacman -Rns superwhisper-bin。設定・履歴はゴミ箱 `~/.local/share/Trash/superwhisper-20261108203008`）、Hyprland の割り当てが消えたことを確かめた
 - 英語の途中の文字が「この」と日本語になった。ReazonSpeech（ja-en）は英語の音声でも日本語で書くため。英語のときは、確定に使う parakeet-tdt v3 で録れた分を 0.6 秒ごとに読み直して出す（8 秒で 0.5 秒ほど）。同じモデルを途中と確定で同時に読まないよう、順に使う
+
+## 2026-11-08 Linux 版: 変換中の文節が Wayland のアプリに映らなかった
+
+- 本人の報告: 変換中に矢印キーで文節の区切りを変えたり、変換する文節を移ったりできなかった
+- DBus の入力欄（fcitx5 の試験の手段）では、←→ で文節を移り、↓ で候補が進み、Shift+← で区切りが縮んでいた。キーはエンジンまで届いて効いている
+- 原因: Wayland のアプリ（text-input-v3。fcitx5 からは input-method-v2）へは、入力中の文字と「カーソルの範囲」しか渡せず、文節ごとの下線・強調は届かない。fcitx5 5.1.23 の `waylandimserverv2.cpp` は、強調が1か所でカーソルがその頭にあるときだけ、強調の範囲をカーソルの範囲として渡す。Kanade はカーソルを文の末尾に置いていたので、アプリには区切りも選んでいる文節も映らず、矢印が効いていないように見えた
+- 直し: 変換中は、カーソルを選んでいる文節の頭に置く（mozc の fcitx5 版と同じ置き方）。1文節だけの変換も強調する。DBus でカーソルが文節の頭に動くことを確かめた。アプリでの見え方（GTK は太字、foot・Chromium はカーソルの範囲の描き方による）は本人の画面で確かめる
+- 試してやめたこと: 本物のキー（uinput）で確かめようとしたが、本人が cramgent を使っている最中で、2回目のキーが本人のブラウザに入った（Ctrl+U でソースの表示が開いた）。本人が使っている機械では uinput の試験をしない
