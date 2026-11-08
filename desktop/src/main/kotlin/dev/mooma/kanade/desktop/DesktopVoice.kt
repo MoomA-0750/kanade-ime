@@ -84,14 +84,19 @@ class DesktopVoice(
         val en = english
         worker.execute { model(en) }
         lastPartial = null
+        // 話している途中の文字: 日本語は ReazonSpeech。英語は ReazonSpeech だと日本語で書いてしまうので、
+        // 確定に使う英語のモデル（parakeet-tdt v3 は 8 秒を 0.5 秒ほどで読む）で、録れた分を読み直す。whisper は遅いので出さない
         val partial = partial
-        if (partial != null && partial.isReady) {
+        val partialEnglish = en && finalModelEn.kind != VoiceFinal.Kind.WHISPER && finalModelEn.isReady(data)
+        if (partialEnglish || (!en && partial != null && partial.isReady)) {
             Thread({
                 while (line === l) {
                     Thread.sleep(PARTIAL_INTERVAL_MS)
                     if (line !== l) break
                     val pcm = snapshot(samples = PARTIAL_MAX_SECONDS * WhisperModel.SAMPLE_RATE)
-                    val text = runCatching { partial.recognize(pcm) }.getOrNull() ?: continue
+                    val text = runCatching {
+                        if (partialEnglish) transcribe(model(true), pcm) else partial!!.recognize(pcm)
+                    }.getOrNull() ?: continue
                     if (line !== l) break
                     lastPartial = text
                     onPartial(spoken(text, en))
@@ -127,13 +132,19 @@ class DesktopVoice(
         val en = english
         worker.execute {
             val started = System.nanoTime()
-            val text = runCatching { model(en)?.transcribe(pcm) }.onFailure { log("音声認識: $it") }.getOrNull()
+            val text = runCatching { transcribe(model(en), pcm) }.onFailure { log("音声認識: $it") }.getOrNull()
             log("${lastModel?.id} ${pcm.size / WhisperModel.SAMPLE_RATE.toFloat()}秒 -> ${(System.nanoTime() - started) / 1_000_000}ms ${text ?: "（なし）"}")
             // 確定の文が作れなければ、話している途中に出していた文を使う（Android 版と同じ）
             onText((text ?: lastPartial)?.let { spoken(it, en) })
             scheduleUnload()
         }
     }
+
+    /** 1つのモデルを途中の文字と確定の文で同時に使わないよう、順に読む */
+    private val transcribing = Any()
+
+    private fun transcribe(recognizer: FinalRecognizer?, pcm: FloatArray): String? =
+        recognizer?.let { synchronized(transcribing) { it.transcribe(pcm) } }
 
     /** 録っている途中の音声（後ろの [samples] サンプルまで） */
     private fun snapshot(samples: Int): FloatArray {

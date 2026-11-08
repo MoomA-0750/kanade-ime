@@ -394,3 +394,5 @@ SPEC.md の未決事項に本人が答えた。
 - アドオンを `/usr` でなく利用者のフォルダーに入れる形にした。cramgent の sudo がパスワードを求めるようになり入れられなかったため。fcitx5 は `~/.local/share/fcitx5/addon` の設定を先に読み、Library にフルパスを書けば .so もそこから読む（cramgent で確かめた）。導入に root が要らなくなった
 - 実際のキーボードを打つ試験は、uinput に sudo が要るようになったためできなかった。代わりに fcitx5 の DBus（`org.fcitx.Fcitx.InputContext1.ProcessKeyEvent`）で入力欄を作ってキーを送った。この道もアドオンの見張りを通る
 - cramgent の Superwhisper は、キーがぶつかるのでサービスを止め、自動起動を外した（パッケージと設定は残す。戻すのは `systemctl --user enable --now superwhisper.service`）
+- （続き）右 Alt を押すと Superwhisper が起き上がった（本人）。Omarchy の Hyprland の設定（`default/hypr/bindings/dictation.lua`）が、選ばれた口述の道具（既定 superwhisper）が入っているあいだ「Alt+Space」と「右 Alt の長押し」を `omarchy-dictation` に割り当てていた。前に右 Alt が fcitx5 まで届かなかったのもこれ。本人の指示で Superwhisper を外し（同梱の uninstall.sh と pacman -Rns superwhisper-bin。設定・履歴はゴミ箱 `~/.local/share/Trash/superwhisper-20261108203008`）、Hyprland の割り当てが消えたことを確かめた
+- 英語の途中の文字が「この」と日本語になった。ReazonSpeech（ja-en）は英語の音声でも日本語で書くため。英語のときは、確定に使う parakeet-tdt v3 で録れた分を 0.6 秒ごとに読み直して出す（8 秒で 0.5 秒ほど）。同じモデルを途中と確定で同時に読まないよう、順に使う

@@ -44,7 +44,7 @@
 - 物理キーボードの Ctrl+Shift+V（設定で変えられる）で、画面キーボードと同じクリップボードのパネルをカーソルの近くに出す（矢印・数字で選んで貼り付け。2026-10-14、`docs/decisions.md`）
 
 - Linux 版（2026-11-08、`docs/decisions.md`）: Windows 版と同じエンジン＋fcitx5 のアドオン（`linux/fcitx5`）。aarch64 の cramgent（Apple M1・Asahi・Hyprland）で組み立てて入れ、ライブ変換・候補の窓・音声入力（parakeet で 8.8 秒の音声を 0.45 秒）を確かめた。本人の指示で cramgent の hazkey を外し、Kanade を既定にした。使い方は `docs/LINUX-USAGE.md`
-- Linux 版で Superwhisper の代わり（2026-11-08、`docs/decisions.md`）: 録音キー（F12・右 Alt の長押し、Ctrl+Alt+Space、Esc で取り消し）がどの入力方式でも効き、英字のときは英語（parakeet-tdt v3、7.7 秒を 0.47 秒）で書く。設定の画面（GTK4・libadwaita）。アドオンを利用者のフォルダーに入れる形にして sudo を不要に。cramgent の Superwhisper は止めた
+- Linux 版で Superwhisper の代わり（2026-11-08、`docs/decisions.md`）: 録音キー（F12・右 Alt の長押し、Ctrl+Alt+Space、Esc で取り消し）がどの入力方式でも効き、英字のときは英語（parakeet-tdt v3、7.7 秒を 0.47 秒）で書く。設定の画面（GTK4・libadwaita）。アドオンを利用者のフォルダーに入れる形にして sudo を不要に。cramgent の Superwhisper は本人の指示で外した
 - Windows 版（2026-10-04〜05）: 常駐のエンジン（`desktop/`）＋薄い TSF の DLL（`windows/tsf`）。ライブ変換・候補の窓・zenz・音声入力（F12、whisper と ReazonSpeech）・設定の保存と Android 版の設定の読み込み・インストーラーまで。to-fu に入れてある。経緯と仮決定は `docs/WINDOWS-PLAN.md`、使い方は `docs/WINDOWS-USAGE.md`
 
 ## 未完了・次の手順

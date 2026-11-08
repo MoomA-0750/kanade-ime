@@ -27,9 +27,9 @@ Android 版・Windows 版と同じ入力（ライブ変換・zenz の並べ替�
 ## 音声入力（どの入力方式でも）
 
 - F12 か右 Alt を押している間だけ録音し、離すと句読点付きの文が入る。Ctrl+Alt+Space は押すたびに録音を始める・終える。録音中の Esc で取り消す。すぐ離した（0.3 秒より短い）ときは何も入れない
-- Kanade のときは日本語（既定 parakeet-ja）、ほかの入力方式（keyboard-us など）のときは英語（既定 parakeet-tdt v3）で書く。話している途中の文字（ReazonSpeech）と「認識中」は、カーソルの近くの窓に出る
+- Kanade のときは日本語（既定 parakeet-ja）、ほかの入力方式（keyboard-us など）のときは英語（既定 parakeet-tdt v3）で書く。話している途中の文字（日本語は ReazonSpeech、英語は英語のモデル）と「認識中」は、カーソルの近くの窓に出る
 - キーとモデルは設定の画面の「音声入力」で変える。入力欄のないところ（デスクトップそのものなど）では効かない
-- Superwhisper など、同じキーを使うほかの音声入力と一緒には動かさない
+- Superwhisper など、同じキーを使うほかの音声入力と一緒には動かさない。Omarchy は口述の道具（Superwhisper・voxtype）が入っていると、右 Alt と Alt+Space を Hyprland で先に取る
 
 ## 設定
 
