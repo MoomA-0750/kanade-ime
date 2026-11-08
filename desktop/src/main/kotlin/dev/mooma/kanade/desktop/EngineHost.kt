@@ -62,7 +62,14 @@ class EngineHost(
     fun onLine(client: Client, line: String) {
         val f = Protocol.decode(line)
         when (f[0]) {
-            "hello" -> synchronized(lock) { client.send(reply(0, listOf(ImeCommand.ModeChanged(engine.japanese)), false)) }
+            "hello" -> synchronized(lock) {
+                client.send(reply(0, listOf(ImeCommand.ModeChanged(engine.japanese)), false))
+                // fcitx5 のアドオンには、どの入力方式でも効く録音キーを教える（Windows の DLL は F12 をキーとして送ってくる）
+                if (f.getOrNull(3) == "fcitx5") {
+                    fcitxClients.add(client)
+                    client.send(voiceKeysLines())
+                }
+            }
             "test" -> {
                 val key = parseKey(f, 2)
                 val relevant = synchronized(lock) { test(client, key) }
@@ -100,6 +107,15 @@ class EngineHost(
                 val on = f.getOrNull(1) == "1"
                 if (engine.japanese != on) client.send(reply(0, run(engine.handle(KeyInput.SetJapanese(on)).commands), false))
             }
+            // 入力方式に関わらない音声入力（fcitx5 のアドオンが、どの入力方式でも録音キーを見て送る）。
+            // voice start <ja|en>・voice stop・voice cancel。結果はこのつなぎへ自分から送る
+            "voice" -> synchronized(lock) {
+                when (f.getOrNull(1)) {
+                    "start" -> client.send(startVoice(client, english = f.getOrNull(2) == "en"))
+                    "stop" -> stopVoice()
+                    "cancel" -> cancelVoice(quiet = f.getOrNull(2) == "quiet")
+                }
+            }
             "menu" -> f.getOrNull(1)?.let { action -> Thread({ runCatching { onMenu(action) } }, "menu").start() }
             // 設定の画面（windows/settings）からの頼みごと。時間のかかるものもあるので別のスレッドで
             "admin" -> {
@@ -115,6 +131,7 @@ class EngineHost(
     }
 
     fun disconnected(client: Client) = synchronized(lock) {
+        fcitxClients.remove(client)
         if (active === client) {
             engine.reset()
             active = null
@@ -165,23 +182,56 @@ class EngineHost(
     }
 
     private var recording = false
+    private var recordingEnglish = false
 
-    /** 録音キー: 押したら（入力中の文字を確定して）録音を始め、離したら文字にして、そのときの相手の DLL へ確定を送る */
+    /** fcitx5 のアドオンのつなぎ（録音キーを教える相手） */
+    private val fcitxClients = LinkedHashSet<Client>()
+
+    /**
+     * どの入力方式でも効く録音キー（fcitx5 のキーの名前。設定の voice_hold_keys・voice_toggle_key）。
+     * 押している間だけ録音するキー（カンマ区切り）と、押すたびに録音の開始と終わりを替えるキー
+     */
+    var voiceKeys: Pair<String, String> = DesktopSettings().let { it.voiceHoldKeys to it.voiceToggleKey }
+        set(value) = synchronized(lock) {
+            if (field == value) return
+            field = value
+            fcitxClients.forEach { it.send(voiceKeysLines()) }
+        }
+
+    private fun voiceKeysLines() = listOf(Protocol.encode("c", "0", "voicekeys", voiceKeys.first, voiceKeys.second), Protocol.encode("done", 0, 0))
+
+    /** 録音キー（Windows の DLL から F12 がキーとして届く）: 押したら録音を始め、離したら文字にする */
     private fun voiceKey(client: Client, id: Int, key: WinKey): List<String> {
-        val v = voice ?: return reply(id, emptyList(), false)
+        if (voice == null) return reply(id, emptyList(), false)
         if (key.down) {
             if (key.repeat || recording) return reply(id, emptyList(), true)
-            activate(client)
-            val commands = run(engine.commitAll())
-            recording = v.start { partial -> synchronized(lock) { if (recording) indicate("🎤 $partial") } }
-            indicate(if (recording) "🎤" else Ui.t("マイクを使えません", "Microphone unavailable"), if (recording) 0 else 2000)
-            return reply(id, commands, true)
+            return startVoice(client, english = false, id = id)
         }
-        if (!recording) {
-            indicate(null)
-            return reply(id, emptyList(), true)
-        }
+        if (!recording) indicate(null) else stopVoice()
+        return reply(id, emptyList(), true)
+    }
+
+    /** （入力中の文字を確定して）録音を始める。[english] なら英語のモデルで文字にする */
+    private fun startVoice(client: Client, english: Boolean, id: Int = 0): List<String> {
+        val v = voice ?: return reply(id, emptyList(), false)
+        activate(client)
+        if (recording) return reply(id, emptyList(), true)
+        val commands = run(engine.commitAll())
+        recordingEnglish = english
+        recording = v.start(english) { partial -> synchronized(lock) { if (recording) indicate("🎤 $partial") } }
+        indicate(
+            if (recording) (if (english) "🎤 EN" else "🎤") else Ui.t("マイクを使えません", "Microphone unavailable"),
+            if (recording) 0 else 2000,
+        )
+        return reply(id, commands, true)
+    }
+
+    /** 録音を止めて文字にし、そのときの相手へ確定を送る */
+    private fun stopVoice() {
+        val v = voice ?: return
+        if (!recording) return
         recording = false
+        val english = recordingEnglish
         indicate(Ui.t("🎤 認識中", "🎤 Recognizing"))
         v.stop { text ->
             synchronized(lock) {
@@ -190,11 +240,19 @@ class EngineHost(
                 if (text.isNullOrEmpty()) return@synchronized
                 // 認識しているあいだに打ち始めていたら、その文字を先に確定する
                 val commands = run(engine.commitAll()) + ImeCommand.Commit(text)
-                engine.leftContext = (engine.leftContext + text).takeLast(InputEngine.MAX_CONTEXT)
+                if (!english) engine.leftContext = (engine.leftContext + text).takeLast(InputEngine.MAX_CONTEXT)
                 target.send(reply(0, commands, false))
             }
         }
-        return reply(id, emptyList(), true)
+    }
+
+    /** 録音を捨てる（録音中の Esc。[quiet] なら録音キーをすぐ離した押し間違いで、何も出さない） */
+    private fun cancelVoice(quiet: Boolean = false) {
+        val v = voice ?: return
+        if (!recording) return
+        recording = false
+        v.cancel()
+        if (quiet) indicate(null) else indicate(Ui.t("🎤 取り消しました", "🎤 Canceled"), 1000)
     }
 
     /** 命令のうち、DLL に送らずエンジンで済ませるもの（候補の窓・並べ替え）を片付け、残りを返す */

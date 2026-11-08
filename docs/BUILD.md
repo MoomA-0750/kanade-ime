@@ -52,8 +52,8 @@ $D whisper .cache/models/ggml-small-q5_1.bin .cache/host-whisper/libkanade_whisp
 ## Linux 版（cramgent などの別の機械）
 
 - `scripts/linux.sh build <ssh の相手>`: エンジンの jar（`-Pkanade.target=linux-aarch64` など、相手の CPU に合わせて sherpa-onnx の native を選ぶ）・辞書・ネイティブのソースを束ねて送り、相手で `linux/build.sh` を動かす。JDK（Temurin 21）は手元で gh から落として送る（相手の curl では GitHub が 504 を返した）。相手に要るのは cmake・C/C++・fcitx5 のヘッダー
-- `scripts/linux.sh install <ssh の相手> [--voice] [--add-im]`: 相手で配布物の `install.sh` を動かす（アドオンだけ sudo）
-- 画面での確かめ方（Hyprland）: wtype の打鍵は仮想キーボードなので入力方式を通らない。uinput の仮のキーボード（sudo の python で /dev/uinput に書く）で打ち、grim で撮る。ssh から fcitx5 を起こし直すと Wayland の環境がないまま動くので、`systemctl --user restart <fcitx5 のサービス>` を使う
+- `scripts/linux.sh install <ssh の相手> [--voice] [--add-im]`: 相手で配布物の `install.sh` を動かす（sudo は要らない。アドオンも利用者のフォルダーに入れる）
+- 画面での確かめ方（Hyprland）: wtype の打鍵は仮想キーボードなので入力方式を通らない。uinput の仮のキーボード（sudo の python で /dev/uinput に書く）で打ち、grim で撮る。sudo が使えないときは、fcitx5 の DBus で入力欄を作ってキーを送る（`org.fcitx.Fcitx.InputMethod1.CreateInputContext` → `InputContext1.ProcessKeyEvent`、確定は `CommitString` の信号。入力方式は `Controller1.SetCurrentIM`）。録った音の代わりに wav を使うには、エンジンを `KANADE_JAVA_OPTS=-Dkanade.voiceWav=<16kHz の wav>` で起こすssh から fcitx5 を起こし直すと Wayland の環境がないまま動くので、`systemctl --user restart <fcitx5 のサービス>` を使う
 - ssh の中の LANG が空だと、エンジンの引数の日本語が化ける（`LANG=en_US.UTF-8` を付ける）。`pkill -f` の模様が ssh の命令の行に入っていると、ssh ごと切れる
 
 ## エミュレータでの確認（to-fu）

@@ -29,7 +29,10 @@ class FakeDll(private val out: (String) -> Unit) {
     private val pending = ConcurrentHashMap<Int, CompletableFuture<Boolean>>()
     private val batch = mutableListOf<List<String>>()
 
-    fun hello() = out(Protocol.encode("hello", 1, ProcessHandle.current().pid(), "fake"))
+    fun hello(kind: String = "fake") = out(Protocol.encode("hello", 1, ProcessHandle.current().pid(), kind))
+
+    /** 返事を待たない1行を送る（fcitx5 のアドオンの voice など） */
+    fun send(vararg fields: Any) = out(Protocol.encode(*fields))
 
     fun press(keys: List<WinKey>) = keys.forEach { key(it) }
 

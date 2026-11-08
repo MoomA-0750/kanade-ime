@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Kanade Settings
+Name[ja]=Kanade の設定
+Comment=Settings for the Kanade Japanese input method
+Comment[ja]=日本語入力 Kanade の設定
+Exec=@BIN@/kanade-settings
+Icon=input-keyboard
+Categories=Settings;
+Keywords=IME;Japanese;input;fcitx;
+StartupNotify=true

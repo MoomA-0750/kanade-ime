@@ -38,7 +38,7 @@ fun main(args: Array<String>) {
                 kanade-engine type [--data DIR] <キー列>...         エンジンを同じプロセスで動かし、キー列を流して結果を出す
                 kanade-engine send [--socket PATH] <キー列>...      動いているエンジンへソケット越しにキー列を流す
                 kanade-engine zenz [--data DIR] <読み>...           zenz を読み、辞書の候補を並べ替えた結果を出す（ネイティブの確認）
-                kanade-engine voice [--data DIR] <wav> | --mic 秒    whisper で wav（16kHz モノラル）を文字にする / マイクで録って文字にする
+                kanade-engine voice [--data DIR] <wav> | --mic 秒    wav（16kHz モノラル）を文字にする / マイクで録って文字にする（-Dkanade.voiceEnglish=1 で英語）
                 kanade-engine import-android <json>                Android 版の設定の書き出しを読み込む
                 キー列: 文字はそのまま、特別なキーは {Space} {Enter} {BS} {Esc} {F7} {Ctrl+Space} {RAlt} {Henkan} など
                 """.trimIndent(),
@@ -172,7 +172,11 @@ private fun zenzCheck(data: File, readings: List<String>) {
 
 private fun voiceCheck(data: File, args: List<String>) {
     val voice = DesktopVoice(DesktopVoice.libraryFile(), data, ::log)
-    System.getProperty("kanade.voiceFinal")?.let { voice.finalModel = VoiceFinal.of(it) }
+    // -Dkanade.voiceEnglish=1 なら英語のモデル（-Dkanade.voiceFinal=parakeet-en など）で文字にする
+    System.getProperty("kanade.voiceFinal")?.let {
+        voice.finalModel = VoiceFinal.of(it)
+        voice.finalModelEn = VoiceFinal.english(it)
+    }
     if (args.firstOrNull() == "--reazon") {
         val reazon = ReazonPartial(File(data, "reazonspeech"), ::log)
         for (wav in args.drop(1)) {

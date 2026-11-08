@@ -3,13 +3,17 @@
 set -euo pipefail
 DEST=${XDG_DATA_HOME:-$HOME/.local/share}/kanade
 pkill -f 'dev.mooma.kanade.desktop.MainKt serve' 2>/dev/null || true
-for d in /usr/lib/fcitx5 /usr/lib64/fcitx5 /usr/lib/x86_64-linux-gnu/fcitx5 /usr/lib/aarch64-linux-gnu/fcitx5; do
-  [ -f "$d/kanade.so" ] && sudo rm -f "$d/kanade.so"
+FCITX_USER=${XDG_DATA_HOME:-$HOME/.local/share}/fcitx5
+rm -f "$FCITX_USER/addon/kanade.conf" "$FCITX_USER/inputmethod/kanade.conf"
+# 前の版は /usr に入れていた
+for f in /usr/lib/fcitx5/kanade.so /usr/lib64/fcitx5/kanade.so /usr/lib/x86_64-linux-gnu/fcitx5/kanade.so /usr/lib/aarch64-linux-gnu/fcitx5/kanade.so \
+  /usr/share/fcitx5/addon/kanade.conf /usr/share/fcitx5/inputmethod/kanade.conf; do
+  [ -e "$f" ] && sudo rm -f "$f"
 done
-sudo rm -f /usr/share/fcitx5/addon/kanade.conf /usr/share/fcitx5/inputmethod/kanade.conf
 TRASH="$HOME/.local/share/Trash/kanade-$(date +%Y%m%d%H%M%S)"
 mkdir -p "$TRASH"
-for d in bin lib native runtime; do [ -e "$DEST/$d" ] && mv "$DEST/$d" "$TRASH/"; done
+rm -f "${XDG_DATA_HOME:-$HOME/.local/share}/applications/dev.mooma.kanade.Settings.desktop"
+for d in bin lib native runtime settings fcitx5; do [ -e "$DEST/$d" ] && mv "$DEST/$d" "$TRASH/"; done
 if [ "${1:-}" = "--all" ]; then
   [ -e "$DEST" ] && mv "$DEST" "$TRASH/share"
   [ -e "${XDG_CONFIG_HOME:-$HOME/.config}/kanade" ] && mv "${XDG_CONFIG_HOME:-$HOME/.config}/kanade" "$TRASH/config"

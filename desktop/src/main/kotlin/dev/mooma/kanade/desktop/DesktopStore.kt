@@ -20,6 +20,12 @@ data class DesktopSettings(
     val voiceFinal: String = VoiceFinal.DEFAULT.id,
     /** 画面に出す文字の言語（auto・ja・en。Ui） */
     val uiLanguage: String = "auto",
+    /** 英語の口述のモデル（Linux 版。Kanade 以外の入力方式で録音キーを押したとき。VoiceFinal.english） */
+    val voiceFinalEn: String = VoiceFinal.DEFAULT_EN.id,
+    /** Linux 版の、どの入力方式でも効く録音キー（fcitx5 のキーの名前をカンマ区切り）。押している間だけ録音する */
+    val voiceHoldKeys: String = "F12,Alt_R",
+    /** Linux 版の、押すたびに録音を始める・終える録音キー（fcitx5 のキーの名前。空なら使わない） */
+    val voiceToggleKey: String = "Control+Alt+space",
 ) {
     fun engineSettings() = EngineSettings(
         fullWidthSymbols = fullWidthSymbols, liveConversion = liveConversion, punctuation = punctuation, pairBrackets = pairBrackets,
@@ -63,6 +69,9 @@ class DesktopStore(val dir: File = defaultDir()) {
             lastJapanese = bool(KEY_LAST_MODE, d.lastJapanese),
             voiceFinal = p.getProperty(KEY_VOICE_FINAL)?.trim()?.takeIf { id -> VoiceFinal.entries.any { it.id == id } } ?: d.voiceFinal,
             uiLanguage = p.getProperty(KEY_UI_LANGUAGE)?.trim()?.takeIf { it in UI_LANGUAGES } ?: d.uiLanguage,
+            voiceFinalEn = p.getProperty(KEY_VOICE_FINAL_EN)?.trim()?.takeIf { id -> VoiceFinal.entries.any { it.id == id && it.english } } ?: d.voiceFinalEn,
+            voiceHoldKeys = p.getProperty(KEY_VOICE_HOLD)?.let(::keyList) ?: d.voiceHoldKeys,
+            voiceToggleKey = p.getProperty(KEY_VOICE_TOGGLE)?.let(::keyList) ?: d.voiceToggleKey,
         )
     }
 
@@ -87,6 +96,12 @@ class DesktopStore(val dir: File = defaultDir()) {
             appendLine("$KEY_LEARNING=${s.learning}")
             appendLine("# 画面に出す文字の言語（auto は Windows の表示言語に合わせる・ja・en）")
             appendLine("$KEY_UI_LANGUAGE=${s.uiLanguage}")
+            appendLine("# Linux 版: 英語の口述のモデル（Kanade 以外の入力方式で録音キーを押したとき。parakeet-en・whisper-small・whisper-turbo）")
+            appendLine("$KEY_VOICE_FINAL_EN=${s.voiceFinalEn}")
+            appendLine("# Linux 版: どの入力方式でも、押している間だけ録音するキー（fcitx5 のキーの名前をカンマ区切り。例 F12,Alt_R,F9）")
+            appendLine("$KEY_VOICE_HOLD=${s.voiceHoldKeys}")
+            appendLine("# Linux 版: 押すたびに録音を始める・終えるキー（例 Control+Alt+space。空なら使わない）。録音中の Esc で取り消す")
+            appendLine("$KEY_VOICE_TOGGLE=${s.voiceToggleKey}")
             appendLine("# 前回の日本語のオン/オフ（エンジンが書く）")
             appendLine("$KEY_LAST_MODE=${s.lastJapanese}")
         }
@@ -191,6 +206,13 @@ class DesktopStore(val dir: File = defaultDir()) {
         const val KEY_LAST_MODE = "last_japanese"
         const val KEY_VOICE_FINAL = "voice_final"
         const val KEY_UI_LANGUAGE = "ui_language"
+        const val KEY_VOICE_FINAL_EN = "voice_final_en"
+        const val KEY_VOICE_HOLD = "voice_hold_keys"
+        const val KEY_VOICE_TOGGLE = "voice_toggle_key"
+
+        /** キーの名前の並びをそろえる（空白を除く。fcitx5 のキーの名前に使わない文字は捨てる） */
+        fun keyList(value: String): String =
+            value.split(',').map { k -> k.trim().filter { it.isLetterOrDigit() || it == '+' || it == '_' } }.filter { it.isNotEmpty() }.joinToString(",")
         val UI_LANGUAGES = listOf("auto", "ja", "en")
 
         /** Windows は %APPDATA%\Kanade、Linux は $XDG_CONFIG_HOME/kanade（ふつうは ~/.config/kanade） */

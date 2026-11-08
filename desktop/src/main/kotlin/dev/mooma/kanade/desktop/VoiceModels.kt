@@ -15,16 +15,22 @@ import java.io.File
  * 確定の文を作る音声認識のモデル（Android 版の VoiceCatalog と同じ id・同じファイル）。置き場所は %LOCALAPPDATA%\Kanade\data。
  * 落とすのは設定の画面（windows/settings の VoiceModels.cs）。一覧を変えるときは両方を直す
  */
-enum class VoiceFinal(val id: String, val path: String, val files: List<String>, val kind: Kind) {
+enum class VoiceFinal(val id: String, val path: String, val files: List<String>, val kind: Kind, val english: Boolean = false, val japanese: Boolean = true) {
     PARAKEET("parakeet", "parakeet-ja", listOf("model.int8.onnx", "tokens.txt"), Kind.NEMO),
     REAZON("reazon", "reazonspeech", ReazonPartial.FILES, Kind.TRANSDUCER),
     SENSEVOICE("sensevoice", "sensevoice-2024-07-17", listOf("model.int8.onnx", "tokens.txt"), Kind.SENSEVOICE),
-    WHISPER_SMALL("whisper-small", "ggml-small-q5_1.bin", emptyList(), Kind.WHISPER),
+    WHISPER_SMALL("whisper-small", "ggml-small-q5_1.bin", emptyList(), Kind.WHISPER, english = true),
     WHISPER_KOTOBA("whisper-kotoba", "ggml-kotoba-whisper-v2.0-q5_0.bin", emptyList(), Kind.WHISPER),
-    WHISPER_TURBO("whisper-turbo", "ggml-large-v3-turbo-q5_0.bin", emptyList(), Kind.WHISPER),
+    WHISPER_TURBO("whisper-turbo", "ggml-large-v3-turbo-q5_0.bin", emptyList(), Kind.WHISPER, english = true),
+
+    /** 英語（とヨーロッパの 25 の言語）の parakeet-tdt v3。句読点と大文字を付ける。Linux 版の英語の口述に使う（Android 版にはない） */
+    PARAKEET_EN(
+        "parakeet-en", "parakeet-v3", listOf("encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt"), Kind.NEMO_TRANSDUCER,
+        english = true, japanese = false,
+    ),
     ;
 
-    enum class Kind { WHISPER, TRANSDUCER, NEMO, SENSEVOICE }
+    enum class Kind { WHISPER, TRANSDUCER, NEMO, NEMO_TRANSDUCER, SENSEVOICE }
 
     fun isReady(data: File): Boolean = if (kind == Kind.WHISPER) File(data, path).exists() else files.all { File(File(data, path), it).exists() }
 
@@ -35,7 +41,11 @@ enum class VoiceFinal(val id: String, val path: String, val files: List<String>,
          */
         val DEFAULT = if (System.getProperty("os.name").startsWith("Windows")) WHISPER_SMALL else PARAKEET
 
-        fun of(id: String?): VoiceFinal = entries.find { it.id == id } ?: DEFAULT
+        /** 英語の口述の既定（Linux 版で、Kanade 以外の入力方式のときに録音キーを押したら英語で書く） */
+        val DEFAULT_EN = PARAKEET_EN
+
+        fun of(id: String?): VoiceFinal = entries.find { it.id == id && it.japanese } ?: DEFAULT
+        fun english(id: String?): VoiceFinal = entries.find { it.id == id && it.english } ?: DEFAULT_EN
     }
 }
 
@@ -44,8 +54,9 @@ interface FinalRecognizer : Closeable {
     fun transcribe(pcm: FloatArray): String?
 }
 
-class WhisperFinal(private val model: WhisperModel) : FinalRecognizer {
-    override fun transcribe(pcm: FloatArray) = model.transcribe(pcm)
+class WhisperFinal(private val model: WhisperModel, private val language: String = "ja") : FinalRecognizer {
+    // 英語のときは、日本語の書き方を誘う既定の前置きを渡さない
+    override fun transcribe(pcm: FloatArray) = if (language == "ja") model.transcribe(pcm) else model.transcribe(pcm, language, "")
     override fun close() = model.close()
 }
 
@@ -77,6 +88,13 @@ class SherpaFinal(private val recognizer: OfflineRecognizer) : FinalRecognizer {
                         .setEncoder(File(d, ReazonPartial.FILES[0]).path)
                         .setDecoder(File(d, ReazonPartial.FILES[1]).path)
                         .setJoiner(File(d, ReazonPartial.FILES[2]).path)
+                        .build(),
+                )
+                VoiceFinal.Kind.NEMO_TRANSDUCER -> builder.setModelType("nemo_transducer").setTransducer(
+                    OfflineTransducerModelConfig.builder()
+                        .setEncoder(File(d, "encoder.int8.onnx").path)
+                        .setDecoder(File(d, "decoder.int8.onnx").path)
+                        .setJoiner(File(d, "joiner.int8.onnx").path)
                         .build(),
                 )
                 VoiceFinal.Kind.NEMO -> builder.setNemo(OfflineNemoEncDecCtcModelConfig.builder().setModel(File(d, "model.int8.onnx").path).build())

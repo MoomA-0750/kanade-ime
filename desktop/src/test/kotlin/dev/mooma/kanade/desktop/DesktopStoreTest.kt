@@ -84,4 +84,24 @@ class DesktopStoreTest {
         val json = File(s.dir, "other.json").apply { writeText("""{"format":"other"}""") }
         assertTrue(runCatching { s.importAndroid(json) }.isFailure)
     }
+
+    @Test
+    fun linuxVoiceSettingsRoundTrip() {
+        val dir = kotlin.io.path.createTempDirectory("kanade-store").toFile()
+        val store = DesktopStore(dir)
+        store.ensureFiles()
+        val d = store.loadSettings()
+        assertEquals("parakeet-en", d.voiceFinalEn)
+        assertEquals("F12,Alt_R", d.voiceHoldKeys)
+        assertEquals("Control+Alt+space", d.voiceToggleKey)
+        store.saveSettings(d.copy(voiceFinalEn = "whisper-turbo", voiceHoldKeys = "F9, Alt_R", voiceToggleKey = ""))
+        val back = store.loadSettings()
+        assertEquals("whisper-turbo", back.voiceFinalEn)
+        assertEquals("F9,Alt_R", back.voiceHoldKeys)
+        assertEquals("", back.voiceToggleKey)
+        // 日本語だけのモデルは英語には選べない
+        store.saveSettings(d.copy(voiceFinalEn = "parakeet"))
+        assertEquals("parakeet-en", store.loadSettings().voiceFinalEn)
+        dir.deleteRecursively()
+    }
 }

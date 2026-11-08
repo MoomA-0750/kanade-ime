@@ -27,6 +27,7 @@ Kotlin 側は `desktop/src/main/kotlin/dev/mooma/kanade/desktop/`（`Protocol.kt
 | `mode	<1\|0>` | 言語バーなど、キー以外で日本語のオン/オフが変わった |
 | `menu	<項目>` | タスクバーの入力の表示の右クリックのメニューで選んだ（`settings`・`user-dictionary`・`snippets`・`import-android`・`log`）。エンジンが画面を開く |
 | `admin	<id>	<頼みごと>	<引数>` | 設定の画面（windows/settings）から。`import-android <json>`・`export-android <json>`・`clear-learning`。返事は `admin	<id>	<1\|0>	<文>` |
+| `voice	<start\|stop\|cancel>	<ja\|en\|quiet>` | （Linux の fcitx5 のアドオンだけ）入力方式に関わらない音声入力。`start ja`（Kanade のとき）・`start en`（ほかの入力方式のとき。英語のモデル）で録音を始め、`stop` で文字にして `commit` を id 0 で返す。`cancel` は捨てる（`cancel quiet` は押し間違いで、何も出さない） |
 | `bye` | 切る |
 
 - `vk` は仮想キー。右 Alt は DLL が VK_RMENU（0xA5）に直す。`char` は ToUnicodeEx の結果（なければ 0）。`mods` は Shift=1・Ctrl=2・Alt=4・Win=8
@@ -46,6 +47,7 @@ Kotlin 側は `desktop/src/main/kotlin/dev/mooma/kanade/desktop/`（`Protocol.kt
 | `hidecands` | 候補の窓を消す |
 | `indicator	<文字>	<ミリ秒>` | カーソルの近くに小さな表示を出す（音声入力の「🎤」と話している途中の文字など）。0 なら消すまで |
 | `hideindicator` | その表示を消す |
+| `voicekeys	<押している間のキー>	<トグルのキー>` | （`hello` の exe が `fcitx5` のときだけ）どの入力方式でも効く録音キー（fcitx5 のキーの名前。前はカンマ区切り、後ろは空なら使わない）。つないだときと設定を変えたときに id 0 で送る |
 | `replace	<前の文字>	<打った文字>	<置き換え>` | スニペット（直接入力中）。カーソルの前が「前の文字」なら消して「置き換え」を入れる。違えば「打った文字」を入れる |
 
 候補の窓と、カーソルの近くの「あ」「A」（DLL がモードの切り替えを見て自分で出す）・音声入力の様子は、DLL がアプリの中に描く。

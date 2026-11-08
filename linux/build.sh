@@ -48,7 +48,7 @@ test -f "$CACHE/build-fcitx5/kanade.so"
 NAME="Kanade-linux-$ARCH"
 D="$ROOT/dist/$NAME"
 rm -rf "$D"
-mkdir -p "$D/bin" "$D/native" "$D/fcitx5" "$D/data"
+mkdir -p "$D/bin" "$D/native" "$D/fcitx5" "$D/data" "$D/settings"
 echo "実行環境を作る（jlink）"
 "$JAVA_HOME/bin/jlink" --add-modules java.base,java.desktop --strip-debug --no-header-files --no-man-pages \
   --compress zip-6 --output "$D/runtime"
@@ -56,6 +56,7 @@ cp -r engine/lib "$D/lib"
 cp "$CACHE/build-zenz/libkanade_zenz.so" "$CACHE/build-whisper/libkanade_whisper.so" "$D/native/"
 cp "$CACHE/build-fcitx5/kanade.so" linux/fcitx5/kanade.conf "$D/fcitx5/"
 cp linux/fcitx5/kanade-addon.conf "$D/fcitx5/"
+cp linux/settings/kanade-settings.py linux/settings/dev.mooma.kanade.Settings.desktop "$D/settings/"
 cp data/* "$D/data/"
 cp linux/install.sh linux/uninstall.sh docs/THIRD-PARTY.md "$D/"
 [ -f docs/LINUX-USAGE.md ] && cp docs/LINUX-USAGE.md "$D/"
@@ -64,8 +65,14 @@ cat > "$D/bin/kanade-engine" <<'SH'
 # Kanade のエンジン（fcitx5 のアドオンが、最初のキーで「serve」で起こす）。KANADE_JAVA_OPTS で JVM に設定を足せる（試験用）
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 exec "$ROOT/runtime/bin/java" $KANADE_JAVA_OPTS -Xmx512m -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 \
-  -cp "$ROOT/lib/*" dev.mooma.kanade.desktop.MainKt "$@"
+  -Dkanade.settings="$ROOT/bin/kanade-settings" -cp "$ROOT/lib/*" dev.mooma.kanade.desktop.MainKt "$@"
 SH
-chmod +x "$D/bin/kanade-engine" "$D/install.sh" "$D/uninstall.sh"
+cat > "$D/bin/kanade-settings" <<'SH'
+#!/bin/sh
+# 設定の画面（GTK4・libadwaita。python-gobject と libadwaita が要る）。引数は開くページ（input・voice・dictionary・snippets・backup・usage）
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+exec python3 "$ROOT/settings/kanade-settings.py" "$@"
+SH
+chmod +x "$D/bin/kanade-engine" "$D/bin/kanade-settings" "$D/install.sh" "$D/uninstall.sh"
 tar -C "$ROOT/dist" -czf "$ROOT/dist/$NAME.tar.gz" "$NAME"
 du -sh "$D" "$ROOT/dist/$NAME.tar.gz"

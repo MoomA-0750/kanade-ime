@@ -137,4 +137,56 @@ class EngineHostTest {
         d.type("ok")
         assertEquals("ok", d.toString())
     }
+
+    /** 試験用の音声入力: 止めたら、英語かどうかで決まった文を返す */
+    private class FakeVoice : VoiceService {
+        var recording = false
+        var english: Boolean? = null
+        var canceled = 0
+        override fun start(english: Boolean, onPartial: (String) -> Unit): Boolean {
+            recording = true
+            this.english = english
+            return true
+        }
+        override fun stop(onText: (String?) -> Unit) {
+            recording = false
+            onText(if (english == true) "Hello world." else "こんにちは。")
+        }
+        override fun cancel() {
+            recording = false
+            canceled++
+        }
+    }
+
+    @Test
+    fun voiceFromAnyInputMethod() {
+        val voice = FakeVoice()
+        val host = EngineHost(InputEngine(), voice = voice)
+        val d = FakeDll.inProcess(host).apply { hello("fcitx5") }
+        // つないだら録音キーが届く
+        assertTrue(d.received.any { it == listOf("voicekeys", "F12,Alt_R", "Control+Alt+space") })
+        // 英字（keyboard-us）のときに録音キー → 英語のモデルで、確定が届く
+        d.send("voice", "start", "en")
+        assertTrue(voice.recording)
+        assertEquals(true, voice.english)
+        assertTrue(d.received.any { it[0] == "indicator" && it[1] == "🎤 EN" })
+        d.send("voice", "stop")
+        assertEquals("Hello world.", d.toString())
+        // Kanade のときは日本語。入力中の文字は先に確定する
+        d.type("{Ctrl+Space}ka")
+        d.send("voice", "start", "ja")
+        assertEquals(false, voice.english)
+        assertEquals("Hello world.か", d.toString())
+        d.send("voice", "stop")
+        assertEquals("Hello world.かこんにちは。", d.toString())
+        // Esc での取り消し: 文字は入らない
+        d.send("voice", "start", "ja")
+        d.send("voice", "cancel")
+        assertEquals(1, voice.canceled)
+        d.send("voice", "stop")
+        assertEquals("Hello world.かこんにちは。", d.toString())
+        // 設定で録音キーを替えたら、すぐ届く
+        host.voiceKeys = "F9" to ""
+        assertTrue(d.received.any { it == listOf("voicekeys", "F9", "") })
+    }
 }

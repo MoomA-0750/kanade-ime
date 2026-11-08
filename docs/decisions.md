@@ -380,3 +380,17 @@ SPEC.md の未決事項に本人が答えた。
 - 音声の既定のモデルは Linux では parakeet-ja（Android 版と同じ）。設定の画面がないので、導入の `--voice` で parakeet と ReazonSpeech を落とす
 - 確かめ方: Hyprland では wtype の打鍵（仮想キーボード）は入力方式を通らない。uinput の仮のキーボードで打って grim で撮った。切り替え直後の1文字が落ちるように見えたのは、直前の Esc が bash に届いて Esc+a（readline）になっていただけだった
 - cramgent の hazkey: 本人の指示で外した（`pacman -Rns fcitx5-hazkey hazkey-zenzai-model`、設定などは `~/.local/share/Trash/hazkey-20261108184600/`、fcitx5 の前の一覧は `~/.config/fcitx5/profile.before-remove-hazkey`）。fcitx5 の一覧は keyboard-us と Kanade、既定は Kanade
+
+## 2026-11-08 Superwhisper の代わり（どの入力方式でも音声入力・英語）と Linux 版の設定の画面
+
+本人の依頼（Superwhisper を置き換えられるか → 「どの入力方式でも使える録音キー」と「英語の口述」を作る。Android・Windows と同じような設定の画面も欲しい）。
+
+- 録音キーは fcitx5 のアドオンが入力方式より先に見る（`watchEvent(InputContextKeyEvent, PreInputMethod)`）。Superwhisper のように Hyprland のキーの割り当てから外のプログラムを呼ぶ形も考えたが、fcitx5 の中なら入力欄に確定をそのまま入れられ（仮のキーボードで打ち込まない）、どのデスクトップでも同じに動く。代わりに入力欄のないところでは効かない
+- 言語は入力方式で決める（Kanade なら日本語、ほかなら英語）。キーを分けるより覚えることが少ない。英語のモデルは parakeet-tdt v3（sherpa-onnx の nemo_transducer、670MB）。cramgent で 7.7 秒の英語を 0.47 秒、日本語の parakeet-ja と同じくらい速く、句読点と大文字が付く。whisper small・turbo も英語に選べる（前置きの文は渡さない）
+- 既定のキーは Superwhisper と同じ並び（右 Alt の長押し・Ctrl+Alt+Space）に F12 を足した。Linux 版では右 Alt を日本語の切り替えに使っていない（11-2）ので取ってよい。0.3 秒より短い押しは押し間違いとして捨てる
+- 英語と日本語のモデルは両方とも読んだままにする（行き来で読み直さない。使わなければ5分で両方放す）
+- エンジンは fcitx5 の起動と一緒に起こす（アドオンを OnDemand=False に）。録音キーの設定をエンジンから受け取るためと、最初の録音で待たせないため
+- 設定の画面は GTK4・libadwaita の Python にした。Linux で標準の見た目（Windows 版の WinUI 3 に当たる）で、cramgent（Arch）には python-gobject と libadwaita が入っている。Kotlin の Swing・Compose Desktop は見た目が浮くか重い。設定のファイルは1行ずつ書き換える（エンジンの書いた説明を残す）
+- アドオンを `/usr` でなく利用者のフォルダーに入れる形にした。cramgent の sudo がパスワードを求めるようになり入れられなかったため。fcitx5 は `~/.local/share/fcitx5/addon` の設定を先に読み、Library にフルパスを書けば .so もそこから読む（cramgent で確かめた）。導入に root が要らなくなった
+- 実際のキーボードを打つ試験は、uinput に sudo が要るようになったためできなかった。代わりに fcitx5 の DBus（`org.fcitx.Fcitx.InputContext1.ProcessKeyEvent`）で入力欄を作ってキーを送った。この道もアドオンの見張りを通る
+- cramgent の Superwhisper は、キーがぶつかるのでサービスを止め、自動起動を外した（パッケージと設定は残す。戻すのは `systemctl --user enable --now superwhisper.service`）

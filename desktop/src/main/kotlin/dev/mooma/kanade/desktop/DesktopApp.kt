@@ -59,6 +59,8 @@ class DesktopApp(
         host.toggles = s.toggles
         voice?.spokenPunctuation = s.spokenPunctuation
         voice?.finalModel = VoiceFinal.of(s.voiceFinal)
+        voice?.finalModelEn = VoiceFinal.english(s.voiceFinalEn)
+        host.voiceKeys = s.voiceHoldKeys to s.voiceToggleKey
         log(if (first) "設定を読んだ" else "設定を読み直した")
     }
 
@@ -82,6 +84,7 @@ class DesktopApp(
     fun handleMenu(action: String) {
         val page = when (action) {
             "settings" -> "input"
+            "voice" -> "voice"
             "user-dictionary" -> "dictionary"
             "snippets" -> "snippets"
             "import-android" -> "backup"

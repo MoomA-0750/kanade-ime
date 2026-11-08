@@ -119,11 +119,11 @@
 
 ## 11. Linux 版
 
-- 11-1（仮）Windows 版と同じエンジン（desktop）を、fcitx5 の入力方式「Kanade」として使える。fcitx5 のアドオン（`linux/fcitx5`）がキーを Windows の仮想キーに写してエンジンへソケットで送り、返ってきた命令で入力中の文字（下線、選んでいる文節は強調）・確定・候補の窓（fcitx5 が描く。9件ずつの頁で、2頁以上なら「1/3」）・音声入力の様子を書く。エンジンが止まっていれば、Kanade を選んだときか最初のキーで起こす（起動のあいだのキーは素通し）。aarch64（Apple M1 の Asahi Linux）と x86_64。確かめ方: cramgent（M1・Hyprland）で foot に uinput の仮のキーボードで打ち、ライブ変換・候補の窓・番号での選択・Enter での確定を画面で見た（`docs/decisions.md` 2026-11-08）
+- 11-1（仮）Windows 版と同じエンジン（desktop）を、fcitx5 の入力方式「Kanade」として使える。fcitx5 のアドオン（`linux/fcitx5`）がキーを Windows の仮想キーに写してエンジンへソケットで送り、返ってきた命令で入力中の文字（下線、選んでいる文節は強調）・確定・候補の窓（fcitx5 が描く。9件ずつの頁で、2頁以上なら「1/3」）・音声入力の様子を書く。アドオンは fcitx5 の起動と一緒に読み、エンジンが止まっていれば起こす（Kanade を選んだときと最初のキーでも。起動のあいだのキーは素通し）。aarch64（Apple M1 の Asahi Linux）と x86_64。確かめ方: cramgent（M1・Hyprland）で foot に uinput の仮のキーボードで打ち、ライブ変換・候補の窓・番号での選択・Enter での確定を画面で見た（`docs/decisions.md` 2026-11-08）
 - 11-2（仮）日本語と英字の切り替えは fcitx5 が受け持つ（英字は keyboard-us）。Kanade に入ったとき（入力欄に戻ったときも）はいつも日本語。fcitx5 は Ctrl+Space・半角/全角などを自分の切り替えに使い、Kanade まで届かないため、Kanade の中に英字の状態を持たない
-- 11-3（仮）F12 を押している間だけ録音し、離すと句読点付きの文を入れる。既定のモデルは parakeet-ja（導入の `--voice` で ReazonSpeech と一緒に落とす）。話している途中の文字と「認識中」は候補の窓の場所に出す
-- 11-4（仮）設定の画面はない。fcitx5 のメニューの「Kanade: 設定・ユーザー辞書・スニペット・記録」で、そのファイルをふだんのエディタで開く（保存するとエンジンが読み直す）。Android 版の設定は `kanade-engine import-android <json>` で読み込む
-- 11-5（仮）配布物は使う機械の上でビルドする（`scripts/linux.sh build <ssh の相手>`。ネイティブは -mcpu=native）。入れる先はエンジンが `~/.local/share/kanade`、設定が `~/.config/kanade`、記録が `~/.local/state/kanade/engine.log`、アドオンだけ sudo で `/usr/lib/fcitx5`
+- 11-3（確定）音声入力はどの入力方式でも使える（Superwhisper の代わり）。アドオンが入力方式より先にキーを見て、録音キーを使う。押している間だけ録音するキー（既定 F12・右 Alt）、押すたびに始める・終えるキー（既定 Ctrl+Alt+Space）、録音中の Esc で取り消し、0.3 秒より短く押しただけなら何も入れない。Kanade のときは日本語のモデル（既定 parakeet-ja）、ほかの入力方式（keyboard-us など）のときは英語のモデル（既定 parakeet-tdt v3。ほかに whisper small・large-v3-turbo）で句読点付きの文にする。話している途中の文字は ReazonSpeech（日本語と英語）でカーソルの近くに出す。録音キーは設定の画面で変えられ、変えるとすぐ効く。確かめ方: 単体テスト（EngineHostTest.voiceFromAnyInputMethod、DesktopStoreTest.linuxVoiceSettingsRoundTrip）と、cramgent で fcitx5 の DBus の入力欄にキーを送り、keyboard-us で F12・右 Alt の長押し・Ctrl+Alt+Space で英語の文が入り、Esc と短い押しでは何も入らず、Kanade では日本語のモデルが使われることを見た（`docs/decisions.md` 2026-11-08 Superwhisper の代わり）
+- 11-4（仮）設定の画面は GTK4・libadwaita（`linux/settings`、Python）。入力・音声入力（録音キー、話した句読点、日本語と英語のモデルを選んで落とす・消す）・ユーザー辞書とスニペット（一覧で足す/直す/消す、テキストでまとめて編集）・Android 版の設定の読み込みと書き出し・使い方。変えたらすぐ保存し、エンジンが読み直す。fcitx5 のメニューの「Kanade: 設定・音声入力・ユーザー辞書・スニペット」とアプリの一覧の「Kanade の設定」から開く
+- 11-5（仮）配布物は使う機械の上でビルドする（`scripts/linux.sh build <ssh の相手>`。ネイティブは -mcpu=native）。入れる先はエンジンとアドオンが `~/.local/share/kanade`、アドオンの設定が `~/.local/share/fcitx5`（Library にフルパスを書く。sudo は要らない）、設定が `~/.config/kanade`、記録が `~/.local/state/kanade/engine.log`
 
 ## 予定（作ると決めたもの）
 
@@ -139,5 +139,5 @@
 - DeX のウィンドウで候補の窓・「あ」「A」がカーソルの近くに出るかは、実機ではまだ確かめていない
 - zenz の使い方の既定を「確かめて直す」にした（評価セット 202 文で正解は並べ替えと同じ 187、Fold 7 で中央値 5.8ms と 24.7ms）。間違え方は違う（「また後で寝」「ひなたぼっこ」は並べ替えのほうが良く、「着いたら」「仕様を」「開いている」は確かめて直すほうが良い）。使ってみて本人が決める
 - Windows 版・Linux 版（desktop）は zenz の使い方の設定がなく、並べ替えのまま。予測の候補の並べ替えには対応した
-- Linux 版: 実際のマイクに話した声での音声入力はまだ確かめていない（見本の音声を流す形と、マイクが開けることだけ確かめた）。IBus には対応していない
+- Linux 版: 実際のマイクに話した声での音声入力、実際のキーボードの右 Alt が Hyprland から fcitx5 へ届くか、英字の入力方式のときの「🎤」の表示は、まだ目で確かめていない（DBus の入力欄と見本の音声で確かめた）。入力欄のないところ（アプリの外）では録音キーは効かない。IBus には対応していない
 - 公開する前の確認: zenz-v3.2 の許諾（Apache-2.0 は HuggingFace のタグでしか確かめていない）、使い方の文体（設定画面は「〜します。」にそろえた）
