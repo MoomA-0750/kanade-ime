@@ -121,4 +121,7 @@
     <string name="input_zenz_profile_label">Conversion profile</string>
     <string name="input_zenz_profile_hint">e.g. Programmer. Talks about tech.</string>
     <string name="input_zenz_profile_summary">Tells zenz about you so it can choose fitting words (up to 25 characters, %1$d used). Leave empty to not use it.</string>
+    <string name="input_reset_to_default">Reset to default</string>
+    <string name="input_reset_to_default_message">Replaces the current entries with the default table.</string>
+    <string name="input_reset">Reset</string>
 </resources>

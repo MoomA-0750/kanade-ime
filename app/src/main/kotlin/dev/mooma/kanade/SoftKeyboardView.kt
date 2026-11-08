@@ -37,6 +37,8 @@ class SoftKeyboardView(
     private val onGlide: (GlideInput) -> Unit = {},
     /** キーイベントにできない文字（記号のページの「」・€ など）を入れる */
     private val onText: (String) -> Unit = {},
+    /** 🎤 を押したまま払って離した: 録音を捨てる */
+    private val onVoiceCancel: () -> Unit = { onVoice(false) },
 ) : View(context) {
 
     /** なぞった軌跡と、そのときの文字のキーの中心・幅（同じ座標） */
@@ -594,7 +596,8 @@ class SoftKeyboardView(
                 t.dir = direction(t, event.getX(i), event.getY(i))
                 val mod = t.heldMod
                 if (t.key.center == Action.Voice) {
-                    onVoice(false)
+                    // 押したまま払って離したら、録音を入れずに捨てる
+                    if (t.dir != null) onVoiceCancel() else onVoice(false)
                 } else if (mod != null) {
                     // 押している間に別のキーを打った（同時押し）なら、離すだけ。打たなかったら1打だけ効く・固定の切り替え
                     if (held.remove(mod) == false) toggleModifier(mod)

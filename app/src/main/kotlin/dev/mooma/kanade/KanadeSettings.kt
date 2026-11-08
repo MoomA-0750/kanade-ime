@@ -128,6 +128,31 @@ class KanadeSettings(context: Context) {
         get() = prefs.getBoolean(KEY_SPOKEN_PUNCT, true)
         set(value) = prefs.edit().putBoolean(KEY_SPOKEN_PUNCT, value).apply()
 
+    /** 音声認識が自分で付ける句読点（、。）を残す。切ると、話して入れた句読点だけになる */
+    var voiceAutoPunctuation: Boolean
+        get() = prefs.getBoolean(KEY_VOICE_AUTO_PUNCT, true)
+        set(value) = prefs.edit().putBoolean(KEY_VOICE_AUTO_PUNCT, value).apply()
+
+    /** 「えー」「えーと」などの言いよどみを消す（既定は切る。整えすぎを嫌う人が多いため） */
+    var voiceFillers: Boolean
+        get() = prefs.getBoolean(KEY_VOICE_FILLERS, false)
+        set(value) = prefs.edit().putBoolean(KEY_VOICE_FILLERS, value).apply()
+
+    /** 声のコマンド（前後に間を置いて「送信して」「取り消して」など） */
+    var voiceCommands: Boolean
+        get() = prefs.getBoolean(KEY_VOICE_COMMANDS, true)
+        set(value) = prefs.edit().putBoolean(KEY_VOICE_COMMANDS, value).apply()
+
+    /** 音声の文で、ユーザー辞書の読みに当たる所をその語にする */
+    var voiceUserDictionary: Boolean
+        get() = prefs.getBoolean(KEY_VOICE_USER_DICT, true)
+        set(value) = prefs.edit().putBoolean(KEY_VOICE_USER_DICT, value).apply()
+
+    /** 聞き続けるモードで、これだけ話さなければ終える（秒。0 なら終えない） */
+    var continuousIdleSeconds: Int
+        get() = prefs.getInt(KEY_CONTINUOUS_IDLE, 60)
+        set(value) = prefs.edit().putInt(KEY_CONTINUOUS_IDLE, value).apply()
+
     /**
      * 画面キーボードの配列: GLIDE（グライドの QWERTY）・QWERTY（払いで記号を出すフルキー）・FLICK（テンキー）。
      * 使う配列（[enabledLayouts]）に入っていなければ、使う配列の最初のものにする
@@ -284,6 +309,11 @@ class KanadeSettings(context: Context) {
         const val KEY_CLIP_OVERLAY_W = "clipboard_overlay_width"
         const val KEY_CLIP_OVERLAY_H = "clipboard_overlay_height"
         const val KEY_SPOKEN_PUNCT = "spoken_punctuation"
+        const val KEY_VOICE_AUTO_PUNCT = "voice_auto_punctuation"
+        const val KEY_VOICE_FILLERS = "voice_fillers"
+        const val KEY_VOICE_COMMANDS = "voice_commands"
+        const val KEY_VOICE_USER_DICT = "voice_user_dictionary"
+        const val KEY_CONTINUOUS_IDLE = "continuous_idle_seconds"
         const val KEY_VOICE_FINAL = "voice_final"
         const val KEY_PUNCTUATION = "punctuation"
         const val KEY_VOICE_MODEL = "voice_model"

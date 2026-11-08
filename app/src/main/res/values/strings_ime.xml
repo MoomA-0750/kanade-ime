@@ -58,4 +58,11 @@
     <string name="ime_flick_segment">Seg</string>
     <string name="ime_flick_segment_shrink">−</string>
     <string name="ime_flick_segment_extend">+</string>
+    <string name="ime_voice_cancelled">🎤 Discarded</string>
+    <string name="ime_voice_command">🎤 %1$s</string>
+    <string name="ime_voice_command_send">Send</string>
+    <string name="ime_voice_command_next">Next field</string>
+    <string name="ime_voice_command_stop">Stop listening</string>
+    <string name="ime_voice_command_undo">Undo</string>
+    <string name="ime_voice_command_clear">Clear all</string>
 </resources>

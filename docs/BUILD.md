@@ -34,6 +34,7 @@ scripts/build-host-zenz.sh                                           # 手元用
 $D eval-zenz .cache/out eval/daily.tsv .cache/models/zenz-v3.2-xsmall-Q5_K_M.gguf .cache/host-zenz/libkanade_zenz.so 10
 $D eval-zenzai .cache/out eval/daily.tsv .cache/models/zenz-v3.2-xsmall-Q5_K_M.gguf .cache/host-zenz/libkanade_zenz.so   # 並べ替えと Zenzai の方式（確かめて直す）を比べる
 $D typo .cache/out しやしん ちよつと                                  # テンキーの打ち間違いを直した候補
+$D reading .cache/out 漢字が書けない                                    # 逆引きの辞書（reverse.kdic）で文の読みを求める
 ```
 
 - 作業機は VM で CPU に AVX2 が見えないので、zenz の時間は参考にならない（正解率は正しい）。速度は Fold 7 で測る（設定の「テストとログ」→「評価セットで測る」。結果は `adb logcat -s KanadeBench` にも出る）
@@ -46,7 +47,7 @@ $D whisper .cache/models/ggml-small-q5_1.bin .cache/host-whisper/libkanade_whisp
 ```
 
 - エミュレータで試すときは、モデルを to-fu で落として `adb push` で `/sdcard/Android/data/dev.mooma.kanade/files/models/` に置ける。エミュレータは `-no-audio` で起動しているのでマイクは無音
-- 見本の音声は to-fu の Windows の音声合成で作れる（PowerShell の `System.Speech`、`Microsoft Haruka Desktop`、16kHz・モノラル・16bit）
+- 見本の音声は to-fu の Windows の音声合成で作れる（PowerShell の `System.Speech`、`Microsoft Haruka Desktop`、16kHz・モノラル・16bit）。間を入れるときは `PromptBuilder.AppendBreak` を使う（SSML の break は読み上げられてしまった）。スクリプトは UTF-8 の BOM 付きで送る（ないと PowerShell 5 が日本語を読み違える）。デバッグ版なら `run-as dev.mooma.kanade cp … files/voice-inject.wav` でマイクの代わりに流せる
 
 ## エミュレータでの確認（to-fu）
 

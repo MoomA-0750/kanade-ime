@@ -140,6 +140,26 @@ fun ColumnScope.VoiceScreen() {
             stringResource(R.string.voice_spoken_punctuation_title), spoken, { spoken = it },
             stringResource(R.string.voice_spoken_punctuation_summary),
         )
+        var autoPunct by rememberPref({ settings.voiceAutoPunctuation }, { settings.voiceAutoPunctuation = it })
+        SwitchRow(
+            stringResource(R.string.voice_auto_punctuation_title), autoPunct, { autoPunct = it },
+            stringResource(R.string.voice_auto_punctuation_summary),
+        )
+        var fillers by rememberPref({ settings.voiceFillers }, { settings.voiceFillers = it })
+        SwitchRow(stringResource(R.string.voice_fillers_title), fillers, { fillers = it }, stringResource(R.string.voice_fillers_summary))
+        var commands by rememberPref({ settings.voiceCommands }, { settings.voiceCommands = it })
+        SwitchRow(stringResource(R.string.voice_commands_title), commands, { commands = it }, stringResource(R.string.voice_commands_summary))
+        var userDict by rememberPref({ settings.voiceUserDictionary }, { settings.voiceUserDictionary = it })
+        SwitchRow(
+            stringResource(R.string.voice_user_dictionary_title), userDict, { userDict = it },
+            stringResource(R.string.voice_user_dictionary_summary),
+        )
+        Text(stringResource(R.string.voice_continuous_idle_label), style = MaterialTheme.typography.labelLarge)
+        var idle by rememberPref({ settings.continuousIdleSeconds }, { settings.continuousIdleSeconds = it })
+        ConnectedChoices(listOf(
+            30 to stringResource(R.string.voice_idle_30s), 60 to stringResource(R.string.voice_idle_1m),
+            120 to stringResource(R.string.voice_idle_2m), 0 to stringResource(R.string.voice_idle_never),
+        ), idle, { idle = it })
         Text(stringResource(R.string.voice_threads_label), style = MaterialTheme.typography.labelLarge)
         var threads by rememberPref({ settings.voiceThreads }, { settings.voiceThreads = it })
         ConnectedChoices(listOf(2, 4, 6, 8).map { it to "$it" }, threads, { threads = it })

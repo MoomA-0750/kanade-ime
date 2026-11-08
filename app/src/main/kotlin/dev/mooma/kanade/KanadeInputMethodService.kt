@@ -20,6 +20,9 @@ import dev.mooma.kanade.core.convert.Reranker
 import dev.mooma.kanade.core.dict.Snippets
 import dev.mooma.kanade.core.dict.UserDictionary
 import dev.mooma.kanade.core.voice.SpokenPunctuation
+import dev.mooma.kanade.core.voice.VoiceCommand
+import dev.mooma.kanade.core.voice.PauseSplitter
+import dev.mooma.kanade.core.voice.Fillers
 import dev.mooma.kanade.core.voice.VoiceEndpointer
 import dev.mooma.kanade.whisper.WhisperModel
 import dev.mooma.kanade.zenz.ZenzModel
@@ -136,7 +139,7 @@ class KanadeInputMethodService : InputMethodService() {
         val keyboard = SoftKeyboardView(
             this, ::softKey, ::nextSource, ::softVoice, ::showEmojiPanel,
             onClipboard = ::showClipboard, onSwitchLayout = ::switchLayout, onFloat = ::toggleFloat,
-            onGlide = ::onGlide, onText = { flickActions.text(it) },
+            onGlide = ::onGlide, onText = { flickActions.text(it) }, onVoiceCancel = ::cancelVoice,
         )
         keyboard.tapCorrector = ::correctLetterTap
         keyboard.onSymbolsPage = ::symbolsElsewhere
@@ -232,6 +235,7 @@ class KanadeInputMethodService : InputMethodService() {
         override fun emoji() = showEmojiPanel()
         override fun clipboard() = showClipboard()
         override fun voice(down: Boolean) = softVoice(down)
+        override fun voiceCancel() = cancelVoice()
         override fun switchToQwerty() = switchLayout()
         override fun toggleFloat() = this@KanadeInputMethodService.toggleFloat()
     }
@@ -921,6 +925,10 @@ class KanadeInputMethodService : InputMethodService() {
 
     /** 候補の窓で候補を指で選んだ */
     private fun onCandidateTapped(index: Int) {
+        if (lastVoice != null) {
+            main.post { if (!replaceVoice(index)) handle(KeyInput.SelectCandidate(index)) }
+            return
+        }
         if (lastGlide != null) {
             // 帯を押した処理の途中で帯を消して出し直すと出なくなるので、押した処理が終わってから置き換える
             main.post { if (!replaceGlide(index)) handle(KeyInput.SelectCandidate(index)) }
@@ -938,6 +946,7 @@ class KanadeInputMethodService : InputMethodService() {
         )
         engine.settings = settings.engineSettings()
         applyZenzSettings()
+        refreshSpokenTable()
         mapper.triggers = settings.toggleTriggers
         // 設定画面でユーザー辞書・スニペットが変わっていたら読み直す
         val v = userDictionaryStore.version()
@@ -1063,6 +1072,13 @@ class KanadeInputMethodService : InputMethodService() {
             log(event, "clipboard")
             return true
         }
+        if (keyCode == KeyEvent.KEYCODE_ESCAPE && (VoiceInput.isRecording || continuous)) {
+            // 録音中の Esc は、録った音声を入れずに捨てる
+            cancelVoice()
+            consumedDown += keyCode
+            log(event, "voice cancel")
+            return true
+        }
         if (keyCode == settings.voiceKey) {
             // 押している間だけ録音する（押しっぱなしの繰り返しは無視）。短く押すと聞き続ける
             if (event.repeatCount == 0) voiceKey(true)
@@ -1137,6 +1153,15 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     private fun handle(input: KeyInput): Boolean {
+        // 音声で入れた直後の Backspace は、入れた文を丸ごと消す（グライドの語と同じ）
+        if (input == KeyInput.Backspace && lastVoice != null && deleteLastVoice()) return true
+        // 音声の文の候補（整える前の文字）を出しているあいだにほかのキーを打ったら、候補はおしまい
+        lastVoice?.let { v ->
+            if (input !is KeyInput.SelectCandidate) {
+                lastVoice = null
+                if (v.alternatives.size > 1) hideBar()
+            }
+        }
         // グライドの直後の Backspace は、入れた語を丸ごと消す（Gboard と同じ）
         if (input == KeyInput.Backspace && lastGlide != null && !replacingGlide && deleteGlide()) return true
         // グライドの候補を出しているあいだにほかのキーを打ったら、グライドの候補はおしまい
@@ -1390,6 +1415,8 @@ class KanadeInputMethodService : InputMethodService() {
      * （入力中の文字があれば、それが確定してから入れる）。もう一度押すか、1分話さなければ終わる
      */
     private var continuous = false
+    /** 聞き続けるモードで、これだけ話さなければ終える（ms。0 なら終えない） */
+    private var continuousIdleMs = 60_000L
     private val endpointer = VoiceEndpointer()
     private var vadIndex = 0
     private var lastSpeechAt = 0L
@@ -1429,7 +1456,7 @@ class KanadeInputMethodService : InputMethodService() {
                         }
                     }
                 }
-                if (!endpointer.inSpeech && now - lastSpeechAt > CONTINUOUS_IDLE_MS) {
+                if (!endpointer.inSpeech && continuousIdleMs > 0 && now - lastSpeechAt > continuousIdleMs) {
                     stopContinuous(getString(R.string.ime_voice_stopped_idle))
                     return
                 }
@@ -1463,6 +1490,7 @@ class KanadeInputMethodService : InputMethodService() {
 
     private fun startContinuous() {
         continuous = true
+        continuousIdleMs = settings.continuousIdleSeconds * 1000L
         endpointer.reset()
         VoiceInput.trimTo(0)
         vadIndex = 0
@@ -1476,7 +1504,7 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     /** 聞き続けるモードを終える。話している途中の音声があれば文字にして入れる */
-    private fun stopContinuous(message: String) {
+    private fun stopContinuous(message: String, keepSpeech: Boolean = true) {
         continuous = false
         keyboardView?.voiceActive = false
         flickView?.voiceActive = false
@@ -1486,7 +1514,7 @@ class KanadeInputMethodService : InputMethodService() {
         val speaking = endpointer.inSpeech
         endpointer.reset()
         val pcm = VoiceInput.stopRecording()
-        if (speaking && pcm != null) {
+        if (speaking && pcm != null && keepSpeech) {
             voiceSegments.addLast(partialText.orEmpty())
             partialText = null
             recognizeUtterance(pcm, continuousMode = true)
@@ -1572,8 +1600,195 @@ class KanadeInputMethodService : InputMethodService() {
         }
     }
 
-    /** 話して入れる句読点（「くてん」→「。」など）。設定で切れる */
-    private fun spoken(text: String) = if (settings.spokenPunctuation) SpokenPunctuation.apply(text) else text
+    /**
+     * 認識した文の後処理: 言いよどみを消す（設定）・話して入れる記号（「くてん」→「。」。表は設定で編集できる）・
+     * 認識が付けた句読点を残すか（設定）・ユーザー辞書の読みに当たる所をその語に（設定）
+     */
+    private fun spoken(text: String): String {
+        var t = text
+        if (settings.voiceFillers) t = Fillers.remove(t)
+        val auto = settings.voiceAutoPunctuation
+        t = when {
+            settings.spokenPunctuation -> spokenTable.apply(t, auto)
+            !auto -> NO_SPOKEN_SYMBOLS.apply(t, autoPunctuation = false)
+            else -> t
+        }
+        if (settings.voiceUserDictionary) t = candidateSource?.applyUserWords(t) ?: t
+        return t
+    }
+
+    /** 話して入れる記号の表。設定画面で編集されていたら読み直す */
+    private var spokenTable = SpokenPunctuation.DEFAULT
+    private var spokenTableVersion = -1L
+
+    private fun refreshSpokenTable() {
+        val store = TextStore.spokenSymbols(this)
+        val v = store.version()
+        if (v == spokenTableVersion) return
+        spokenTableVersion = v
+        spokenTable = SpokenPunctuation(SpokenPunctuation.parse(store.read()))
+    }
+
+    /** 直前に音声で入れた文（直後の Backspace・「取り消して」で丸ごと消す）と、候補の窓に出す選び直しの候補 */
+    private class VoiceResult(var text: String, val alternatives: List<String>)
+    private var lastVoice: VoiceResult? = null
+
+    /** 音声の文を確定して入れる。[alternatives]（確定の文と整える前の文）が2つ以上なら候補の窓に出して選び直せるようにする */
+    private fun commitVoice(text: String, alternatives: List<String> = emptyList()) {
+        currentInputConnection?.commitText(text, 1)
+        lastCommitAt = android.os.SystemClock.uptimeMillis()
+        engine.leftContext = (engine.leftContext + text).takeLast(InputEngine.MAX_CONTEXT)
+        val alts = alternatives.filter { it.isNotEmpty() }.distinct()
+        lastVoice = VoiceResult(text, alts)
+        if (alts.size > 1) showBar { it.showCandidates(alts, 0, numbered = false) }
+    }
+
+    /** 直前に音声で入れた文を消す。カーソルの前がその文でなければ（動かした・打った）何もしない */
+    private fun deleteLastVoice(): Boolean {
+        val v = lastVoice ?: return false
+        lastVoice = null
+        if (v.alternatives.size > 1) hideBar()
+        val ic = currentInputConnection ?: return false
+        if (ic.getTextBeforeCursor(v.text.length, 0)?.toString() != v.text) return false
+        ic.deleteSurroundingText(v.text.length, 0)
+        engine.leftContext = engine.leftContext.removeSuffix(v.text)
+        return true
+    }
+
+    /** 音声の文の候補の窓で、別の文（整える前の文字）を選んだ */
+    private fun replaceVoice(index: Int): Boolean {
+        val v = lastVoice ?: return false
+        val next = v.alternatives.getOrNull(index) ?: return false
+        val ic = currentInputConnection ?: return false
+        if (ic.getTextBeforeCursor(v.text.length, 0)?.toString() != v.text) return false.also { lastVoice = null }
+        ic.deleteSurroundingText(v.text.length, 0)
+        ic.commitText(next, 1)
+        engine.leftContext = (engine.leftContext.removeSuffix(v.text) + next).takeLast(InputEngine.MAX_CONTEXT)
+        v.text = next
+        showBar { it.showCandidates(v.alternatives, index, numbered = false) }
+        return true
+    }
+
+    /** 録音を捨てる（Esc・🎤 を押したまま払って離す）。聞き続けるモードなら、話している途中の音声を捨てて終える */
+    private fun cancelVoice() {
+        if (continuous) {
+            stopContinuous(getString(R.string.ime_voice_cancelled), keepSpeech = false)
+            return
+        }
+        if (!VoiceInput.isRecording) return
+        VoiceInput.cancel()
+        main.removeCallbacks(partialTick)
+        if (partialStreaming) StreamingRecognizer.finishStream()
+        if (partialText != null || !previewInBar) {
+            currentInputConnection?.let {
+                it.setComposingText("", 1)
+                it.finishComposingText()
+            }
+        }
+        if (previewInBar) hideBar()
+        partialText = null
+        voiceStreaming = false
+        showIndicatorText(getString(R.string.ime_voice_cancelled), 1200)
+    }
+
+    /** 声のコマンドを実行する。何として受け取ったかを少し出す */
+    private fun runVoiceCommand(c: VoiceCommand) {
+        showIndicatorText(getString(R.string.ime_voice_command, getString(voiceCommandLabel(c))), 1500)
+        log("voice: command $c")
+        val ic = currentInputConnection
+        when (c) {
+            VoiceCommand.SEND -> {
+                val info = currentInputEditorInfo
+                val action = (info?.imeOptions ?: 0) and EditorInfo.IME_MASK_ACTION
+                val noEnterAction = (info?.imeOptions ?: 0) and EditorInfo.IME_FLAG_NO_ENTER_ACTION != 0
+                val sendLike = action == EditorInfo.IME_ACTION_SEND || action == EditorInfo.IME_ACTION_GO ||
+                    action == EditorInfo.IME_ACTION_SEARCH || action == EditorInfo.IME_ACTION_DONE
+                if (sendLike && !noEnterAction) ic?.performEditorAction(action) else sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
+            }
+            VoiceCommand.NEXT -> {
+                val action = (currentInputEditorInfo?.imeOptions ?: 0) and EditorInfo.IME_MASK_ACTION
+                if (action == EditorInfo.IME_ACTION_NEXT) ic?.performEditorAction(action) else sendDownUpKeyEvents(KeyEvent.KEYCODE_TAB)
+            }
+            VoiceCommand.STOP -> if (continuous) stopContinuous(getString(R.string.ime_voice_stopped))
+            VoiceCommand.UNDO -> deleteLastVoice()
+            VoiceCommand.CLEAR -> {
+                lastVoice = null
+                ic?.performContextMenuAction(android.R.id.selectAll)
+                ic?.commitText("", 1)
+                engine.leftContext = ""
+            }
+        }
+    }
+
+    private fun voiceCommandLabel(c: VoiceCommand) = when (c) {
+        VoiceCommand.SEND -> R.string.ime_voice_command_send
+        VoiceCommand.NEXT -> R.string.ime_voice_command_next
+        VoiceCommand.STOP -> R.string.ime_voice_command_stop
+        VoiceCommand.UNDO -> R.string.ime_voice_command_undo
+        VoiceCommand.CLEAR -> R.string.ime_voice_command_clear
+    }
+
+    /** 音声を順に文字にする（区切りごと）。[onDone] には同じ順の文字（認識できなければ null）を渡す */
+    private fun recognizeEach(model: VoiceModelSpec, pcms: List<FloatArray>, onDone: (List<String?>) -> Unit) {
+        val out = ArrayList<String?>()
+        fun next() {
+            if (out.size == pcms.size) {
+                onDone(out)
+                return
+            }
+            model.recognize(this, pcms[out.size], settings.voiceThreads) { text ->
+                out += text
+                next()
+            }
+        }
+        next()
+    }
+
+    /**
+     * 押している間の録音で、声のコマンドを見分けて文字にする。録音を間（無音）で区切り、前後に間がある短い区切りだけを
+     * 別に文字にして、まるごとコマンドの言葉ならコマンドにする（「送信して」などは録音の最後の区切りだけ）。
+     * コマンドがなければ、録音の全体をふつうに文字にする（[normal]）
+     */
+    private fun recognizeWithCommands(model: VoiceModelSpec, pcm: FloatArray, normal: () -> Unit, apply: (List<Any>) -> Unit) {
+        val rate = WhisperModel.SAMPLE_RATE
+        val spans = PauseSplitter.split(pcm, rate, VoiceCommand.PAUSE_MS, VoiceCommand.MIN_SPEECH_MS)
+        val short = spans.indices.filter { spans[it].length * 1000L / rate <= VoiceCommand.MAX_SPEECH_MS }
+        if (short.isEmpty()) {
+            normal()
+            return
+        }
+        val pad = rate * COMMAND_PAD_MS / 1000
+        fun slice(from: Int, to: Int) = pcm.copyOfRange(maxOf(0, from - pad), minOf(pcm.size, to + pad))
+        recognizeEach(model, short.map { slice(spans[it].start, spans[it].end) }) { texts ->
+            val commands = HashMap<Int, VoiceCommand>()
+            short.forEachIndexed { k, i ->
+                val c = texts[k]?.let { VoiceCommand.match(it) } ?: return@forEachIndexed
+                if (!c.lastOnly || i == spans.lastIndex) commands[i] = c
+            }
+            if (commands.isEmpty()) {
+                normal()
+                return@recognizeEach
+            }
+            // コマンドの前後の区切りは、つながった音声ごとに文字にする
+            val parts = ArrayList<Any>()
+            var groupStart = -1
+            for (i in spans.indices) {
+                val c = commands[i]
+                if (c == null) {
+                    if (groupStart < 0) groupStart = i
+                    continue
+                }
+                if (groupStart >= 0) parts += slice(spans[groupStart].start, spans[i - 1].end)
+                groupStart = -1
+                parts += c
+            }
+            if (groupStart >= 0) parts += slice(spans[groupStart].start, spans.last().end)
+            recognizeEach(model, parts.filterIsInstance<FloatArray>()) { groupTexts ->
+                var t = 0
+                apply(parts.map { if (it is FloatArray) (groupTexts[t++] ?: "") else it })
+            }
+        }
+    }
 
     private fun stopVoice() {
         val pcm = VoiceInput.stopRecording() ?: return
@@ -1588,48 +1803,83 @@ class KanadeInputMethodService : InputMethodService() {
         val started = System.nanoTime()
         val generation = inputGeneration
         val partialAtStart = partialText
+        val rate = WhisperModel.SAMPLE_RATE
+        // 聞き続けるモードのひと区切りは、もとから前後に間がある。短ければコマンドかもしれない
+        val commandCandidate = continuousMode && settings.voiceCommands &&
+            PauseSplitter.split(pcm, rate, VoiceCommand.PAUSE_MS, VoiceCommand.MIN_SPEECH_MS)
+                .let { it.size == 1 && it[0].length * 1000L / rate <= VoiceCommand.MAX_SPEECH_MS }
+        /** 入力欄が替わっていたら（認識しているあいだに）捨てる。捨てたら false */
+        fun stillHere(): Boolean {
+            if (generation == inputGeneration) return true
+            log("voice: 入力欄が替わったので捨てた")
+            if (!continuousMode) {
+                partialText = null
+                voiceStreaming = false
+            }
+            return false
+        }
+        /** 押している間の録音の、途中の文字（未確定文字列・帯）を片付ける */
+        fun clearPartial(typing: Boolean) {
+            if (!typing && (partialText != null || !previewInBar)) {
+                currentInputConnection?.let {
+                    it.setComposingText("", 1)
+                    it.finishComposingText()
+                }
+            }
+            if (previewInBar) hideBar()
+            partialText = null
+            voiceStreaming = false
+        }
         val finish = { text: String?, engineName: String ->
             main.post {
                 if (!continuousMode) modeIndicator?.dismiss()
-                if (generation != inputGeneration) {
-                    // 認識しているあいだに入力欄が替わった。別の入力欄には入れない
-                    log("voice: 入力欄が替わったので捨てた")
-                    if (!continuousMode) {
-                        partialText = null
-                        voiceStreaming = false
-                    }
-                    return@post
-                }
+                if (!stillHere()) return@post
                 val ms = (System.nanoTime() - started) / 1_000_000
                 // 確定の文が作れなければ、話している途中に出していた文を使う
                 val final = text?.let { spoken(it) } ?: partialAtStart
-                log("voice: $engineName ${ms}ms ${final ?: "（認識できなかった）"}")
+                log("voice: $engineName ${ms}ms ${final ?: "（認識できなかった）"}（認識そのまま: $text）")
                 if (continuousMode) {
                     voiceSegments.removeFirstOrNull()
+                    val command = if (commandCandidate && text != null) VoiceCommand.match(text) else null
+                    if (command != null) {
+                        showVoiceDisplay()
+                        runVoiceCommand(command)
+                        return@post
+                    }
                     if (final != null) insertVoiceText(final)
                     showVoiceDisplay()
                     return@post
                 }
-                val ic = currentInputConnection
                 // 認識しているあいだに打ち始めていたら、その文字を先に確定する（未確定を上書きしないため）
                 val typing = engine.isComposing
                 if (typing && final != null) apply(engine.commitAll())
-                if (final != null) {
-                    ic?.commitText(final, 1)
-                    lastCommitAt = android.os.SystemClock.uptimeMillis()
-                    engine.leftContext = (engine.leftContext + final).takeLast(InputEngine.MAX_CONTEXT)
-                } else if (!typing && (partialText != null || !previewInBar)) {
-                    ic?.setComposingText("", 1)
-                    ic?.finishComposingText()
-                }
-                if (previewInBar) hideBar()
-                partialText = null
-                voiceStreaming = false
+                clearPartial(typing)
+                // 整える前の文字（話している途中に出していた文）も候補に出し、選び直せるようにする
+                if (final != null) commitVoice(final, listOfNotNull(final, partialAtStart))
             }
         }
         val model = VoiceCatalog.finalModel(this, settings)
         if (model == null) {
             finish(null, "none")
+            return
+        }
+        if (!continuousMode && settings.voiceCommands) {
+            recognizeWithCommands(model, pcm, normal = {
+                model.recognize(this, pcm, settings.voiceThreads) { text -> finish(text, model.id) }
+            }) { parts ->
+                main.post {
+                    modeIndicator?.dismiss()
+                    if (!stillHere()) return@post
+                    log("voice: ${model.id} ${(System.nanoTime() - started) / 1_000_000}ms $parts")
+                    val typing = engine.isComposing
+                    if (typing) apply(engine.commitAll())
+                    clearPartial(typing)
+                    for (p in parts) when (p) {
+                        is String -> spoken(p).takeIf { it.isNotEmpty() }?.let { commitVoice(it) }
+                        is VoiceCommand -> runVoiceCommand(p)
+                    }
+                }
+            }
             return
         }
         model.recognize(this, pcm, settings.voiceThreads) { text -> finish(text, model.id) }
@@ -1647,9 +1897,7 @@ class KanadeInputMethodService : InputMethodService() {
         pendingVoice.clear()
         // 途中の文字を未確定文字列に出していれば、それを置き換えて確定する（残りは showVoiceDisplay で出し直す）
         voiceInField = false
-        currentInputConnection?.commitText(text, 1)
-        lastCommitAt = android.os.SystemClock.uptimeMillis()
-        engine.leftContext = (engine.leftContext + text).takeLast(InputEngine.MAX_CONTEXT)
+        commitVoice(text)
     }
     private fun showIndicatorText(text: String, durationMs: Long) {
         if (!OverlayBar.permitted(this)) return
@@ -1742,7 +1990,11 @@ class KanadeInputMethodService : InputMethodService() {
         const val TAP_MS = 300L
         const val VAD_INTERVAL_MS = 100L
         /** 聞き続けるモードで、これだけ話さなければ終える */
-        const val CONTINUOUS_IDLE_MS = 60_000L
+        /** 声のコマンドの区切りを文字にするとき、前後に足す音声（話し始め・終わりを切らないため） */
+        const val COMMAND_PAD_MS = 150
+
+        /** 話して入れる記号を使わないときに、認識が付けた句読点だけを捨てるための空の表 */
+        val NO_SPOKEN_SYMBOLS = SpokenPunctuation(emptyList())
 
         /** 変換中に選んでいる文節の背景（薄い青。明るい画面でも暗い画面でも字が読める程度に） */
         val FOCUS_COLOR = Color.argb(0x60, 0x40, 0x80, 0xE0)

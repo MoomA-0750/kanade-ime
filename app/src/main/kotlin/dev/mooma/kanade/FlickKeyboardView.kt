@@ -45,6 +45,8 @@ class FlickKeyboardView(
         fun emoji()
         fun clipboard()
         fun voice(down: Boolean)
+        /** 🎤 を押したまま払って離した: 録音を捨てる */
+        fun voiceCancel() = voice(false)
         fun switchToQwerty()
         /** 浮かせる・固定に戻す */
         fun toggleFloat()
@@ -415,7 +417,12 @@ class FlickKeyboardView(
                 t.tabCode = tabCode(t, event.getX(i), event.getY(i))
                 t.lastX = event.getX(i)
                 t.lastY = event.getY(i)
-                if (t.voiceStarted) actions.voice(false) else if (!t.repeated) fire(t)
+                // 🎤 を押したまま払って離したら、録音を入れずに捨てる
+                if (t.voiceStarted) {
+                    if (t.dir != FlickTables.Dir.TAP) actions.voiceCancel() else actions.voice(false)
+                } else if (!t.repeated) {
+                    fire(t)
+                }
                 invalidate()
             }
             MotionEvent.ACTION_CANCEL -> {

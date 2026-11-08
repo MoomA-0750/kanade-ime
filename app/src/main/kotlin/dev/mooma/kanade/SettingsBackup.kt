@@ -15,8 +15,8 @@ object SettingsBackup {
     private const val VERSION = 1
     private const val PREFS = "kanade"
 
-    /** まとめる文字のファイル（ユーザー辞書・スニペット） */
-    private val FILES = listOf("user_dictionary.txt", "snippets.txt")
+    /** まとめる文字のファイル（ユーザー辞書・スニペット・話して入れる記号） */
+    private val FILES = listOf("user_dictionary.txt", "snippets.txt", "spoken_symbols.txt")
 
     /** 端末ごとの印で、書き出さず・読み込みでも今の値を残すもの（学習を消した時刻。変わると IME が学習を消すため） */
     private val LOCAL_KEYS = setOf("learning_reset_at")

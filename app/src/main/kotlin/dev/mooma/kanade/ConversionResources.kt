@@ -39,6 +39,10 @@ object ConversionResources {
         )
         // カタカナ→英語の表（約11万の読み）は読むのに時間がかかるので、起動を止めないよう裏で読んで差し替える
         Thread({ runCatching { source.setEnglishTable(table("english.ksym")) } }, "kanade-english").start()
+        // 表記→読みの逆引き（再変換・音声の文）。初回は展開に時間がかかるので裏で
+        Thread({
+            runCatching { source.reverse = dev.mooma.kanade.core.dict.ReverseDictionary(SystemDictionary(mapExtracted(app, "reverse.kdic"))) }
+        }, "kanade-reverse").start()
         return source
     }
 
@@ -60,6 +64,7 @@ object ConversionResources {
      * gzip で入れた asset（`name.kgz`）をアプリ内へ展開して mmap する。展開は APK を入れ直したとき（更新時刻が変わったとき）だけ。
      * 古い版の展開先は消す
      */
+    @Synchronized
     private fun mapExtracted(context: Context, name: String): MappedByteBuffer {
         val updated = context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime
         val root = File(context.noBackupFilesDir, "assets")

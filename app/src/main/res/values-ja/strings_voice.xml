@@ -16,7 +16,7 @@
     <string name="voice_streaming_title">話しながら文字を出す</string>
     <string name="voice_streaming_summary">話している途中の文字を出します（Nemotron を落としてあればそれで、なければ ReazonSpeech で）。</string>
     <string name="voice_spoken_punctuation_title">話して句読点を入れる</string>
-    <string name="voice_spoken_punctuation_summary">くてん→。 とうてん→、 かいぎょう→改行 はてなマーク→？ びっくりマーク→！ かぎかっこ／かぎかっことじ→「」 かっこ／かっことじ→（） なかぐろ→・</string>
+    <string name="voice_spoken_punctuation_summary">「くてん」→「。」、「とうてん」→「、」、「かいぎょう」→ 改行、文の終わりの「まる」「てん」などを記号にします。言葉の一覧は設定の「話して入れる記号」で増やしたり減らしたりできます。</string>
     <string name="voice_threads_label">認識に使うスレッド数</string>
 
     <!-- 見本の音声で測る -->
@@ -106,4 +106,22 @@
     <string name="voice_model_label_whisper_small">whisper small（190MB、速い・精度はほどほど）</string>
     <string name="voice_model_label_kotoba_whisper">kotoba-whisper v2.0（538MB、日本語向け・高精度・重い）</string>
     <string name="voice_model_label_whisper_turbo">whisper large-v3-turbo（574MB、多言語・高精度・重い）</string>
+    <string name="voice_symbols_title">話して入れる記号</string>
+    <string name="voice_symbols_key_label">言い方</string>
+    <string name="voice_symbols_value_label">記号</string>
+    <string name="voice_symbols_description">音声入力で、この言葉を言うと記号になります。言い方の先頭に | を付けたものは、文の切れ目（後ろが文の終わり・句読点）で言ったときだけ記号にします（「まる」「てん」や、「くてん」の聞き違いの「九点」など）。</string>
+    <string name="voice_symbols_text_help">1行に「言い方 記号」と書きます（最初の空白で区切ります）。記号の中の \\n は改行です。言い方の先頭の | は「文の切れ目だけ」の印です。# で始まる行は無視します</string>
+    <string name="voice_auto_punctuation_title">認識が付ける句読点</string>
+    <string name="voice_auto_punctuation_summary">切ると、音声認識が自分で付ける「、」「。」を外し、話して入れた句読点だけにします。</string>
+    <string name="voice_fillers_title">言いよどみを消す</string>
+    <string name="voice_fillers_summary">「えー」「えーと」「あのー」「うーん」などを消します。</string>
+    <string name="voice_commands_title">声のコマンド</string>
+    <string name="voice_commands_summary">前後に少し間を置いて「送信して」「次へ」「取り消して」「全部消して」「止めて」と言うと、その操作をします。文の中で言った言葉は、そのまま文字になります。</string>
+    <string name="voice_user_dictionary_title">ユーザー辞書を音声にも使う</string>
+    <string name="voice_user_dictionary_summary">認識した文で、ユーザー辞書の読みに当たる所を、登録した語にします。</string>
+    <string name="voice_continuous_idle_label">聞き続けるモードを終えるまでの無言の時間</string>
+    <string name="voice_idle_30s">30秒</string>
+    <string name="voice_idle_1m">1分</string>
+    <string name="voice_idle_2m">2分</string>
+    <string name="voice_idle_never">終えない</string>
 </resources>

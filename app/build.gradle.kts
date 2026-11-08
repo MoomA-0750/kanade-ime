@@ -39,7 +39,7 @@ val prepareKanadeAssets by tasks.registering(JavaExec::class) {
         rootProject.file("eval/voice-sample-ja.wav").copyTo(File(out, "voice-sample-ja.wav"), overwrite = true)
         // 辞書と接続行列はよく縮む（37MB→16MB、14MB→2MB）ので gzip で入れ、初回にアプリ内へ展開して mmap する。
         // 拡張子を .gz にすると AGP が assets をまとめるときに勝手に展開してしまうので、.kgz にする
-        for (name in listOf("system.kdic", "connection.kcon")) {
+        for (name in listOf("system.kdic", "reverse.kdic", "connection.kcon")) {
             val src = File(out, name)
             GZIPOutputStream(File(out, "$name.kgz").outputStream().buffered(), 1 shl 16).use { gz ->
                 src.inputStream().use { it.copyTo(gz) }

@@ -57,4 +57,11 @@
     <string name="ime_flick_segment">文節</string>
     <string name="ime_flick_segment_shrink">縮</string>
     <string name="ime_flick_segment_extend">伸</string>
+    <string name="ime_voice_cancelled">🎤 捨てました</string>
+    <string name="ime_voice_command">🎤 %1$s</string>
+    <string name="ime_voice_command_send">送信</string>
+    <string name="ime_voice_command_next">次の欄へ</string>
+    <string name="ime_voice_command_stop">止めました</string>
+    <string name="ime_voice_command_undo">取り消しました</string>
+    <string name="ime_voice_command_clear">全部消しました</string>
 </resources>

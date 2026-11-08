@@ -70,6 +70,7 @@ enum class Category(val title: Int, val summary: Int, val icon: Int, val group: 
     VOICE(R.string.app_category_voice_title, R.string.app_category_voice_summary, R.drawable.sym_mic, CategoryGroup.INPUT),
     DICTIONARY(R.string.app_category_dictionary_title, R.string.app_category_dictionary_summary, R.drawable.sym_dictionary, CategoryGroup.WORDS),
     SNIPPETS(R.string.app_category_snippets_title, R.string.app_category_snippets_summary, R.drawable.sym_bolt, CategoryGroup.WORDS),
+    SPOKEN_SYMBOLS(R.string.app_category_spoken_symbols_title, R.string.app_category_spoken_symbols_summary, R.drawable.sym_mic, CategoryGroup.WORDS),
     LANGUAGE(R.string.app_category_language_title, R.string.app_category_language_summary, R.drawable.sym_language, CategoryGroup.OTHER),
     BACKUP(R.string.app_category_backup_title, R.string.app_category_backup_summary, R.drawable.sym_upload_file, CategoryGroup.OTHER),
     TOOLS(R.string.app_category_tools_title, R.string.app_category_tools_summary, R.drawable.sym_science, CategoryGroup.OTHER),
@@ -306,6 +307,7 @@ private fun DetailPane(category: Category, onBack: (() -> Unit)?, modifier: Modi
                     Category.VOICE -> VoiceScreen()
                     Category.DICTIONARY -> PairEditorScreen(PairKind.DICTIONARY)
                     Category.SNIPPETS -> PairEditorScreen(PairKind.SNIPPETS)
+                    Category.SPOKEN_SYMBOLS -> PairEditorScreen(PairKind.SPOKEN_SYMBOLS)
                     Category.LANGUAGE -> LanguageScreen()
                     Category.BACKUP -> BackupScreen()
                     Category.TOOLS -> ToolsScreen()

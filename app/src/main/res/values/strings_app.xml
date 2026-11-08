@@ -105,4 +105,6 @@
     <string name="app_tools_zenz_threads">Inference threads (zenz)</string>
     <string name="app_bench_eval_zenz_correct">Check and fix (Zenzai): %1$s, %2$s</string>
     <string name="app_bench_eval_threads">Rerank with %1$d threads: %2$s</string>
+    <string name="app_category_spoken_symbols_title">Spoken symbols</string>
+    <string name="app_category_spoken_symbols_summary">Words that become symbols in voice input, like くてん → 。</string>
 </resources>

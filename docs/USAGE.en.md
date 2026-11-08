@@ -262,26 +262,62 @@ A short press on the record key (mic key) keeps listening, like voice typing on 
 
 - You can keep typing on the keyboard while it listens. If recognition finishes while you have composing text, that text is committed first
 - Text you're still speaking appears in the field as uncommitted text (in apps like Termux, it appears in the bar). It disappears briefly when you press a key and comes back while you speak
-- Press again to stop (if you're mid-sentence, what you've said so far is entered). It also stops after a minute of silence, or when you move to another input field
+- Press again to stop (if you're mid-sentence, what you've said so far is entered). It also stops after the silence time set in settings (1 minute by default), when you move to another input field, or when you say 止めて
 - The mic key on the on-screen keyboard changes color while listening
 
-### Spoken punctuation
+### Spoken symbols
 
-Say words like "くてん" or "とうてん" to enter punctuation (you can turn this off with "Speak punctuation" in settings).
+Say words like "くてん" or "とうてん" to enter symbols (you can turn this off with "Speak punctuation" in settings). You can add or remove words under "Spoken symbols" in settings ("Reset to default" restores the original list).
 
 | Say | Enters |
 |---|---|
-| くてん | 。 |
-| とうてん | 、 |
-| かいぎょう | Line break |
-| かいだんらく | Two line breaks |
+| くてん / まる at the end of a sentence | 。 |
+| とうてん / てん at a clause break | 、 |
+| かいぎょう, あたらしいぎょう, 次の行 | Line break |
+| かいだんらく, 次の段落 | Two line breaks |
 | はてなマーク, ぎもんふ | ？ |
 | びっくりマーク, かんたんふ | ！ |
 | かぎかっこ / かぎかっことじ | 「 / 」 |
-| かっこ / かっことじ | （ / ） |
-| なかぐろ | ・ |
+| 二重かぎかっこ / 二重かぎかっこ閉じ | 『 / 』 |
+| かっこ (かっこ開く) / かっことじ | （ / ） |
+| なかぐろ, 三点リーダー, スラッシュ, アットマーク | ・ … ／ ＠ |
 
-If this overlaps with punctuation the model added itself, the two are merged into one. Ordinary words such as "かっこいい" (cool) are left as they are.
+- まる and てん become symbols only at the end of a sentence or clause (followed by the end or punctuation). 丸い, 点数 and 100点 stay as they are
+- When recognition mishears くてん as 九点 or 点, it still becomes 。 at a sentence break (てん right after です or ます becomes 。)
+- If this overlaps with punctuation the model added itself, the two are merged into one. Ordinary words such as "かっこいい" (cool) are left as they are
+
+### Voice commands
+
+Pause briefly (about 0.6 seconds) before and after saying only a command to run it (turn off with "Voice commands" in settings). The same words inside a sentence are typed as text (メッセージを送信してから寝ます stays as text).
+
+| Say | Does |
+|---|---|
+| 送信して, 送って | Send (Enter in fields without a send button) |
+| 次へ | Next input field |
+| 取り消して, 元に戻して | Delete the text you just entered by voice |
+| 全部消して, すべて消去 | Clear the field |
+| 止めて, ストップ | Stop continuous listening |
+
+- 送信して, 次へ, 全部消して and 止めて only work as the last thing in a recording (they can't be undone)
+- Polite forms such as 〜してください or 〜お願いします work too
+- The command that was recognized is shown briefly near the cursor
+
+### Fixing what was entered
+
+- Pressing Backspace right after voice input deletes the whole entered text (like a glide word)
+- If the text shown while you were speaking differs from what was entered, both appear in the candidate window. Pick the in-progress text to swap it in
+- Text entered by voice can be reconverted by selecting it and pressing Space (Kanade looks up readings in a reverse dictionary; this also works for kanji typed with other keyboards)
+
+### Discarding a recording
+
+Press Esc while recording, or slide sideways off the mic key before releasing, to discard the recording without entering anything.
+
+### Other settings
+
+- Punctuation added by recognition: when off, the 、 and 。 that the model adds by itself are removed, leaving only punctuation you speak
+- Remove fillers: removes えー, えーと, あのー, うーん and similar (off by default)
+- Use the user dictionary for voice: replaces parts of recognized text whose reading matches a user dictionary entry with the registered word (this works when recognition writes the same reading in other kanji, not when the reading differs)
+- Silence before continuous listening stops: 30 s, 1 min (default), 2 min, or never
 
 ## Display language
 

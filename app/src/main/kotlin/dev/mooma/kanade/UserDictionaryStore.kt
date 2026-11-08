@@ -28,6 +28,11 @@ class TextStore(context: Context, name: String, private val default: String) {
             "かなで Kanade\nでっくす DeX\n",
         )
 
+        /** 話して入れる記号の表（[dev.mooma.kanade.core.voice.SpokenPunctuation]）。初めは既定の表 */
+        fun spokenSymbols(context: Context) = TextStore(
+            context, "spoken_symbols.txt", dev.mooma.kanade.core.voice.SpokenPunctuation.DEFAULT_TEXT,
+        )
+
         fun snippets(context: Context) = TextStore(
             context, "snippets.txt",
             "-> →\n<- ←\n=> ⇒\n",

@@ -1,5 +1,8 @@
 package dev.mooma.kanade.dictool
 
+import dev.mooma.kanade.core.CharWidth
+import dev.mooma.kanade.core.dict.WordEntry
+
 import dev.mooma.kanade.core.convert.KanaKanjiConverter
 import dev.mooma.kanade.core.convert.Reranker
 import dev.mooma.kanade.zenz.ZenzModel
@@ -19,7 +22,7 @@ import kotlin.system.exitProcess
 /** Mozc OSS 辞書の取得元。版を固定する（上げるときはここを変え、評価をやり直す） */
 const val MOZC_COMMIT = "a069a88d4cb5c011de0f9aebb6c149a1c808d904"
 /** 辞書の生成物の版（2: pos.kpos、3: symbol.ksym、4: 記号と絵文字を分けた emoji.ksym） */
-const val BUILD_REVISION = 5
+const val BUILD_REVISION = 6
 
 /** 逐次の音声認識に使う sherpa-onnx の Android 用ライブラリ（onnxruntime を静的に含む AAR）。版とハッシュを固定する */
 const val SHERPA_AAR_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-static-link-onnxruntime-1.13.8.aar"
@@ -72,6 +75,7 @@ fun main(args: Array<String>) {
         "eval" -> evaluate(File(args[1]), File(args[2]))
         "convert" -> convert(File(args[1]), args.drop(2))
         "profile" -> profileTry(File(args[1]), File(args[2]), File(args[3]), args[4].split('|'), args.drop(5))
+        "reading" -> readingTry(File(args[1]), args.drop(2))
         "typo" -> typo(File(args[1]), args.drop(2))
         "predict" -> predict(File(args[1]), args.drop(2))
         "zenz" -> zenzTry(File(args[1]), File(args[2]), File(args[3]), args.drop(4))
@@ -331,7 +335,7 @@ fun assets(cacheDir: File, outDir: File) {
     if (!File(built, "mozc-dictionary-license.txt").exists()) build(mozcDir, built)
     val model = fetchModel(cacheDir)
     outDir.mkdirs()
-    for (name in listOf("system.kdic", "connection.kcon", "pos.kpos", "symbol.ksym", "emoji.ksym", "mozc-dictionary-license.txt")) {
+    for (name in listOf("system.kdic", "reverse.kdic", "connection.kcon", "pos.kpos", "symbol.ksym", "emoji.ksym", "mozc-dictionary-license.txt")) {
         File(built, name).copyTo(File(outDir, name), overwrite = true)
     }
     model.copyTo(File(outDir, "zenz.gguf"), overwrite = true)
@@ -356,6 +360,7 @@ fun build(mozcDir: File, outDir: File) {
         File(mozcDir, "dictionary0$i.txt").readLines().mapNotNull(DictionaryBuilder::parseMozcLine)
     }
     File(outDir, "system.kdic").outputStream().use { DictionaryBuilder.write(words, it) }
+    File(outDir, "reverse.kdic").outputStream().use { DictionaryBuilder.write(reverseEntries(words), it) }
     File(mozcDir, "connection_single_column.txt").useLines { lines ->
         File(outDir, "connection.kcon").outputStream().use { ConnectionMatrix.writeFromMozc(lines, it) }
     }
@@ -366,6 +371,26 @@ fun build(mozcDir: File, outDir: File) {
     File(mozcDir, "README.txt").copyTo(File(outDir, "mozc-dictionary-license.txt"), overwrite = true)
     println("語数 ${words.size}、${File(outDir, "system.kdic").length() / 1024 / 1024}MB")
 }
+
+/**
+ * 表記→読みの逆引き（再変換と、音声の文の読みを求めるため）。kdic の形のまま、読みの欄に表記、表記の欄に読みを入れる。
+ * 漢字を含む表記だけ、同じ表記と読みの組はコストの小さいものを1つ。表記が長いもの（連語）は、短い語をつないで読めるので外す
+ */
+fun reverseEntries(words: List<WordEntry>): List<WordEntry> =
+    words.asSequence()
+        .filter { w ->
+            w.surface != w.reading && w.cost <= REVERSE_MAX_COST && w.surface.length <= REVERSE_MAX_SURFACE &&
+                w.surface.any { CharWidth.isIdeographic(it) }
+        }
+        .groupBy { it.surface }
+        // 同じ表記の読みは、コストの小さいほうから [REVERSE_READINGS] 個（「行った」→ いった・おこなった）
+        .flatMap { (_, list) -> list.sortedBy { it.cost }.distinctBy { it.reading }.take(REVERSE_READINGS) }
+        .map { WordEntry(it.surface, it.lid, it.rid, it.cost, it.reading) }
+
+/** APK を大きくしすぎないよう、めったに使わない語（コストが大きい）と長い表記は外す（約 11.7MB → 5MB 前後） */
+const val REVERSE_MAX_SURFACE = 8
+const val REVERSE_MAX_COST = 7000
+const val REVERSE_READINGS = 2
 
 /**
  * Mozc の evaluation.tsv の1行。意味は Mozc の converter/quality_regression_util.cc と同じにする:
@@ -600,6 +625,18 @@ fun profileTry(outDir: File, model: File, lib: File, profiles: List<String>, rea
                 println("  ${p.ifEmpty { "（なし）" }}: 並べ替え $ranked、直す $corrected")
             }
         }
+    }
+}
+
+/** 逆引きの辞書で、文の読みを求める */
+fun readingTry(outDir: File, texts: List<String>) {
+    val reverse = FileChannel.open(File(outDir, "reverse.kdic").toPath(), StandardOpenOption.READ)
+        .use { it.map(FileChannel.MapMode.READ_ONLY, 0, it.size()) }
+    val r = dev.mooma.kanade.core.dict.ReverseDictionary(SystemDictionary(reverse))
+    for (t in texts) {
+        val start = System.nanoTime()
+        val p = r.pieces(t)
+        println("$t → ${p?.joinToString(" | ") { "${it.surface}:${it.reading}" }}  ${"%.1f".format((System.nanoTime() - start) / 1e6)}ms")
     }
 }
 

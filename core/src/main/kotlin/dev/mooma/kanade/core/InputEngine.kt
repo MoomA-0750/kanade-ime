@@ -158,6 +158,9 @@ interface CandidateSource {
     /** 表記が [prefix] で始まる変換のうち一番よいもの（Zenzai の探し直し）。なければ null */
     fun convertWithPrefix(reading: String, prefix: String): Conversion? = null
 
+    /** 漢字の入った文の読み（表記→読みの逆引きの辞書で）。読めなければ null */
+    fun reverseReading(text: String): String? = null
+
     /** [surface] は、利用者が [reading] の候補から選び直して学習したものか */
     fun isLearned(reading: String, surface: String): Boolean = false
 }
@@ -433,8 +436,8 @@ class InputEngine(
      */
     fun reconvert(selected: String): List<ImeCommand>? {
         if (!japanese || isComposing || selected.isEmpty() || selected.length > MAX_CONTEXT) return null
-        val pieces = piecesOf(selected) ?: return null
         val source = candidateSource ?: return null
+        val pieces = piecesOf(selected) ?: return reconvertByDictionary(selected, source)
         val r = pieces.joinToString("") { it.reading }
         units.clear()
         r.forEach { units += KanaUnit(it.toString(), rawOf(it.toString())) }
@@ -460,6 +463,37 @@ class InputEngine(
                 val conv = source.convert(p.reading, 1).firstOrNull() ?: Conversion(listOf(Segment(p.reading, p.surface)))
                 for (s in conv.segments) segs += newSeg(s.reading, s.surface, source)
             }
+        }
+        focus = 0
+        showReading = false
+        reconvertOriginal = selected
+        return conversionView()
+    }
+
+    /**
+     * 確定したときに覚えていない文（ほかのキーボードや音声で入れた文）の再変換。逆引きの辞書で読みを求め、
+     * 元の表記で始まる経路を辞書で探して、元の文節の区切りと表記のまま変換中にする（見つからなければ、ふつうに変換を始める）
+     */
+    private fun reconvertByDictionary(selected: String, source: CandidateSource): List<ImeCommand>? {
+        val r = source.reverseReading(selected)?.takeIf { it.isNotEmpty() } ?: return null
+        units.clear()
+        r.forEach { units += KanaUnit(it.toString(), rawOf(it.toString())) }
+        caret = units.size
+        val conv = source.convertWithPrefix(r, selected)?.takeIf { it.text == selected }
+        if (conv == null) {
+            val commands = startConversion()
+            if (!isConverting) {
+                reset()
+                return null
+            }
+            reconvertOriginal = selected
+            return commands + conversionView()
+        }
+        segs.clear()
+        for (s in conv.segments) {
+            val pinned = source.pinned(s.reading)
+            segs += Seg(s.reading, (listOf(s.surface) + pinned + source.segmentCandidates(s.reading, settings.candidateCount)).distinct(), pinned)
+                .apply { reranked = true }
         }
         focus = 0
         showReading = false
@@ -502,7 +536,7 @@ class InputEngine(
      * [text] の読み。確定したときに覚えた表記（文節か文全体）をつないで作る。かな・記号などはそのまま読みにする。
      * 漢字などで覚えていない文字があれば null
      */
-    fun readingOf(text: String): String? = piecesOf(text)?.joinToString("") { it.reading }
+    fun readingOf(text: String): String? = piecesOf(text)?.joinToString("") { it.reading } ?: candidateSource?.reverseReading(text)
 
     /** 確定した表記の読みを覚えるか（学習しないよう求める入力欄では false） */
     var rememberReadings = true

@@ -121,4 +121,7 @@
     <string name="input_zenz_profile_label">変換のプロフィール</string>
     <string name="input_zenz_profile_hint">例: プログラマ。技術の話が多い</string>
     <string name="input_zenz_profile_summary">自分のことを zenz に伝え、合う語を選ばせます（25文字まで。いま %1$d 文字）。空なら使いません。</string>
+    <string name="input_reset_to_default">既定に戻す</string>
+    <string name="input_reset_to_default_message">今の中身を消して、既定の表に戻します。</string>
+    <string name="input_reset">戻す</string>
 </resources>

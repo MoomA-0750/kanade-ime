@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.dp
 import dev.mooma.kanade.TextStore
 import dev.mooma.kanade.core.dict.UserDictionary
 
-/** ユーザー辞書とスニペット。どちらも1行に「キー 値」のテキストファイル */
+/** ユーザー辞書・スニペット・話して入れる記号。どれも1行に「キー 値」のテキストファイル */
 enum class PairKind(
     val titleRes: Int,
     val keyLabelRes: Int,
@@ -45,6 +45,8 @@ enum class PairKind(
     val textHelpRes: Int,
     val prefKey: String,
     val store: (Context) -> TextStore,
+    /** 「既定に戻す」で書き戻す中身（null ならボタンを出さない） */
+    val defaultText: String? = null,
 ) {
     DICTIONARY(
         R.string.input_dictionary_title,
@@ -59,6 +61,14 @@ enum class PairKind(
         R.string.input_snippets_description,
         R.string.input_snippets_text_help,
         "snippets_text_mode", { TextStore.snippets(it) },
+    ),
+    SPOKEN_SYMBOLS(
+        R.string.voice_symbols_title,
+        R.string.voice_symbols_key_label, R.string.voice_symbols_value_label,
+        R.string.voice_symbols_description,
+        R.string.voice_symbols_text_help,
+        "spoken_symbols_text_mode", { TextStore.spokenSymbols(it) },
+        dev.mooma.kanade.core.voice.SpokenPunctuation.DEFAULT_TEXT,
     ),
 }
 
@@ -103,6 +113,25 @@ fun ColumnScope.PairEditorScreen(kind: PairKind) {
             prefs.edit().putBoolean(kind.prefKey, it).apply()
         })
         Note(stringResource(R.string.input_entry_count, list.size))
+        kind.defaultText?.let { default ->
+            var confirm by remember { mutableStateOf(false) }
+            androidx.compose.material3.OutlinedButton(onClick = { confirm = true }) { Text(stringResource(R.string.input_reset_to_default)) }
+            if (confirm) {
+                AlertDialog(
+                    onDismissRequest = { confirm = false },
+                    title = { Text(stringResource(R.string.input_reset_to_default)) },
+                    text = { Text(stringResource(R.string.input_reset_to_default_message)) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            store.write(default)
+                            version++
+                            confirm = false
+                        }) { Text(stringResource(R.string.input_reset)) }
+                    },
+                    dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.input_cancel)) } },
+                )
+            }
+        }
     }
 
     if (!textMode) {

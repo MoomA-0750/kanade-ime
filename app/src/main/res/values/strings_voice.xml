@@ -16,7 +16,7 @@
     <string name="voice_streaming_title">Show text while speaking</string>
     <string name="voice_streaming_summary">Shows text while you are still speaking (with Nemotron if downloaded, otherwise ReazonSpeech).</string>
     <string name="voice_spoken_punctuation_title">Speak punctuation</string>
-    <string name="voice_spoken_punctuation_summary">Say these Japanese words: くてん→。 とうてん→、 かいぎょう→new line はてなマーク→？ びっくりマーク→！ かぎかっこ／かぎかっことじ→「」 かっこ／かっことじ→（） なかぐろ→・</string>
+    <string name="voice_spoken_punctuation_summary">Say words like くてん → 。, とうてん → 、, かいぎょう → new line, まる / てん at the end of a sentence. Edit the list under Settings → Spoken symbols.</string>
     <string name="voice_threads_label">Recognition threads</string>
 
     <!-- Benchmark -->
@@ -106,4 +106,22 @@
     <string name="voice_model_label_whisper_small">whisper small (190MB, fast, moderate accuracy)</string>
     <string name="voice_model_label_kotoba_whisper">kotoba-whisper v2.0 (538MB, for Japanese, high accuracy, heavy)</string>
     <string name="voice_model_label_whisper_turbo">whisper large-v3-turbo (574MB, multilingual, high accuracy, heavy)</string>
+    <string name="voice_symbols_title">Spoken symbols</string>
+    <string name="voice_symbols_key_label">Say</string>
+    <string name="voice_symbols_value_label">Symbol</string>
+    <string name="voice_symbols_description">In voice input, saying one of these words enters the symbol. Words starting with | become symbols only at the end of a sentence or clause (before punctuation), such as まる, てん, or 九点 (a common mishearing of くてん).</string>
+    <string name="voice_symbols_text_help">One entry per line: \"word symbol\" (split at the first space). \\n in the symbol is a line break. A leading | means \"only at a sentence break\". Lines starting with # are ignored</string>
+    <string name="voice_auto_punctuation_title">Punctuation added by recognition</string>
+    <string name="voice_auto_punctuation_summary">When off, the 、 and 。 that speech recognition adds by itself are removed, leaving only punctuation you speak.</string>
+    <string name="voice_fillers_title">Remove fillers</string>
+    <string name="voice_fillers_summary">Removes えー, えーと, あのー, うーん and similar.</string>
+    <string name="voice_commands_title">Voice commands</string>
+    <string name="voice_commands_summary">Pause briefly before and after saying 送信して (send), 次へ (next), 取り消して (undo), 全部消して (clear) or 止めて (stop) to run the action. The same words inside a sentence are typed as text.</string>
+    <string name="voice_user_dictionary_title">Use the user dictionary for voice</string>
+    <string name="voice_user_dictionary_summary">Replaces parts of recognized text whose reading matches a user dictionary entry with the registered word.</string>
+    <string name="voice_continuous_idle_label">Silence before continuous listening stops</string>
+    <string name="voice_idle_30s">30 s</string>
+    <string name="voice_idle_1m">1 min</string>
+    <string name="voice_idle_2m">2 min</string>
+    <string name="voice_idle_never">Never</string>
 </resources>

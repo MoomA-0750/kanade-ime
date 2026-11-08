@@ -44,6 +44,48 @@ class DictionaryCandidateSource(
      */
     @Volatile var typoCorrection = false
 
+    /** 表記→読みの逆引き（再変換・音声の文）。IME が起動のあとに読んで入れる。なければ逆引きはしない */
+    @Volatile var reverse: dev.mooma.kanade.core.dict.ReverseDictionary? = null
+
+    override fun reverseReading(text: String): String? = reverse?.readingOf(text)
+
+    /**
+     * 音声の文で、ユーザー辞書の読みに当たる所をその語にする（「かなで Kanade」を登録していれば、認識の「奏で」→ Kanade）。
+     * 逆引きで文を語に分け、語の切れ目から切れ目までの読みが、登録した読み（2文字以上）とちょうど同じ所だけを置き換える
+     */
+    fun applyUserWords(text: String): String {
+        val dict = userDictionary
+        val rev = reverse ?: return text
+        if (dict.size == 0) return text
+        val pieces = rev.pieces(text) ?: return text
+        val out = StringBuilder()
+        var i = 0
+        while (i < pieces.size) {
+            var replaced = false
+            val reading = StringBuilder()
+            val surface = StringBuilder()
+            // 長く当たるものを先に（i から始まる区切りの並びのうち、読みが登録されているもの）
+            var best: Triple<Int, String, String>? = null
+            for (j in i until minOf(pieces.size, i + MAX_USER_WORD_PIECES)) {
+                reading.append(pieces[j].reading)
+                surface.append(pieces[j].surface)
+                if (reading.length < 2) continue
+                val word = dict.lookup(reading.toString()).firstOrNull() ?: continue
+                if (word != surface.toString()) best = Triple(j, word, surface.toString())
+            }
+            best?.let { (j, word, _) ->
+                out.append(word)
+                i = j + 1
+                replaced = true
+            }
+            if (!replaced) {
+                out.append(pieces[i].surface)
+                i++
+            }
+        }
+        return out.toString()
+    }
+
     /** 学習が変わった（保存したほうがよい） */
     @Volatile var learningChanged = false
 
@@ -183,6 +225,9 @@ class DictionaryCandidateSource(
 
     private companion object {
         const val SYMBOL_POSITION = 3
+
+        /** ユーザー辞書の語に当てるとき、いくつの区切りまでつないで見るか */
+        const val MAX_USER_WORD_PIECES = 4
 
         val TIME_READINGS = setOf("いま", "じこく", "げんざいじこく")
 
