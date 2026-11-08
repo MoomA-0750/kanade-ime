@@ -19,6 +19,8 @@ Kanade 自身のコードは MIT（リポジトリ直下の `LICENSE`）。下�
 | parakeet-tdt_ctc-0.6b-ja（NVIDIA、sherpa-onnx の int8 版 `sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8`） | 設定画面の「parakeet-ja をダウンロード」で HuggingFace から落とす | CC-BY-4.0（公開するなら表示が要る） | |
 | Nemotron-3.5-ASR-Streaming-0.6B（NVIDIA、sherpa-onnx の int8 版 `sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11`） | 設定画面の「モデル」の一覧から HuggingFace で落とす | OpenMDW-1.1（公開前に条件を確かめる） | |
 | Material Symbols（Google、Rounded の 24px。`app/src/main/res/drawable/sym_*.xml` に変換して同梱） | リポジトリ・APK | Apache-2.0 | 画面キーボードと設定画面のアイコン |
+| Material Icons（Google。形の数値を `linux/settings/qt/qml/Icon.qml` に写した） | リポジトリ・Linux 版の設定の画面の QML 版 | Apache-2.0 | QML 版のアイコン |
+| Qt 6（Qt Base・Qt Declarative） | Linux 版の設定の画面の QML 版が、使う機械に入っているものを動的にリンクする（配布物には入れない） | LGPL-3.0 | |
 | FrequencyWords の英語の上位5万語（hermitdave/FrequencyWords、`content/2018/en/en_50k.txt`、コミット 525f9b5。OpenSubtitles 2018 由来） | ビルド時に取得して、グライド入力の英単語（`glide-en.txt`）として assets へ | CC BY-SA 4.0（コードは MIT） | 公開するときは出典の表示と、同じ許諾での単語リストの公開が要る |
 | SCOWL 2020.12.07（Kevin Atkinson ほか。english-words・american-words の大きさ 70 まで） | ビルド時に取得して、グライドの英単語のふるいに使う（辞書にある語だけを残す）。著作権表示を `scowl-license.txt` として assets へ | MIT に近い許諾（著作権表示と許諾文を添える） | |
 | JMdict（英語版）・JMnedict（EDRDG。jmdict-simplified 3.6.2+20260928191014 の JSON） | ビルド時に取得して、カタカナ→英語の表記の表（`english.ksym`）にして assets へ | CC BY-SA 4.0（EDRDG のライセンス。「This package uses the JMdict/EDICT and JMnedict files. These files are the property of the Electronic Dictionary Research and Development Group, and are used in conformance with the Group's licence.」の表示が要る） | 公開するときは、アプリの中にもこの表示を出す |

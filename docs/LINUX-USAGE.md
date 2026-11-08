@@ -4,13 +4,14 @@ Android 版・Windows 版と同じ入力（ライブ変換・zenz の並べ替�
 
 ## 入れる・外す
 
-要るもの: fcitx5（開発用のヘッダーを含む。Arch は `fcitx5` に入っている。Debian・Ubuntu は `fcitx5-modules-dev`）、cmake、C/C++ のコンパイラ、curl、python3。設定の画面には python-gobject と libadwaita（Debian・Ubuntu は `python3-gi gir1.2-adw-1`）。Java は要らない（配布物に入っている）。sudo も要らない。
+要るもの: fcitx5（開発用のヘッダーを含む。Arch は `fcitx5` に入っている。Debian・Ubuntu は `fcitx5-modules-dev`）、cmake、C/C++ のコンパイラ、curl、python3。設定の画面の GTK 版には python-gobject と libadwaita（Debian・Ubuntu は `python3-gi gir1.2-adw-1`）。QML 版（Omarchy・Hyprland・KDE 向け）は組むときと使うときに Qt 6.5 以上（Arch は `qt6-base qt6-declarative`、Wayland では `qt6-wayland` も）と libxkbcommon。組む機械に Qt が無ければ QML 版は組まず、GTK 版だけになる。Java は要らない（配布物に入っている）。sudo も要らない。
 
 - 組み立て: リポジトリの手元で `scripts/linux.sh build <ssh の相手>` を実行する。ネイティブ（zenz・whisper・fcitx5 のアドオン）は相手の機械の上でビルドするので、その機械の CPU に合ったものになる（別の CPU の機械へ配布物を写すと、遅いか動かないことがある）
 - 入れる: `scripts/linux.sh install <ssh の相手> --voice --add-im`（相手の機械で配布物の `install.sh` を動かす）
   - エンジン・辞書・音声のモデル・アドオンは `~/.local/share/kanade`、設定・ユーザー辞書・学習は `~/.config/kanade`、記録は `~/.local/state/kanade/engine.log`
   - fcitx5 のアドオンの設定は `~/.local/share/fcitx5/{addon,inputmethod}/kanade.conf`（Library に .so のフルパスを書く）。入れたあと fcitx5 を起こし直す（systemd のサービスで動いていれば自動）
-  - 設定の画面をアプリの一覧に「Kanade の設定」として足す
+  - 設定の画面をアプリの一覧に「Kanade の設定」として足す（本体には GTK 版が入る）
+  - 設定の画面の QML 版は、本体を入れたあとに `install.sh --qt`（`scripts/linux.sh install <ssh の相手> --qt`）で別に入れる（`~/.local/share/kanade/qt`。エンジンと fcitx5 には触らない）。外すのは `~/.local/share/kanade/uninstall.sh --qt`（GTK 版に戻る）
   - `--voice`: 音声入力のモデル（日本語の parakeet-ja 656MB・ReazonSpeech 73MB と、英語の parakeet-tdt v3 670MB）を落とす。設定の画面からも落とせる
   - `--add-im`: fcitx5 の入力方式の一覧の最後に Kanade を足す（既定の入力方式は変えない。前の設定は `~/.config/fcitx5/profile.before-kanade`）。付けなければ fcitx5-configtool で足す
 - エンジンは fcitx5 の起動と一緒にアドオンが起こす（起動に数秒かかり、そのあいだのキーは素通しになる）
@@ -33,7 +34,14 @@ Android 版・Windows 版と同じ入力（ライブ変換・zenz の並べ替�
 
 ## 設定
 
-設定の画面（GTK4・libadwaita）は、アプリの一覧の「Kanade の設定」か、fcitx5 のトレイのメニュー（Kanade を使っているとき）の「Kanade: 設定」「音声入力」「ユーザー辞書」「スニペット」で開く（`~/.local/share/kanade/bin/kanade-settings [input|voice|dictionary|snippets|backup|usage]`）。中身は入力・音声入力（録音キー・モデルを落とす）・ユーザー辞書・スニペット・Android 版の設定の読み込みと書き出し・使い方。変えると、エンジンが 2 秒ほどで読み直す。
+設定の画面は、アプリの一覧の「Kanade の設定」か、fcitx5 のトレイのメニュー（Kanade を使っているとき）の「Kanade: 設定」「音声入力」「ユーザー辞書」「スニペット」で開く（`~/.local/share/kanade/bin/kanade-settings [input|voice|dictionary|snippets|backup|usage]`）。中身は入力・音声入力（録音キー・モデルを落とす）・ユーザー辞書・スニペット・Android 版の設定の読み込みと書き出し・使い方。変えると、エンジンが 2 秒ほどで読み直す。
+
+画面は2つあり、中身は同じ:
+
+- GTK 版（GTK4・libadwaita、`bin/kanade-settings-gtk`）: GNOME の設定アプリと同じ見た目
+- QML 版（Qt Quick・Material、`qt/kanade-settings-qt`。`install.sh --qt` で入れる）: Omarchy のテーマの色（`~/.local/state/omarchy/current/theme/colors.toml`）と Hyprland の角の丸み（`decoration:rounding`）に合わせる。テーマを替えると開いたままでも色が変わる
+
+`kanade-settings` はどちらかを選んで開く: `KANADE_UI=gtk` か `KANADE_UI=qt` があればそれ。なければ、QML 版が入っていてデスクトップが GNOME でない（`XDG_CURRENT_DESKTOP` に GNOME が無い）ときは QML 版、ほかは GTK 版。
 
 ファイルを直接書き換えてもよい:
 

@@ -45,6 +45,7 @@
 
 - Linux 版（2026-11-08、`docs/decisions.md`）: Windows 版と同じエンジン＋fcitx5 のアドオン（`linux/fcitx5`）。aarch64 の cramgent（Apple M1・Asahi・Hyprland）で組み立てて入れ、ライブ変換・候補の窓・音声入力（parakeet で 8.8 秒の音声を 0.45 秒）を確かめた。本人の指示で cramgent の hazkey を外し、Kanade を既定にした。使い方は `docs/LINUX-USAGE.md`
 - Linux 版で Superwhisper の代わり（2026-11-08、`docs/decisions.md`）: 録音キー（F12・右 Alt の長押し、Ctrl+Alt+Space、Esc で取り消し）がどの入力方式でも効き、英字のときは英語（parakeet-tdt v3、7.7 秒を 0.47 秒）で書く。設定の画面（GTK4・libadwaita）。アドオンを利用者のフォルダーに入れる形にして sudo を不要に。cramgent の Superwhisper は本人の指示で外した
+- Linux 版の設定の画面に QML 版（2026-11-09、`docs/decisions.md`）: GTK 版と同じ中身を C++・Qt Quick・Material で作り、Omarchy のテーマの色と Hyprland の角の丸みに合わせる。入口の `kanade-settings` が GNOME では GTK 版、それ以外では QML 版を開く。QML 版は `install.sh --qt` で別に入れる。cramgent で組み、画面を出さずに暗い・明るいテーマで撮って確かめた（本人の画面ではまだ開いていない）
 - Windows 版（2026-10-04〜05）: 常駐のエンジン（`desktop/`）＋薄い TSF の DLL（`windows/tsf`）。ライブ変換・候補の窓・zenz・音声入力（F12、whisper と ReazonSpeech）・設定の保存と Android 版の設定の読み込み・インストーラーまで。to-fu に入れてある。経緯と仮決定は `docs/WINDOWS-PLAN.md`、使い方は `docs/WINDOWS-USAGE.md`
 
 ## 未完了・次の手順
@@ -55,4 +56,5 @@
 - ReazonSpeech は後ろに長い無音が付くと文末を落とす（押したまま長く黙ると確定の文が欠ける）。確定の前に後ろの無音を切る直しを考える
 - ReazonSpeech の前後に無音を足す直しを Android 版にも入れる（作ると決めた）。ただしコードを見ると、Android 版の途中表示もすでに前後 0.5 秒を足している。実機で話し始めが落ちないか確かめる
 - Gemini アプリでカーソルが出ない件（本人の指示で後回し。キー記録に入力欄の情報が残る）
+- Linux 版の設定の画面の QML 版を、本人の Hyprland の画面で開いて確かめる（cramgent には組んだだけで入れていない。`scripts/linux.sh build cramgent` のあと `scripts/linux.sh install cramgent --qt`）。ファイルを選ぶ窓（Qt の FileDialog）が Omarchy でどう出るか、録音キーを取るダイアログで右 Alt などの実際のキーの名前が取れるかも見る
 - 後回し: Zenzai の制約付き再探索（並べ替えで外れる文の多くは正解が辞書の2〜4位にあり、効き目は小さい見込み）、kotoba-whisper の句読点、段階5（ホームラボの GPU）

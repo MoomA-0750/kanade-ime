@@ -411,3 +411,19 @@ SPEC.md の未決事項に本人が答えた。
 
 - 本人の指示で https://github.com/MoomA-0750/kanade-ime を公開で作り、main を push した。公開の前に履歴の秘密（鍵・トークン）を探し、見つからなかった。commit のメールアドレスは、本人のほかの公開リポジトリと同じ
 - 本人の指示でライセンスを MIT にした（著作権者は MoomA）。第三者のもの（Mozc の辞書・zenz・Material Symbols・FrequencyWords など）は MIT の対象外で、docs/THIRD-PARTY.md のとおりそれぞれのライセンスに従う
+
+## 2026-11-09 Linux 版: 設定の画面の QML 版
+
+本人の依頼（Omarchy で GTK の設定の画面がテーマに馴染まない）。決まりの正本は Vault の `AI/Wiki/LinuxアプリのQML版の画面の決まり.md`（中身は共通、GTK 版と QML 版は別の実行ファイル、入口は選び役、パッケージを本体と qt に分ける、C++・Qt Quick・Material、colors.toml を見張る）。決まりに無くて決めたこと:
+
+- 中身の「共通」: GTK 版は Python なので、C++ の QML 版とコードは共有できない。共有しているのはファイルの書式（正本は DesktopStore.kt）とエンジンへのソケット。QML 版の読み書きを GTK 版の関数と比べる `tests/compat.sh` を作り、同じ操作で同じファイルができることを確かめた（改行の分け方は Python の splitlines に合わせた）
+- 文字の表は共有しない（GTK 版は `T(日本語, 英語)` をコードに並べている。共有するには GTK 版の作りを変えることになるため）。QML 版も同じ文言を `Pal.t(日本語, 英語)` で並べた。文言を変えるときは両方を直す
+- 入れ方: `install.sh --qt` は QML 版だけを入れる（本体の install.sh はエンジンを止め fcitx5 を起こし直すので、それをしない別の入口にした）。入れる先は `~/.local/share/kanade/qt`（本体の入れ直しで消えない）。`uninstall.sh` は全部を外すと QML 版も外し、`--qt` は QML 版だけ
+- 選び役で `KANADE_UI` に gtk・qt 以外の値があれば、無いのと同じに扱う。GNOME かどうかは `XDG_CURRENT_DESKTOP` を大文字にして GNOME を含むかで見る（`ubuntu:GNOME`・`GNOME-Classic` も GNOME）
+- 色: colors.toml に `mode` が無ければ背景の明るさで明暗を決める。無い色は omarchy-gtk-tint と同じ代わり（`dark_background`→`background` など）で、それも無ければ窓の地。Omarchy が無いときの色は Material 3 の基本の色（紫）にした（Qt の Material の既定のアクセントはピンクで、Material 3 の見本と違うため）
+- 角の丸み: hyprctl で読めない（Hyprland の外から開いた）ときは、Omarchy があれば 0、無ければ Material の既定（丸い端のボタン、カード 12、ダイアログ 28）。入力欄の角は Qt の Material が 4 で固定しているので、丸み 0 でも 4 のまま
+- アイコンは Material Icons の形を QtQuick.Shapes で描く（qt6-svg を足さずに済む）。Qt の Material のボタンとダイアログの地・影は層の効果（layer.effect）で描くため、画面を出さずに撮るとき（software の描き方）に地ごと消えた。ボタン・ダイアログ・選ぶ部品の窓の地は自分で描き、スイッチの溝もテーマのアクセントで描く（Material の溝の色はアクセントから作った別の色になる）
+- 2つ目を開いたとき: GTK 版は GApplication で開いている窓にページを渡す。QML 版は `$XDG_RUNTIME_DIR/kanade-settings-qt.sock` の QLocalServer で同じことをする
+- 録音キーの名前: Qt のキーの知らせの `nativeVirtualKey`（Wayland・X11 では keysym）を xkbcommon で名前にする（GTK 版の `Gdk.keyval_name` と同じ名前）。keysym が取れない描き先では Qt のキーから作る
+- 書き出しのファイルを選ぶ窓は、ダウンロードのフォルダーから始める（GTK 版は既定の場所）
+- 確かめたこと（cramgent、Qt 6.12、aarch64）: tst_backend が全部通る、compat.sh で GTK 版と同じファイル、選び役の組み合わせ（test-selector.sh）、install.sh --qt → 入口から QML 版が開く → 2つ目でページが渡る → uninstall.sh --qt で GTK 版に戻る（一時的な XDG_DATA_HOME で）、モデルを落とす・止める・続きから（手元のゆっくり返すサーバーで、206 の続きから）・落とし終えたら選ぶ。画面は `QT_QPA_PLATFORM=offscreen` で撮った（catppuccin・flexoki-light、丸み 0 と 10、幅 460、英語、Omarchy なし）。本人の Hyprland の画面ではまだ開いていない。GTK 版と並べて撮るのはしていない
