@@ -184,12 +184,22 @@ class SoftKeyboardView(
 
     /** キーの1段の高さ。半開きで折り目が横なら、画面の下から折り目までを埋める（折り曲げる・広げる途中はその間） */
     private val rowHeight: Float
-        get() {
-            val fit = fold.lastFit ?: return normalRowHeight
-            if (fold.stretch == 0f) return normalRowHeight
-            val h = maxOf((fit - bottomSpace - gap * 2) / rows.size, normalRowHeight * Hinge.MIN_FIT_ROW_FRACTION)
-            return FoldMotion.lerp(normalRowHeight, h, fold.stretch)
-        }
+        get() = rowHeightAt(fold.stretch.coerceIn(0f, 1f))
+
+    private fun rowHeightAt(t: Float): Float {
+        val fit = fold.lastFit ?: return normalRowHeight
+        if (t == 0f) return normalRowHeight
+        val h = maxOf((fit - bottomSpace - gap * 2) / rows.size, normalRowHeight * Hinge.MIN_FIT_ROW_FRACTION)
+        return FoldMotion.lerp(normalRowHeight, h, t)
+    }
+
+    /** 窓の高さに使う段の高さ（伸ばす・戻す途中は伸ばした高さのまま。[FoldMotion.stretchTall]） */
+    private val measureRowHeight: Float get() = rowHeightAt(if (fold.stretchTall) 1f else fold.stretch.coerceIn(0f, 1f))
+
+    /** キーの上に空ける高さ（伸ばす・戻す途中、キーを下に寄せて描く） */
+    private val topPad: Float get() = rows.size * (measureRowHeight - rowHeight)
+
+    private fun measuredFor(): Int = (rows.size * measureRowHeight + gap * 2).toInt() + bottomSpace
 
     /** 折りたたみの折り目（[Hinge]）。半開きで縦なら折り目で左右に分け、横なら折り目まで伸ばす */
     var hinge: Hinge? = null
@@ -203,7 +213,7 @@ class SoftKeyboardView(
 
     /** 分ける・伸ばすの移り変わり */
     private val fold = FoldMotion { stretching ->
-        if (stretching) requestLayout()
+        if (stretching && measuredHeight != measuredFor()) requestLayout()
         invalidate()
     }
 
@@ -320,7 +330,7 @@ class SoftKeyboardView(
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec)
-        setMeasuredDimension(w, (rows.size * rowHeight + gap * 2).toInt() + bottomSpace)
+        setMeasuredDimension(w, measuredFor())
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -408,7 +418,7 @@ class SoftKeyboardView(
         val plain = HashMap<Key, RectF>()
         rows.forEachIndexed { r, row ->
             var x = gap / 2
-            val top = gap + r * rowHeight
+            val top = topPad + gap + r * rowHeight
             for (key in row) {
                 val rect = RectF(x + gap / 2, top + gap / 2, x + key.width * unit - gap / 2, top + rowHeight - gap / 2)
                 x += key.width * unit
@@ -442,7 +452,7 @@ class SoftKeyboardView(
             keyRects[p.key] = FoldMotion.lerp(from, target, t)
         }
         parts.forEachIndexed { r, part ->
-            val top = gap + r * rowHeight
+            val top = topPad + gap + r * rowHeight
             // 左は左端から、右は右端から並べる（行のずれはふだんの並びのまま）
             for (p in part.left) place(p, gap / 2 + p.x * splitUnit, top)
             for (p in part.right) place(p, width - gap / 2 - (part.total - p.x) * splitUnit, top)

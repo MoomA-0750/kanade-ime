@@ -184,12 +184,22 @@ class FlickKeyboardView(
 
     /** キーの1段の高さ。半開きで折り目が横なら、画面の下から折り目までを埋める（折り曲げる・広げる途中はその間） */
     private val rowHeight: Float
-        get() {
-            val fit = fold.lastFit ?: return normalRowHeight
-            if (fold.stretch == 0f) return normalRowHeight
-            val h = maxOf((fit - bottomSpace - gap * 2) / 4, normalRowHeight * Hinge.MIN_FIT_ROW_FRACTION)
-            return FoldMotion.lerp(normalRowHeight, h, fold.stretch)
-        }
+        get() = rowHeightAt(fold.stretch.coerceIn(0f, 1f))
+
+    private fun rowHeightAt(t: Float): Float {
+        val fit = fold.lastFit ?: return normalRowHeight
+        if (t == 0f) return normalRowHeight
+        val h = maxOf((fit - bottomSpace - gap * 2) / 4, normalRowHeight * Hinge.MIN_FIT_ROW_FRACTION)
+        return FoldMotion.lerp(normalRowHeight, h, t)
+    }
+
+    /** 窓の高さに使う段の高さ（伸ばす・戻す途中は伸ばした高さのまま。[FoldMotion.stretchTall]） */
+    private val measureRowHeight: Float get() = rowHeightAt(if (fold.stretchTall) 1f else fold.stretch.coerceIn(0f, 1f))
+
+    /** キーの上に空ける高さ（伸ばす・戻す途中、キーを下に寄せて描く） */
+    private val topPad: Float get() = 4 * (measureRowHeight - rowHeight)
+
+    private fun measuredFor(): Int = (4 * measureRowHeight + gap * 2).toInt() + bottomSpace
 
     /** 最後に確かめた折り目の位置（ビューの中の左右） */
     private var laidOutSplit: Pair<Float, Float>? = null
@@ -207,7 +217,7 @@ class FlickKeyboardView(
 
     /** 分ける・伸ばすの移り変わり */
     private val fold = FoldMotion { stretching ->
-        if (stretching) requestLayout()
+        if (stretching && measuredHeight != measuredFor()) requestLayout()
         layoutCells(width)
         invalidate()
     }
@@ -250,7 +260,7 @@ class FlickKeyboardView(
     fun refreshInsets() = bottomInset.refresh()
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), (4 * rowHeight + gap * 2).toInt() + bottomSpace)
+        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), measuredFor())
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) = layoutCells(w)
@@ -278,7 +288,7 @@ class FlickKeyboardView(
             val cw = width / cols
             for (r in 0 until 4) {
                 var c = 0
-                val top = gap + r * rowHeight
+                val top = topPad + gap + r * rowHeight
                 fun add(slot: Slot) {
                     val x = x0 + c * cw
                     out += slot to RectF(x + gap / 2, top + gap / 2, x + cw - gap / 2, top + rowHeight - gap / 2)

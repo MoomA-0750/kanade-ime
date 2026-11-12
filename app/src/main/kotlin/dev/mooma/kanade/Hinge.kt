@@ -72,6 +72,7 @@ class FoldMotion(private val onFrame: (stretching: Boolean) -> Unit) {
                 set(value)
                 onFrame(stretching)
             }
+            addEndListener { _, _, _, _ -> onFrame(stretching) }
         }
 
         fun go(to: Float, animate: Boolean) {
@@ -90,6 +91,12 @@ class FoldMotion(private val onFrame: (stretching: Boolean) -> Unit) {
 
     private val splitChannel = Channel({ split = it }, stretching = false)
     private val stretchChannel = Channel({ stretch = it }, stretching = true)
+
+    /**
+     * 伸ばした高さの窓にしておくか（伸ばしている・伸ばす途中・戻る途中）。窓の高さは毎コマ変えず、
+     * 伸ばすときは先に高くして中のキーを下から伸ばし、戻すときはキーを縮め終えてから低くする（毎コマ窓を変えると、アプリの画面が跳び、空いたコマが出る）
+     */
+    val stretchTall get() = lastFit != null && (stretchChannel.target == 1f || (stretchChannel.anim.isRunning && stretch > SETTLED))
 
     /** 分けた並びを描くか（分けている・分ける途中・戻る途中） */
     val splitting get() = lastSplit != null && (split != 0f || splitChannel.anim.isRunning)
@@ -110,6 +117,9 @@ class FoldMotion(private val onFrame: (stretching: Boolean) -> Unit) {
     companion object {
         const val STIFFNESS = 380f
         const val DAMPING = 0.8f
+
+        /** 戻す途中、残りがこれより小さくなったら窓を低くする（ばねが止まりきるのを待つと、空いた帯が残って見える） */
+        const val SETTLED = 0.02f
 
         fun lerp(a: Float, b: Float, t: Float) = a + (b - a) * t
 
