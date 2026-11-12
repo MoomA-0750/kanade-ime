@@ -72,7 +72,11 @@ class FlickKeyboardView(
         data class Fn(val id: String) : Slot
     }
 
-    private class Cell(val slot: Slot, val rect: RectF)
+    /** キー。[rect] は今の位置で、分ける・戻す途中は [from]（ふだんの位置）と [to]（分けた位置）の間 */
+    private class Cell(val slot: Slot, val rect: RectF) {
+        val from = RectF(rect)
+        val to = RectF(rect)
+    }
 
     private val palette = KeyboardPalette.of(context)
     private val density = resources.displayMetrics.density
@@ -130,7 +134,9 @@ class FlickKeyboardView(
         set(value) {
             if (field == value) return
             field = value
+            syncFold(animate = false)
             requestLayout()
+            layoutCells(width)
         }
 
     /** 日本語入力中か（「あa1」のキーの表示に使う。かなの配列のときだけ意味がある） */
@@ -176,25 +182,44 @@ class FlickKeyboardView(
 
     private val normalRowHeight get() = 52 * density * heightPercent / 100
 
-    /** キーの1段の高さ。半開きで折り目が横なら、画面の下から折り目までを埋める */
+    /** キーの1段の高さ。半開きで折り目が横なら、画面の下から折り目までを埋める（折り曲げる・広げる途中はその間） */
     private val rowHeight: Float
         get() {
-            val fit = hinge?.heightBelow?.takeIf { !floating } ?: return normalRowHeight
-            return maxOf((fit - bottomSpace - gap * 2) / 4, normalRowHeight * Hinge.MIN_FIT_ROW_FRACTION)
+            val fit = fold.lastFit ?: return normalRowHeight
+            if (fold.stretch == 0f) return normalRowHeight
+            val h = maxOf((fit - bottomSpace - gap * 2) / 4, normalRowHeight * Hinge.MIN_FIT_ROW_FRACTION)
+            return FoldMotion.lerp(normalRowHeight, h, fold.stretch)
         }
 
-    /** 最後に並べたときの折り目の位置（ビューの中の左右） */
+    /** 最後に確かめた折り目の位置（ビューの中の左右） */
     private var laidOutSplit: Pair<Float, Float>? = null
 
-    /** 折りたたみの折り目（[Hinge]）。縦なら折り目の左右に分け、横で半開きなら折り目まで伸ばす */
+    /** 折りたたみの折り目（[Hinge]）。半開きで縦なら折り目の左右に分け、横なら折り目まで伸ばす */
     var hinge: Hinge? = null
         set(value) {
             if (field == value) return
             field = value
+            syncFold(animate = drawn && isAttachedToWindow && windowVisibility == VISIBLE)
             requestLayout()
             layoutCells(width)
             invalidate()
         }
+
+    /** 分ける・伸ばすの移り変わり */
+    private val fold = FoldMotion { stretching ->
+        if (stretching) requestLayout()
+        layoutCells(width)
+        invalidate()
+    }
+
+    /** 今の窓で一度描いたか（出したばかりのキーボードは動かさずにその並びで出す） */
+    private var drawn = false
+
+    private fun syncFold(animate: Boolean) {
+        val h = hinge.takeIf { !floating }
+        laidOutSplit = h?.splitIn(this)
+        fold.update(laidOutSplit, h?.heightBelow, animate)
+    }
     private val gap = 3 * density
     private val swipe = 18 * density
 
@@ -210,6 +235,17 @@ class FlickKeyboardView(
         bottomInset.refresh()
     }
 
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        drawn = false
+        fold.cancel()
+    }
+
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        if (visibility != VISIBLE) drawn = false
+    }
+
     /** 窓の今の余白を読み直す（キーボードを出すたびに呼ぶ） */
     fun refreshInsets() = bottomInset.refresh()
 
@@ -221,22 +257,23 @@ class FlickKeyboardView(
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
-        // 折り目の位置は画面の上での位置で決まるので、置かれてから並べ直す（押している途中に並べ直さないよう、変わったときだけ）
-        if (hinge != null && (if (floating) null else hinge?.splitIn(this)) != laidOutSplit) layoutCells(width)
+        // 折り目の位置は画面の上での位置で決まるので、置かれてから確かめる（変わったときだけ並べ直す）
+        val before = laidOutSplit
+        syncFold(animate = drawn)
+        if (laidOutSplit != before) layoutCells(width)
     }
 
-    /** キーの位置を決める。広い画面では左右に分ける */
+    /**
+     * キーの位置を決める。半開きで縦の折り目が横切るときは折り目の左右に分ける。折りたたみでない広い画面でも左右に分ける
+     * （折りたたみの端末は、平らに開いているときは分けない）。分ける・戻す途中は、ふだんの位置と分けた位置の間に置く。
+     * キーの並びが変わらなければ同じ [Cell] の位置だけ動かす（押している指と、押した形の動きを保つ）
+     */
     private fun layoutCells(w: Int) {
-        pillAnimators.values.forEach { it.cancel() }
-        pillAnimators.clear()
-        pill.clear()
-        cells.clear()
-        val split = if (floating) null else hinge?.splitIn(this)
-        laidOutSplit = split
-        val wide = split != null || ScreenWidth.isWide(context, w)
+        val split = fold.lastSplit?.takeIf { fold.splitting }
+        val wide = hinge == null && ScreenWidth.isWide(context, w)
         val left = listOf("undo", "emoji", "voice", "mode")
         val right = listOf("backspace", "tab", "space", "enter")
-        fun block(x0: Float, width: Float, withLeft: Boolean, withRight: Boolean) {
+        fun block(out: MutableList<Pair<Slot, RectF>>, x0: Float, width: Float, withLeft: Boolean, withRight: Boolean) {
             val cols = 3 + (if (withLeft) 1 else 0) + (if (withRight) 1 else 0)
             val cw = width / cols
             for (r in 0 until 4) {
@@ -244,7 +281,7 @@ class FlickKeyboardView(
                 val top = gap + r * rowHeight
                 fun add(slot: Slot) {
                     val x = x0 + c * cw
-                    cells += Cell(slot, RectF(x + gap / 2, top + gap / 2, x + cw - gap / 2, top + rowHeight - gap / 2))
+                    out += slot to RectF(x + gap / 2, top + gap / 2, x + cw - gap / 2, top + rowHeight - gap / 2)
                     c++
                 }
                 if (withLeft) add(Slot.Fn(left[r]))
@@ -252,25 +289,49 @@ class FlickKeyboardView(
                 if (withRight) add(Slot.Fn(right[r]))
             }
         }
-        if (split != null) {
-            // 縦の折り目の左右に分ける（左手側: 左の列＋文字、右手側: 文字＋右の列）。折り目の上にはキーを置かない
-            val margin = Hinge.MARGIN_DP * density
-            val half = minOf(split.first - margin - gap, w - gap - (split.second + margin), w * Hinge.MAX_SIDE_FRACTION)
-            block(gap, half, withLeft = true, withRight = false)
-            block(w - half - gap, half, withLeft = false, withRight = true)
-        } else if (wide) {
-            // 左右に分ける（左手側: 左の列＋文字、右手側: 文字＋右の列）。真ん中は空ける
-            val half = w * Hinge.MAX_SIDE_FRACTION
-            block(gap, half, withLeft = true, withRight = false)
-            block(w - half - gap, half, withLeft = false, withRight = true)
-        } else {
-            block(gap / 2, w - gap, withLeft = true, withRight = true)
+        val plain = ArrayList<Pair<Slot, RectF>>()
+        block(plain, gap / 2, w - gap, withLeft = true, withRight = true)
+        val next: List<Pair<Slot, Pair<RectF, RectF>>> = when {
+            split != null -> {
+                // 縦の折り目の左右に分ける（左手側: 左の列＋文字、右手側: 文字＋右の列）。折り目の上にはキーを置かない
+                val margin = Hinge.MARGIN_DP * density
+                val half = minOf(split.first - margin - gap, w - gap - (split.second + margin), w * Hinge.MAX_SIDE_FRACTION)
+                val parts = ArrayList<Pair<Slot, RectF>>()
+                block(parts, gap, half, withLeft = true, withRight = false)
+                block(parts, w - half - gap, half, withLeft = false, withRight = true)
+                val from = plain.toMap()
+                parts.map { (slot, rect) -> slot to ((from[slot] ?: rect) to rect) }
+            }
+            wide -> {
+                // 左右に分ける（左手側: 左の列＋文字、右手側: 文字＋右の列）。真ん中は空ける
+                val half = w * Hinge.MAX_SIDE_FRACTION
+                val parts = ArrayList<Pair<Slot, RectF>>()
+                block(parts, gap, half, withLeft = true, withRight = false)
+                block(parts, w - half - gap, half, withLeft = false, withRight = true)
+                parts.map { (slot, rect) -> slot to (rect to rect) }
+            }
+            else -> plain.map { (slot, rect) -> slot to (rect to rect) }
+        }
+        if (cells.map { it.slot } != next.map { it.first }) {
+            pillAnimators.values.forEach { it.cancel() }
+            pillAnimators.clear()
+            pill.clear()
+            cells.clear()
+            for ((slot, _) in next) cells += Cell(slot, RectF())
+        }
+        val t = if (split != null) fold.split else 1f
+        for ((cell, n) in cells.zip(next)) {
+            val (from, to) = n.second
+            cell.from.set(from)
+            cell.to.set(to)
+            cell.rect.set(FoldMotion.lerp(from, to, t))
         }
     }
 
     override fun onDraw(canvas: Canvas) {
         canvas.drawColor(palette.background)
         for (cell in cells) drawCell(canvas, cell)
+        drawn = true
     }
 
     private fun drawCell(canvas: Canvas, cell: Cell) {

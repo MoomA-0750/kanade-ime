@@ -182,22 +182,38 @@ class SoftKeyboardView(
         }
     private val normalRowHeight get() = 52 * density * heightPercent / 100
 
-    /** キーの1段の高さ。半開きで折り目が横なら、画面の下から折り目までを埋める */
+    /** キーの1段の高さ。半開きで折り目が横なら、画面の下から折り目までを埋める（折り曲げる・広げる途中はその間） */
     private val rowHeight: Float
         get() {
-            val fit = hinge?.heightBelow?.takeIf { !floating } ?: return normalRowHeight
-            val h = (fit - bottomSpace - gap * 2) / rows.size
-            return maxOf(h, normalRowHeight * Hinge.MIN_FIT_ROW_FRACTION)
+            val fit = fold.lastFit ?: return normalRowHeight
+            if (fold.stretch == 0f) return normalRowHeight
+            val h = maxOf((fit - bottomSpace - gap * 2) / rows.size, normalRowHeight * Hinge.MIN_FIT_ROW_FRACTION)
+            return FoldMotion.lerp(normalRowHeight, h, fold.stretch)
         }
 
-    /** 折りたたみの折り目（[Hinge]）。縦なら折り目で左右に分け、横で半開きなら折り目まで伸ばす */
+    /** 折りたたみの折り目（[Hinge]）。半開きで縦なら折り目で左右に分け、横なら折り目まで伸ばす */
     var hinge: Hinge? = null
         set(value) {
             if (field == value) return
             field = value
+            syncFold(animate = drawn && isAttachedToWindow && windowVisibility == VISIBLE)
             requestLayout()
             invalidate()
         }
+
+    /** 分ける・伸ばすの移り変わり */
+    private val fold = FoldMotion { stretching ->
+        if (stretching) requestLayout()
+        invalidate()
+    }
+
+    /** 今の窓で一度描いたか（出したばかりのキーボードは動かさずにその並びで出す） */
+    private var drawn = false
+
+    private fun syncFold(animate: Boolean) {
+        val h = hinge.takeIf { !floating }
+        fold.update(h?.splitIn(this), h?.heightBelow, animate)
+    }
 
     /** キーの幅の単位（ふつうは幅の 1/10。左右に分けたときは小さくなる） */
     private var keyUnit = 0f
@@ -266,6 +282,7 @@ class SoftKeyboardView(
         set(value) {
             if (field == value) return
             field = value
+            syncFold(animate = false)
             requestLayout()
         }
 
@@ -281,6 +298,23 @@ class SoftKeyboardView(
         bottomInset.refresh()
     }
 
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        drawn = false
+        fold.cancel()
+    }
+
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        if (visibility != VISIBLE) drawn = false
+    }
+
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        // 折り目の位置は画面の上での位置で決まるので、置かれてから確かめる
+        syncFold(animate = drawn)
+    }
+
     /** 窓の今の余白を読み直す（キーボードを出すたびに呼ぶ） */
     fun refreshInsets() = bottomInset.refresh()
 
@@ -294,14 +328,18 @@ class SoftKeyboardView(
         layoutKeys()
         for ((key, rect) in keyRects) drawKey(canvas, key, rect)
         drawTrail(canvas)
+        drawn = true
     }
 
     private fun unitOrDefault() = keyUnit.takeIf { it > 0f } ?: ((width - gap) / 10f)
 
-    /** 行を左右に分けたもの（キーと、行の中での左端の位置。単位はキーの幅） */
-    private class SplitRow(val left: List<Pair<Key, Float>>, val right: List<Pair<Key, Float>>, val total: Float) {
-        val leftUnits get() = left.maxOfOrNull { it.second + it.first.width } ?: 0f
-        val rightUnits get() = total - (right.minOfOrNull { it.second } ?: total)
+    /** 分けた行に置くキー（[x] は行の中での左端の位置。単位はキーの幅）。[origin] は分ける前のキー */
+    private class Placed(val key: Key, val x: Float, val origin: Key)
+
+    /** 行を左右に分けたもの */
+    private class SplitRow(val left: List<Placed>, val right: List<Placed>, val total: Float) {
+        val leftUnits get() = left.maxOfOrNull { it.x + it.key.width } ?: 0f
+        val rightUnits get() = total - (right.minOfOrNull { it.x } ?: total)
     }
 
     /** 左右に分けた行（行が替わるまで同じものを使う。分けた Space などは別のキーになるので、作り直すと押している指が迷う） */
@@ -314,8 +352,11 @@ class SoftKeyboardView(
         return split
     }
 
+    private fun Key.isLetter() = (center as? Action.Text)?.char?.let { it in 'a'..'z' || it in 'A'..'Z' } == true
+
     /**
      * 1行を真ん中で左右に分ける。キーの境目のうち真ん中に近いところで分け（同じ近さなら右寄り。asdfg|hjkl、zxcv|bnm）、
+     * 右の文字が左より少なければ、境目のすぐ左の文字を右にも置く（g・v を両手で打てる: asdfg|ghjkl、zxcv|vbnm）。
      * 近くに境目がなければ（Space など）、またがるキーを2つに分けて両側に置く
      */
     private fun splitRow(row: List<Key>): SplitRow {
@@ -328,23 +369,27 @@ class SoftKeyboardView(
             bounds += x
         }
         val at = bounds.minWithOrNull(compareBy<Float> { Math.round(Math.abs(it - half) * 100) }.thenByDescending { it })
-        val left = ArrayList<Pair<Key, Float>>()
-        val right = ArrayList<Pair<Key, Float>>()
+        val left = ArrayList<Placed>()
+        val right = ArrayList<Placed>()
         x = 0f
         if (at != null && Math.abs(at - half) <= SPLIT_SNAP_UNITS) {
             for (key in row) {
-                if (x < at) left += key to x else right += key to x
+                if (x < at) left += Placed(key, x, key) else right += Placed(key, x, key)
                 x += key.width
+            }
+            val edge = left.lastOrNull()
+            if (edge != null && edge.key.isLetter() && left.count { it.key.isLetter() } > right.count { it.key.isLetter() }) {
+                right.add(0, Placed(Key(edge.key.width, edge.key.center, edge.key.corners), edge.x, edge.key))
             }
         } else {
             for (key in row) {
                 val end = x + key.width
                 when {
-                    end <= half -> left += key to x
-                    x >= half -> right += key to x
+                    end <= half -> left += Placed(key, x, key)
+                    x >= half -> right += Placed(key, x, key)
                     else -> {
-                        left += Key(half - x, key.center, key.corners) to x
-                        right += Key(end - half, key.center, key.corners) to half
+                        left += Placed(Key(half - x, key.center, key.corners), x, key)
+                        right += Placed(Key(end - half, key.center, key.corners), half, key)
                     }
                 }
                 x = end
@@ -353,48 +398,54 @@ class SoftKeyboardView(
         return SplitRow(left, right, total)
     }
 
-    /** キーの位置を決める（[keyRects]）。縦の折り目がキーボードを横切るときは、折り目の左右に分ける */
+    /**
+     * キーの位置を決める（[keyRects]）。半開きで縦の折り目がキーボードを横切るときは、折り目の左右に分ける。
+     * 分ける・戻す途中は、ふだんの位置と分けた位置の間に置く
+     */
     private fun layoutKeys() {
         keyRects.clear()
-        val split = if (floating) null else hinge?.splitIn(this)
-        if (split == null) {
-            val unit = (width - gap) / 10f
-            keyUnit = unit
-            rows.forEachIndexed { r, row ->
-                var x = gap / 2
-                val top = gap + r * rowHeight
-                for (key in row) {
-                    val rect = RectF(x + gap / 2, top + gap / 2, x + key.width * unit - gap / 2, top + rowHeight - gap / 2)
-                    x += key.width * unit
-                    if (key.center != null) keyRects[key] = rect
-                }
+        val unit = (width - gap) / 10f
+        val plain = HashMap<Key, RectF>()
+        rows.forEachIndexed { r, row ->
+            var x = gap / 2
+            val top = gap + r * rowHeight
+            for (key in row) {
+                val rect = RectF(x + gap / 2, top + gap / 2, x + key.width * unit - gap / 2, top + rowHeight - gap / 2)
+                x += key.width * unit
+                if (key.center != null) plain[key] = rect
             }
+        }
+        val split = fold.lastSplit
+        if (split == null || !fold.splitting) {
+            keyUnit = unit
+            keyRects.putAll(plain)
             return
         }
+        val t = fold.split
         val margin = Hinge.MARGIN_DP * density
         val leftWidth = split.first - margin - gap / 2
         val rightWidth = width - gap / 2 - (split.second + margin)
         val parts = splitRows()
         val maxLeft = parts.maxOf { it.leftUnits }
         val maxRight = parts.maxOf { it.rightUnits }
-        val unit = minOf(
+        val splitUnit = minOf(
             leftWidth / maxLeft,
             rightWidth / maxRight,
             width * Hinge.MAX_SIDE_FRACTION / maxOf(maxLeft, maxRight),
-            (width - gap) / 10f,
+            unit,
         )
-        keyUnit = unit
+        keyUnit = FoldMotion.lerp(unit, splitUnit, t)
+        fun place(p: Placed, x: Float, top: Float) {
+            if (p.key.center == null) return
+            val target = RectF(x + gap / 2, top + gap / 2, x + p.key.width * splitUnit - gap / 2, top + rowHeight - gap / 2)
+            val from = plain[p.origin] ?: target
+            keyRects[p.key] = FoldMotion.lerp(from, target, t)
+        }
         parts.forEachIndexed { r, part ->
             val top = gap + r * rowHeight
             // 左は左端から、右は右端から並べる（行のずれはふだんの並びのまま）
-            for ((key, x0) in part.left) {
-                val x = gap / 2 + x0 * unit
-                if (key.center != null) keyRects[key] = RectF(x + gap / 2, top + gap / 2, x + key.width * unit - gap / 2, top + rowHeight - gap / 2)
-            }
-            for ((key, x0) in part.right) {
-                val x = width - gap / 2 - (part.total - x0) * unit
-                if (key.center != null) keyRects[key] = RectF(x + gap / 2, top + gap / 2, x + key.width * unit - gap / 2, top + rowHeight - gap / 2)
-            }
+            for (p in part.left) place(p, gap / 2 + p.x * splitUnit, top)
+            for (p in part.right) place(p, width - gap / 2 - (part.total - p.x) * splitUnit, top)
         }
     }
 

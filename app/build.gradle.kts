@@ -136,4 +136,6 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.13.0")
     // 折りたたみの折り目の位置と開き具合（画面キーボードを折り目で分ける・折り目まで伸ばす）
     implementation("androidx.window:window:1.5.1")
+    // 折り曲げる・広げるときの並びの移り変わり（ばね）
+    implementation("androidx.dynamicanimation:dynamicanimation:1.1.0")
 }
