@@ -141,6 +141,12 @@ Under "Layouts" in settings, choose which languages each layout is used for (Jap
 - If Glide isn't set to use numbers & symbols, ?123 switches to a 12-key layout that is
 - When you switch Japanese on or off with a physical keyboard, Kanade also moves to a layout that uses that language
 
+### Foldable phones
+
+- When the phone is open like a book (vertical fold), the glide, full and 12-key keyboards split on either side of the fold, and no key sits on the fold (qwert | yuiop, asdfg | hjkl, zxcv | bnm, with Space on both halves)
+- When it is half open (L shape) with a horizontal fold (a Fold held sideways, a Flip held upright), the keyboard fills the screen from the bottom up to the fold. The upper half stays with the app. Opened flat, the keyboard goes back to the height in settings
+- Neither happens while the keyboard is floating
+
 ### Floating
 
 You can detach the keyboard from the bottom of the screen and float it anywhere, at any width (swipe down on the bottom-left key: ?123, Ctrl, or "あa1"). While it floats, the app's screen doesn't shrink, and touching outside the keyboard lets you use the app underneath.

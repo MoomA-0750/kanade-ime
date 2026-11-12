@@ -3,9 +3,11 @@
 #   scripts/emu.sh adb <args...>     to-fu の adb を実行
 #   scripts/emu.sh install           手元の debug APK を送って入れる
 #   scripts/emu.sh shot <file.png>   画面を撮って手元に保存（半分の大きさの <file>-s.png も作る）
+#   EMU_SERIAL=emulator-5556 を付けると、その端末を使う（エミュレータを2つ動かしているとき）
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ADB='C:\Users\MoomA\AppData\Local\Android\Sdk\platform-tools\adb.exe'
+[ -n "${EMU_SERIAL:-}" ] && ADB="$ADB -s $EMU_SERIAL"
 case "$1" in
   adb)
     shift

@@ -174,7 +174,27 @@ class FlickKeyboardView(
     private var toggleAt = 0L
     private var toggleChar = ""
 
-    private val rowHeight get() = 52 * density * heightPercent / 100
+    private val normalRowHeight get() = 52 * density * heightPercent / 100
+
+    /** キーの1段の高さ。半開きで折り目が横なら、画面の下から折り目までを埋める */
+    private val rowHeight: Float
+        get() {
+            val fit = hinge?.heightBelow?.takeIf { !floating } ?: return normalRowHeight
+            return maxOf((fit - bottomSpace - gap * 2) / 4, normalRowHeight * Hinge.MIN_FIT_ROW_FRACTION)
+        }
+
+    /** 最後に並べたときの折り目の位置（ビューの中の左右） */
+    private var laidOutSplit: Pair<Float, Float>? = null
+
+    /** 折りたたみの折り目（[Hinge]）。縦なら折り目の左右に分け、横で半開きなら折り目まで伸ばす */
+    var hinge: Hinge? = null
+        set(value) {
+            if (field == value) return
+            field = value
+            requestLayout()
+            layoutCells(width)
+            invalidate()
+        }
     private val gap = 3 * density
     private val swipe = 18 * density
 
@@ -199,13 +219,21 @@ class FlickKeyboardView(
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) = layoutCells(w)
 
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        // 折り目の位置は画面の上での位置で決まるので、置かれてから並べ直す（押している途中に並べ直さないよう、変わったときだけ）
+        if (hinge != null && (if (floating) null else hinge?.splitIn(this)) != laidOutSplit) layoutCells(width)
+    }
+
     /** キーの位置を決める。広い画面では左右に分ける */
     private fun layoutCells(w: Int) {
         pillAnimators.values.forEach { it.cancel() }
         pillAnimators.clear()
         pill.clear()
         cells.clear()
-        val wide = ScreenWidth.isWide(context, w)
+        val split = if (floating) null else hinge?.splitIn(this)
+        laidOutSplit = split
+        val wide = split != null || ScreenWidth.isWide(context, w)
         val left = listOf("undo", "emoji", "voice", "mode")
         val right = listOf("backspace", "tab", "space", "enter")
         fun block(x0: Float, width: Float, withLeft: Boolean, withRight: Boolean) {
@@ -224,9 +252,15 @@ class FlickKeyboardView(
                 if (withRight) add(Slot.Fn(right[r]))
             }
         }
-        if (wide) {
+        if (split != null) {
+            // 縦の折り目の左右に分ける（左手側: 左の列＋文字、右手側: 文字＋右の列）。折り目の上にはキーを置かない
+            val margin = Hinge.MARGIN_DP * density
+            val half = minOf(split.first - margin - gap, w - gap - (split.second + margin), w * Hinge.MAX_SIDE_FRACTION)
+            block(gap, half, withLeft = true, withRight = false)
+            block(w - half - gap, half, withLeft = false, withRight = true)
+        } else if (wide) {
             // 左右に分ける（左手側: 左の列＋文字、右手側: 文字＋右の列）。真ん中は空ける
-            val half = w * 0.42f
+            val half = w * Hinge.MAX_SIDE_FRACTION
             block(gap, half, withLeft = true, withRight = false)
             block(w - half - gap, half, withLeft = false, withRight = true)
         } else {

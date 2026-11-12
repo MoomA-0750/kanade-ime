@@ -27,6 +27,9 @@ import dev.mooma.kanade.core.voice.VoiceEndpointer
 import dev.mooma.kanade.whisper.WhisperModel
 import dev.mooma.kanade.zenz.ZenzModel
 import java.util.concurrent.Executors
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * 物理キーボード専用の IME。画面キーボードは出さず、キーをすべて onKeyDown/onKeyUp で受ける。
@@ -80,6 +83,13 @@ class KanadeInputMethodService : InputMethodService() {
     /** 未確定文字列をアプリに出さず、帯に出すアプリを使っている */
     private var previewInBar = false
 
+    /** 折り目の様子を受け取る（折りたたみの端末） */
+    private val foldScope = MainScope()
+    private var foldJob: kotlinx.coroutines.Job? = null
+
+    /** 今の折り目（なければ null）。画面キーボードを折り目で分ける・折り目まで伸ばすのに使う */
+    private var hinge: Hinge? = null
+
     override fun onCreate() {
         super.onCreate()
         settings = KanadeSettings(this)
@@ -97,7 +107,48 @@ class KanadeInputMethodService : InputMethodService() {
         if (settings.lastJapanese) engine.handle(KeyInput.SetJapanese(true))
     }
 
+    /**
+     * 折りたたみの折り目の位置と開き具合を受け取り、画面キーボードに渡す。
+     * IME の窓が出る前に受け取り始めると折り目のない様子しか来ないことがある（エミュレータの Pixel 10 Pro Fold）ので、
+     * キーボードを出すたびに受け取り直す（受け取り始めると、今の様子がすぐ1回届く）
+     */
+    private fun watchFold() {
+        foldJob?.cancel()
+        foldJob = foldScope.launch {
+            try {
+                androidx.window.layout.WindowInfoTracker.getOrCreate(this@KanadeInputMethodService)
+                    .windowLayoutInfo(this@KanadeInputMethodService)
+                    .collect { info ->
+                        val fold = info.displayFeatures.filterIsInstance<androidx.window.layout.FoldingFeature>().firstOrNull()
+                        val window = androidx.window.layout.WindowMetricsCalculator.getOrCreate()
+                            .computeCurrentWindowMetrics(this@KanadeInputMethodService).bounds
+                        val next = fold?.let {
+                            Hinge(
+                                android.graphics.Rect(it.bounds).apply { offset(window.left, window.top) },
+                                vertical = it.orientation == androidx.window.layout.FoldingFeature.Orientation.VERTICAL,
+                                halfOpened = it.state == androidx.window.layout.FoldingFeature.State.HALF_OPENED,
+                                windowBottom = window.bottom,
+                            )
+                        }
+                        if (next != hinge) {
+                            android.util.Log.i("KanadeFold", "$next window=$window")
+                            log("fold: $next window=$window")
+                            hinge = next
+                            keyboardView?.hinge = next
+                            flickView?.hinge = next
+                        }
+                    }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.w("KanadeFold", e)
+                log("fold: ${e.javaClass.simpleName} ${e.message}")
+            }
+        }
+    }
+
     override fun onDestroy() {
+        foldScope.cancel()
         NavBarInsets.onChanged = null
         clipboardManager.removePrimaryClipChangedListener(clipListener)
         overlay?.hide()
@@ -158,6 +209,8 @@ class KanadeInputMethodService : InputMethodService() {
         val flick = FlickKeyboardView(this, flickActions)
         flick.tapCorrector = ::correctKanaTap
         flickView = flick
+        keyboard.hinge = hinge
+        flick.hinge = hinge
         val h = InputViewHost(this, keyboard, flick, panel, createClipboardView())
         host = h
         h.flickLayout = settings.softKeyboardLayout == "FLICK"
@@ -871,6 +924,7 @@ class KanadeInputMethodService : InputMethodService() {
         // 隠している間に届いた余白（ナビゲーションバーが見えていない扱いなど）が残らないよう、出すたびに読み直す
         keyboardView?.refreshInsets()
         flickView?.refreshInsets()
+        watchFold()
     }
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {

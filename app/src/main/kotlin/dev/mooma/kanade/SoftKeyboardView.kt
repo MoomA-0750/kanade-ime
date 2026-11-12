@@ -180,7 +180,27 @@ class SoftKeyboardView(
             requestLayout()
             invalidate()
         }
-    private val rowHeight get() = 52 * density * heightPercent / 100
+    private val normalRowHeight get() = 52 * density * heightPercent / 100
+
+    /** キーの1段の高さ。半開きで折り目が横なら、画面の下から折り目までを埋める */
+    private val rowHeight: Float
+        get() {
+            val fit = hinge?.heightBelow?.takeIf { !floating } ?: return normalRowHeight
+            val h = (fit - bottomSpace - gap * 2) / rows.size
+            return maxOf(h, normalRowHeight * Hinge.MIN_FIT_ROW_FRACTION)
+        }
+
+    /** 折りたたみの折り目（[Hinge]）。縦なら折り目で左右に分け、横で半開きなら折り目まで伸ばす */
+    var hinge: Hinge? = null
+        set(value) {
+            if (field == value) return
+            field = value
+            requestLayout()
+            invalidate()
+        }
+
+    /** キーの幅の単位（ふつうは幅の 1/10。左右に分けたときは小さくなる） */
+    private var keyUnit = 0f
 
     /** 下に足す余白（dp、設定の「下の余白」）。ナビゲーションバーの分が取れない端末用 */
     var extraBottomDp = 0
@@ -203,7 +223,7 @@ class SoftKeyboardView(
 
     /** 払いと見なす指の距離（px）。キーの幅に合わせるが、小さいキーでも最低これだけは要る */
     private val swipeThreshold: Float
-        get() = maxOf(MIN_SWIPE_DP * density, (width - gap) / 10f * swipePercent / 100f)
+        get() = maxOf(MIN_SWIPE_DP * density, unitOrDefault() * swipePercent / 100f)
 
     /** 押している指ごとの状態（速く打つときに前の指を離す前に次を押せるように） */
     private class Touch(val key: Key, val rect: RectF, val x0: Float, val y0: Float) {
@@ -271,20 +291,111 @@ class SoftKeyboardView(
 
     override fun onDraw(canvas: Canvas) {
         canvas.drawColor(palette.background)
-        keyRects.clear()
-        val unit = (width - gap) / 10f
-        rows.forEachIndexed { r, row ->
-            var x = gap / 2
-            val top = gap + r * rowHeight
+        layoutKeys()
+        for ((key, rect) in keyRects) drawKey(canvas, key, rect)
+        drawTrail(canvas)
+    }
+
+    private fun unitOrDefault() = keyUnit.takeIf { it > 0f } ?: ((width - gap) / 10f)
+
+    /** 行を左右に分けたもの（キーと、行の中での左端の位置。単位はキーの幅） */
+    private class SplitRow(val left: List<Pair<Key, Float>>, val right: List<Pair<Key, Float>>, val total: Float) {
+        val leftUnits get() = left.maxOfOrNull { it.second + it.first.width } ?: 0f
+        val rightUnits get() = total - (right.minOfOrNull { it.second } ?: total)
+    }
+
+    /** 左右に分けた行（行が替わるまで同じものを使う。分けた Space などは別のキーになるので、作り直すと押している指が迷う） */
+    private var splitCache: Pair<List<List<Key>>, List<SplitRow>>? = null
+
+    private fun splitRows(): List<SplitRow> {
+        splitCache?.let { (forRows, split) -> if (forRows === rows) return split }
+        val split = rows.map(::splitRow)
+        splitCache = rows to split
+        return split
+    }
+
+    /**
+     * 1行を真ん中で左右に分ける。キーの境目のうち真ん中に近いところで分け（同じ近さなら右寄り。asdfg|hjkl、zxcv|bnm）、
+     * 近くに境目がなければ（Space など）、またがるキーを2つに分けて両側に置く
+     */
+    private fun splitRow(row: List<Key>): SplitRow {
+        val total = row.sumOf { it.width.toDouble() }.toFloat()
+        val half = total / 2
+        val bounds = ArrayList<Float>()
+        var x = 0f
+        for (key in row.dropLast(1)) {
+            x += key.width
+            bounds += x
+        }
+        val at = bounds.minWithOrNull(compareBy<Float> { Math.round(Math.abs(it - half) * 100) }.thenByDescending { it })
+        val left = ArrayList<Pair<Key, Float>>()
+        val right = ArrayList<Pair<Key, Float>>()
+        x = 0f
+        if (at != null && Math.abs(at - half) <= SPLIT_SNAP_UNITS) {
             for (key in row) {
-                val rect = RectF(x + gap / 2, top + gap / 2, x + key.width * unit - gap / 2, top + rowHeight - gap / 2)
-                x += key.width * unit
-                if (key.center == null) continue
-                keyRects[key] = rect
-                drawKey(canvas, key, rect)
+                if (x < at) left += key to x else right += key to x
+                x += key.width
+            }
+        } else {
+            for (key in row) {
+                val end = x + key.width
+                when {
+                    end <= half -> left += key to x
+                    x >= half -> right += key to x
+                    else -> {
+                        left += Key(half - x, key.center, key.corners) to x
+                        right += Key(end - half, key.center, key.corners) to half
+                    }
+                }
+                x = end
             }
         }
-        drawTrail(canvas)
+        return SplitRow(left, right, total)
+    }
+
+    /** キーの位置を決める（[keyRects]）。縦の折り目がキーボードを横切るときは、折り目の左右に分ける */
+    private fun layoutKeys() {
+        keyRects.clear()
+        val split = if (floating) null else hinge?.splitIn(this)
+        if (split == null) {
+            val unit = (width - gap) / 10f
+            keyUnit = unit
+            rows.forEachIndexed { r, row ->
+                var x = gap / 2
+                val top = gap + r * rowHeight
+                for (key in row) {
+                    val rect = RectF(x + gap / 2, top + gap / 2, x + key.width * unit - gap / 2, top + rowHeight - gap / 2)
+                    x += key.width * unit
+                    if (key.center != null) keyRects[key] = rect
+                }
+            }
+            return
+        }
+        val margin = Hinge.MARGIN_DP * density
+        val leftWidth = split.first - margin - gap / 2
+        val rightWidth = width - gap / 2 - (split.second + margin)
+        val parts = splitRows()
+        val maxLeft = parts.maxOf { it.leftUnits }
+        val maxRight = parts.maxOf { it.rightUnits }
+        val unit = minOf(
+            leftWidth / maxLeft,
+            rightWidth / maxRight,
+            width * Hinge.MAX_SIDE_FRACTION / maxOf(maxLeft, maxRight),
+            (width - gap) / 10f,
+        )
+        keyUnit = unit
+        parts.forEachIndexed { r, part ->
+            val top = gap + r * rowHeight
+            // 左は左端から、右は右端から並べる（行のずれはふだんの並びのまま）
+            for ((key, x0) in part.left) {
+                val x = gap / 2 + x0 * unit
+                if (key.center != null) keyRects[key] = RectF(x + gap / 2, top + gap / 2, x + key.width * unit - gap / 2, top + rowHeight - gap / 2)
+            }
+            for ((key, x0) in part.right) {
+                val x = width - gap / 2 - (part.total - x0) * unit
+                if (key.center != null) keyRects[key] = RectF(x + gap / 2, top + gap / 2, x + key.width * unit - gap / 2, top + rowHeight - gap / 2)
+            }
+        }
     }
 
     private fun drawTrail(canvas: Canvas) {
@@ -325,7 +436,7 @@ class SoftKeyboardView(
         val corrector = tapCorrector ?: return null
         if (!glideLayout || t.dir != null) return null
         val touched = (t.key.center as? Action.Text)?.char?.takeIf { it in 'a'..'z' } ?: return null
-        val kw = (width - gap) / 10f
+        val kw = unitOrDefault()
         val kh = rowHeight
         fun distance(rect: RectF) = hypot((t.x0 - rect.centerX()) / kw, (t.y0 - rect.centerY()) / kh)
         val options = ArrayList<dev.mooma.kanade.core.touch.TapCorrection.Option>()
@@ -585,8 +696,7 @@ class SoftKeyboardView(
                     val ys = t.ys!!
                     xs += event.getX(i)
                     ys += event.getY(i)
-                    val unit = (width - gap) / 10f
-                    onGlide(GlideInput(xs.toFloatArray(), ys.toFloatArray(), letterCenters(), unit, rowHeight, isOn(Mod.SHIFT)))
+                    onGlide(GlideInput(xs.toFloatArray(), ys.toFloatArray(), letterCenters(), unitOrDefault(), rowHeight, isOn(Mod.SHIFT)))
                     consumeOnceModifiers()
                     fadeTrail()
                     syncLatchedPills()
@@ -795,6 +905,8 @@ class SoftKeyboardView(
 
     companion object {
         private const val REPEAT_DELAY_MS = 400L
+        /** 左右に分けるとき、真ん中からこれ（キーの幅の単位）より近いキーの境目で分ける。遠ければまたがるキーを2つに分ける */
+        private const val SPLIT_SNAP_UNITS = 0.75f
         /** Space のドラッグで1文字動かす指の距離 */
         private const val DRAG_STEP_DP = 12f
         /** キーの角の丸み（Material 3 の medium に近い） */

@@ -134,4 +134,6 @@ dependencies {
     implementation("androidx.compose.material3:material3:1.5.0-alpha18")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.activity:activity-compose:1.13.0")
+    // 折りたたみの折り目の位置と開き具合（画面キーボードを折り目で分ける・折り目まで伸ばす）
+    implementation("androidx.window:window:1.5.1")
 }
