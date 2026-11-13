@@ -373,7 +373,7 @@ class EmojiPanelView(
         val tick = object : Runnable {
             override fun run() {
                 action()
-                handler.postDelayed(this, 50)
+                handler.postDelayed(this, KeyRepeat.intervalMs)
             }
         }
         setOnTouchListener { v, e ->
@@ -381,7 +381,7 @@ class EmojiPanelView(
                 MotionEvent.ACTION_DOWN -> {
                     action()
                     v.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
-                    handler.postDelayed(tick, 400)
+                    handler.postDelayed(tick, KeyRepeat.delayMs)
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> handler.removeCallbacks(tick)
             }

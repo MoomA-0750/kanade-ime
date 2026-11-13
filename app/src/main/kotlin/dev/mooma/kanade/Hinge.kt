@@ -16,9 +16,17 @@ import androidx.dynamicanimation.animation.SpringForce
  * [windowBottom] は IME の窓の下端（画面の座標）
  */
 data class Hinge(val screen: Rect, val vertical: Boolean, val halfOpened: Boolean, val windowBottom: Int) {
-    /** 半開きで縦の折り目がこのビューを横切るとき、ビューの中での折り目の左端と右端（px）。そうでなければ null */
-    fun splitIn(view: View): Pair<Float, Float>? {
-        if (!vertical || !halfOpened || view.width == 0) return null
+    /**
+     * 縦の折り目がこのビューを横切り、[mode] が分ける場合（[FoldSplit.ALWAYS] なら平らでも、[FoldSplit.FOLDED] なら半開きのときだけ）、
+     * ビューの中での折り目の左端と右端（px）。そうでなければ null
+     */
+    fun splitIn(view: View, mode: FoldSplit): Pair<Float, Float>? {
+        val wanted = when (mode) {
+            FoldSplit.ALWAYS -> true
+            FoldSplit.FOLDED -> halfOpened
+            FoldSplit.NEVER -> false
+        }
+        if (!vertical || !wanted || view.width == 0) return null
         val at = IntArray(2)
         view.getLocationOnScreen(at)
         val left = (screen.left - at[0]).toFloat()
@@ -40,6 +48,22 @@ data class Hinge(val screen: Rect, val vertical: Boolean, val halfOpened: Boolea
 
         /** 折り目まで伸ばしても、キーの高さはふだんの高さのこの割合より低くしない */
         const val MIN_FIT_ROW_FRACTION = 0.6f
+    }
+}
+
+/** 縦の折り目で画面キーボードを左右に分けるか（設定の「折り目で分ける」） */
+enum class FoldSplit {
+    /** 平らに開いていても分ける */
+    ALWAYS,
+
+    /** 折り曲げた（半開き）ときだけ分ける（既定） */
+    FOLDED,
+
+    /** 分けない（折りたたみでない広い画面のテンキーも分けない） */
+    NEVER;
+
+    companion object {
+        fun of(name: String?): FoldSplit = entries.firstOrNull { it.name == name } ?: FOLDED
     }
 }
 

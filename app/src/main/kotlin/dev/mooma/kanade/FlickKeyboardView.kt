@@ -129,6 +129,16 @@ class FlickKeyboardView(
     private val bottomInset = BottomInsetTracker(this, "flick")
     val bottomSpace: Int get() = if (floating) 0 else bottomInset.value + (extraBottomDp * density).toInt()
 
+    /** 縦の折り目で左右に分けるか（設定） */
+    var foldSplit = FoldSplit.FOLDED
+        set(value) {
+            if (field == value) return
+            field = value
+            syncFold(animate = drawn && isAttachedToWindow && windowVisibility == VISIBLE)
+            requestLayout()
+            invalidate()
+        }
+
     /** 浮かせているとき（下の余白を取らない） */
     var floating = false
         set(value) {
@@ -227,7 +237,7 @@ class FlickKeyboardView(
 
     private fun syncFold(animate: Boolean) {
         val h = hinge.takeIf { !floating }
-        laidOutSplit = h?.splitIn(this)
+        laidOutSplit = h?.splitIn(this, foldSplit)
         fold.update(laidOutSplit, h?.heightBelow, animate)
     }
     private val gap = 3 * density
@@ -280,7 +290,7 @@ class FlickKeyboardView(
      */
     private fun layoutCells(w: Int) {
         val split = fold.lastSplit?.takeIf { fold.splitting }
-        val wide = hinge == null && ScreenWidth.isWide(context, w)
+        val wide = hinge == null && foldSplit != FoldSplit.NEVER && ScreenWidth.isWide(context, w)
         val left = listOf("undo", "emoji", "voice", "mode")
         val right = listOf("backspace", "tab", "space", "enter")
         fun block(out: MutableList<Pair<Slot, RectF>>, x0: Float, width: Float, withLeft: Boolean, withRight: Boolean) {
@@ -593,10 +603,10 @@ class FlickKeyboardView(
                 } else if (t.dir != FlickTables.Dir.TAP) return
                 if (fn == "tab") sendTab(code) else actions.key(code)
                 t.repeated = true
-                handler.postAtTime(this, id, android.os.SystemClock.uptimeMillis() + 50)
+                handler.postAtTime(this, id, android.os.SystemClock.uptimeMillis() + KeyRepeat.intervalMs)
             }
         }
-        handler.postAtTime(tick, id, android.os.SystemClock.uptimeMillis() + 400)
+        handler.postAtTime(tick, id, android.os.SystemClock.uptimeMillis() + KeyRepeat.delayMs)
     }
 
     private fun fire(t: Touch) {

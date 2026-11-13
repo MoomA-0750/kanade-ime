@@ -222,7 +222,7 @@ class SoftKeyboardView(
 
     private fun syncFold(animate: Boolean) {
         val h = hinge.takeIf { !floating }
-        fold.update(h?.splitIn(this), h?.heightBelow, animate)
+        fold.update(h?.splitIn(this, foldSplit), h?.heightBelow, animate)
     }
 
     /** キーの幅の単位（ふつうは幅の 1/10。左右に分けたときは小さくなる） */
@@ -286,6 +286,16 @@ class SoftKeyboardView(
 
     /** キーの下に空けている高さ（絵文字パネルも同じだけ空ける） */
     val bottomSpace: Int get() = if (floating) 0 else bottomInset.value + (extraBottomDp * density).toInt()
+
+    /** 縦の折り目で左右に分けるか（設定） */
+    var foldSplit = FoldSplit.FOLDED
+        set(value) {
+            if (field == value) return
+            field = value
+            syncFold(animate = drawn && isAttachedToWindow && windowVisibility == VISIBLE)
+            requestLayout()
+            invalidate()
+        }
 
     /** 浮かせているとき（下の余白を取らない） */
     var floating = false
@@ -869,10 +879,10 @@ class SoftKeyboardView(
                 // 繰り返している間は1打だけの修飾を残す（Shift を1回押して ← を長押しで、続けて選択できるように）。離したときに外す
                 (t.visual?.center ?: actionOf(t))?.let { fire(it, consume = false) }
                 t.repeated = true
-                handler.postAtTime(this, id, android.os.SystemClock.uptimeMillis() + REPEAT_MS)
+                handler.postAtTime(this, id, android.os.SystemClock.uptimeMillis() + KeyRepeat.intervalMs)
             }
         }
-        handler.postAtTime(tick, id, android.os.SystemClock.uptimeMillis() + REPEAT_DELAY_MS)
+        handler.postAtTime(tick, id, android.os.SystemClock.uptimeMillis() + KeyRepeat.delayMs)
     }
 
     private fun fire(action: Action, consume: Boolean = true) {
@@ -965,7 +975,6 @@ class SoftKeyboardView(
     }
 
     companion object {
-        private const val REPEAT_DELAY_MS = 400L
         /** 左右に分けるとき、真ん中からこれ（キーの幅の単位）より近いキーの境目で分ける。遠ければまたがるキーを2つに分ける */
         private const val SPLIT_SNAP_UNITS = 0.75f
         /** Space のドラッグで1文字動かす指の距離 */
@@ -974,7 +983,6 @@ class SoftKeyboardView(
         private const val KEY_RADIUS_DP = 10f
         private const val PILL_IN_MS = 90L
         private const val PILL_OUT_MS = 280L
-        private const val REPEAT_MS = 50L
         private const val DOUBLE_TAP_MS = 350L
         private const val LONG_PRESS_MS = 450L
         /** タップの補いで候補にする近くのキー（中心までの距離。キーの大きさを 1 として） */

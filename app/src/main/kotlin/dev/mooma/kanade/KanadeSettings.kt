@@ -123,6 +123,21 @@ class KanadeSettings(context: Context) {
         get() = prefs.getInt(KEY_SOFT_KEYBOARD_BOTTOM, 0)
         set(value) = prefs.edit().putInt(KEY_SOFT_KEYBOARD_BOTTOM, value).apply()
 
+    /** 長押しで繰り返すキー（Backspace・矢印など）の、繰り返し始めるまでの待ち（ms） */
+    var repeatDelayMs: Int
+        get() = prefs.getInt(KEY_REPEAT_DELAY, KeyRepeat.DEFAULT_DELAY_MS).coerceIn(KeyRepeat.DELAY_RANGE)
+        set(value) = prefs.edit().putInt(KEY_REPEAT_DELAY, value).apply()
+
+    /** 長押しで繰り返す間隔（ms。短いほど速い） */
+    var repeatIntervalMs: Int
+        get() = prefs.getInt(KEY_REPEAT_INTERVAL, KeyRepeat.DEFAULT_INTERVAL_MS).coerceIn(KeyRepeat.INTERVAL_RANGE)
+        set(value) = prefs.edit().putInt(KEY_REPEAT_INTERVAL, value).apply()
+
+    /** 縦の折り目で画面キーボードを左右に分ける: ALWAYS（平らでも）・FOLDED（折り曲げたときだけ）・NEVER */
+    var foldSplit: FoldSplit
+        get() = FoldSplit.of(prefs.getString(KEY_FOLD_SPLIT, null))
+        set(value) = prefs.edit().putString(KEY_FOLD_SPLIT, value.name).apply()
+
     /** 話して句読点を入れる（「くてん」→「。」など） */
     var spokenPunctuation: Boolean
         get() = prefs.getBoolean(KEY_SPOKEN_PUNCT, true)
@@ -289,6 +304,9 @@ class KanadeSettings(context: Context) {
         const val KEY_SOFT_KEYBOARD = "soft_keyboard"
         const val KEY_SOFT_KEYBOARD_HEIGHT = "soft_keyboard_height"
         const val KEY_SOFT_KEYBOARD_BOTTOM = "soft_keyboard_bottom"
+        const val KEY_FOLD_SPLIT = "fold_split"
+        const val KEY_REPEAT_DELAY = "key_repeat_delay"
+        const val KEY_REPEAT_INTERVAL = "key_repeat_interval"
         const val KEY_SOFT_KEYBOARD_LAYOUT = "soft_keyboard_layout"
         const val KEY_FLICK_TOGGLE = "flick_toggle"
         const val KEY_ENABLED_LAYOUTS = "enabled_layouts"

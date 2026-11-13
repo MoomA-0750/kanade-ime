@@ -69,6 +69,11 @@
     <string name="input_height">Height</string>
     <string name="input_bottom_margin">Bottom margin</string>
     <string name="input_size_note">If the keyboard overlaps the navigation bar, increase the bottom margin. Changes apply the next time the keyboard opens.</string>
+    <string name="input_fold_split">Split at the fold</string>
+    <string name="input_fold_split_always">Even flat</string>
+    <string name="input_fold_split_folded">When folded</string>
+    <string name="input_fold_split_never">Never</string>
+    <string name="input_fold_split_note">Whether to split the keyboard on both sides of the fold when you hold a foldable upright. "Never" also stops the 12-key keyboard from splitting on wide non-foldable screens.</string>
     <string name="input_gestures_title">Gestures</string>
     <string name="input_gesture_swipe_keys">• Swipe a key toward a corner or edge to get the small character (number or symbol) printed on it.</string>
     <string name="input_gesture_modifiers">• Shift, Ctrl, Alt, and Fn apply to the next key only; press twice to lock. You can also hold one while pressing another key.</string>
@@ -111,6 +116,11 @@
     <string name="input_delete">Delete</string>
     <string name="input_swipe_distance">Swipe distance</string>
     <string name="input_swipe_distance_note">How far you must move your finger (as a share of the key width) before a touch counts as a swipe for numbers and symbols. Raise it if you often get symbols when you meant to type letters.</string>
+    <string name="input_repeat_delay">Delay before repeating</string>
+    <string name="input_repeat_speed">Repeat speed</string>
+    <string name="input_repeat_per_second">%1$d per second</string>
+    <string name="input_repeat_default">default</string>
+    <string name="input_repeat_note">Applies when you hold Backspace, the arrows and similar keys. Changes apply the next time the keyboard opens.</string>
     <string name="input_tap_correction">Correct off-target taps</string>
     <string name="input_tap_correction_note">On the Glide and 12-key layouts, when you tap near the edge between keys, Kanade picks the key whose character is more likely to come next in the word you\'re typing. Taps near the middle of a key are never changed.</string>
     <string name="input_zenz_mode_label">How zenz is used</string>

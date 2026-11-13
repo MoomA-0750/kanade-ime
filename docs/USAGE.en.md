@@ -144,6 +144,7 @@ Under "Layouts" in settings, choose which languages each layout is used for (Jap
 ### Foldable phones
 
 - When the phone is open like a book and bent (vertical fold, half open), the glide, full and 12-key keyboards split on either side of the fold, and no key sits on the fold (qwert | yuiop, asdfg | ghjkl, zxcv | vbnm, with g, v and Space on both halves). Opened flat, the keyboard joins back into one
+- "Split at the fold" in Settings → On-screen keyboard → Size chooses between "Even flat" (split even when opened flat), "When folded" (the default) and "Never"
 - When it is half open (L shape) with a horizontal fold (a Fold held sideways, a Flip held upright), the keyboard fills the screen from the bottom up to the fold. The upper half stays with the app. Opened flat, the keyboard goes back to the height in settings
 - Folding and unfolding moves the keys smoothly between the layouts
 - Neither happens while the keyboard is floating
@@ -190,7 +191,7 @@ Works the same way as Unexpected Keyboard, and shortcuts work as-is.
 - Fn+digits gives F1–F10, and Fn+`-` `=` gives F11 and F12 (`-` is at the top right of g, `=` at the top right of h)
 - Drag Space sideways to move the cursor along with your finger (it selects if Shift or similar is active). A short swipe moves one character
 - Swipe the Tab key up, down, left, or right for arrow keys, or toward the four corners for Home, End, PgUp, and PgDn
-- Hold Backspace to keep deleting; swipe it right for Delete. Letter keys also repeat when held
+- Hold Backspace to keep deleting; swipe it right for Delete. Letter keys also repeat when held. The delay before repeating and the repeat speed are in Settings → On-screen keyboard → Gestures
 - The あ/A key turns Japanese on and off. Swipe it up for the emoji panel, or down for the clipboard
 - The mic key records only while you hold it (same as the record key). A short press starts continuous listening
 

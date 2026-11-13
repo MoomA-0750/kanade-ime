@@ -215,14 +215,37 @@ fun ColumnScope.KeyboardScreen() {
         var bottom by rememberPref({ settings.softKeyboardBottom }, { settings.softKeyboardBottom = it })
         SliderRow(stringResource(R.string.input_bottom_margin), bottom, 0..64, 4, { bottom = it }) { "${it}dp" }
         Note(stringResource(R.string.input_size_note))
+        var foldSplit by rememberPref({ settings.foldSplit }, { settings.foldSplit = it })
+        Text(stringResource(R.string.input_fold_split), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
+        ConnectedChoices(
+            listOf(
+                dev.mooma.kanade.FoldSplit.ALWAYS to stringResource(R.string.input_fold_split_always),
+                dev.mooma.kanade.FoldSplit.FOLDED to stringResource(R.string.input_fold_split_folded),
+                dev.mooma.kanade.FoldSplit.NEVER to stringResource(R.string.input_fold_split_never),
+            ),
+            foldSplit, { foldSplit = it },
+        )
+        Note(stringResource(R.string.input_fold_split_note))
     }
 
     Section(stringResource(R.string.input_gestures_title)) {
+        val defaultLabel = stringResource(R.string.input_repeat_default)
+        val perSecondFormat = stringResource(R.string.input_repeat_per_second)
         var tapCorrection by rememberPref({ settings.tapCorrection }, { settings.tapCorrection = it })
         SwitchRow(stringResource(R.string.input_tap_correction), tapCorrection, { tapCorrection = it }, stringResource(R.string.input_tap_correction_note))
         var swipe by rememberPref({ settings.softKeyboardSwipe }, { settings.softKeyboardSwipe = it })
         SliderRow(stringResource(R.string.input_swipe_distance), swipe, 25..80, 5, { swipe = it }) { "$it%" }
         Note(stringResource(R.string.input_swipe_distance_note))
+        var repeatDelay by rememberPref({ settings.repeatDelayMs }, { settings.repeatDelayMs = it })
+        SliderRow(stringResource(R.string.input_repeat_delay), repeatDelay, dev.mooma.kanade.KeyRepeat.DELAY_RANGE, 50, { repeatDelay = it }) {
+            if (it == dev.mooma.kanade.KeyRepeat.DEFAULT_DELAY_MS) "${it}ms ($defaultLabel)" else "${it}ms"
+        }
+        var repeatInterval by rememberPref({ settings.repeatIntervalMs }, { settings.repeatIntervalMs = it })
+        SliderRow(stringResource(R.string.input_repeat_speed), repeatInterval, dev.mooma.kanade.KeyRepeat.INTERVAL_RANGE, 10, { repeatInterval = it }) {
+            val perSecond = String.format(perSecondFormat, 1000 / it)
+            if (it == dev.mooma.kanade.KeyRepeat.DEFAULT_INTERVAL_MS) "$perSecond ($defaultLabel)" else perSecond
+        }
+        Note(stringResource(R.string.input_repeat_note))
         for (line in listOf(
             R.string.input_gesture_swipe_keys,
             R.string.input_gesture_modifiers,

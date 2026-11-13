@@ -69,6 +69,11 @@
     <string name="input_height">高さ</string>
     <string name="input_bottom_margin">下の余白</string>
     <string name="input_size_note">ナビゲーションバーに重なるときは、下の余白を増やしてください。次にキーボードを出したときから変わります。</string>
+    <string name="input_fold_split">折り目で左右に分ける</string>
+    <string name="input_fold_split_always">平らでも</string>
+    <string name="input_fold_split_folded">折ったときだけ</string>
+    <string name="input_fold_split_never">分けない</string>
+    <string name="input_fold_split_note">折りたたみの端末を縦に持ったとき、キーボードを折り目の左右に分けるかどうかです。「分けない」にすると、折りたたみでない広い画面のテンキーも分けません。</string>
     <string name="input_gestures_title">操作</string>
     <string name="input_gesture_swipe_keys">・キーを隅や上下左右へ払うと、小さく書いてある文字（数字・記号）が出ます。</string>
     <string name="input_gesture_modifiers">・Shift・Ctrl・Alt・Fn は次の1打だけ効き、2回続けて押すと固定します。押したまま別のキーを押す同時押しもできます。</string>
@@ -111,6 +116,11 @@
     <string name="input_delete">削除</string>
     <string name="input_swipe_distance">払いと見なす距離</string>
     <string name="input_swipe_distance_note">キーの幅に対して、どれだけ指を動かしたら払い（数字・記号）にするかです。文字を打ったつもりが記号や数字になるときは大きくしてください。</string>
+    <string name="input_repeat_delay">長押しで繰り返すまでの待ち</string>
+    <string name="input_repeat_speed">繰り返す速さ</string>
+    <string name="input_repeat_per_second">毎秒 %1$d 回</string>
+    <string name="input_repeat_default">既定</string>
+    <string name="input_repeat_note">Backspace・矢印などを押し続けたときです。次にキーボードを出したときから変わります。</string>
     <string name="input_tap_correction">タップのずれを補う</string>
     <string name="input_tap_correction_note">グライドとテンキーで、キーの境目あたりを触ったときは、入力中の語のあとに来やすい文字のキーにします。キーの真ん中あたりを触ったときは、そのキーのままです。</string>
     <string name="input_zenz_mode_label">zenz の使い方</string>
