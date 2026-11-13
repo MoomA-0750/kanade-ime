@@ -215,16 +215,23 @@ fun ColumnScope.KeyboardScreen() {
         var bottom by rememberPref({ settings.softKeyboardBottom }, { settings.softKeyboardBottom = it })
         SliderRow(stringResource(R.string.input_bottom_margin), bottom, 0..64, 4, { bottom = it }) { "${it}dp" }
         Note(stringResource(R.string.input_size_note))
-        var foldSplit by rememberPref({ settings.foldSplit }, { settings.foldSplit = it })
         Text(stringResource(R.string.input_fold_split), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
-        ConnectedChoices(
-            listOf(
-                dev.mooma.kanade.FoldSplit.ALWAYS to stringResource(R.string.input_fold_split_always),
-                dev.mooma.kanade.FoldSplit.FOLDED to stringResource(R.string.input_fold_split_folded),
-                dev.mooma.kanade.FoldSplit.NEVER to stringResource(R.string.input_fold_split_never),
-            ),
-            foldSplit, { foldSplit = it },
+        val splitChoices = listOf(
+            dev.mooma.kanade.FoldSplit.ALWAYS to stringResource(R.string.input_fold_split_always),
+            dev.mooma.kanade.FoldSplit.FOLDED to stringResource(R.string.input_fold_split_folded),
+            dev.mooma.kanade.FoldSplit.NEVER to stringResource(R.string.input_fold_split_never),
         )
+        val layoutNames = mapOf(
+            "GLIDE" to stringResource(R.string.input_layout_glide),
+            "QWERTY" to stringResource(R.string.input_layout_qwerty),
+            "FLICK" to stringResource(R.string.input_layout_flick),
+        )
+        // 配列ごとに選ぶ
+        for (id in LAYOUTS) androidx.compose.runtime.key(id) {
+            var split by rememberPref({ settings.foldSplit(id) }, { settings.setFoldSplit(id, it) })
+            Text(layoutNames.getValue(id), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
+            ConnectedChoices(splitChoices, split, { split = it })
+        }
         Note(stringResource(R.string.input_fold_split_note))
     }
 

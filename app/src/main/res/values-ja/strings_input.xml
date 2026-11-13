@@ -73,7 +73,7 @@
     <string name="input_fold_split_always">平らでも</string>
     <string name="input_fold_split_folded">折ったときだけ</string>
     <string name="input_fold_split_never">分けない</string>
-    <string name="input_fold_split_note">折りたたみの端末を縦に持ったとき、キーボードを折り目の左右に分けるかどうかです。「分けない」にすると、折りたたみでない広い画面のテンキーも分けません。</string>
+    <string name="input_fold_split_note">折りたたみの端末を縦に持ったとき、キーボードを折り目の左右に分けるかどうかです。配列ごとに選べます。「分けない」にすると、折りたたみでない広い画面のテンキーも分けません。</string>
     <string name="input_gestures_title">操作</string>
     <string name="input_gesture_swipe_keys">・キーを隅や上下左右へ払うと、小さく書いてある文字（数字・記号）が出ます。</string>
     <string name="input_gesture_modifiers">・Shift・Ctrl・Alt・Fn は次の1打だけ効き、2回続けて押すと固定します。押したまま別のキーを押す同時押しもできます。</string>

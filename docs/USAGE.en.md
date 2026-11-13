@@ -144,7 +144,7 @@ Under "Layouts" in settings, choose which languages each layout is used for (Jap
 ### Foldable phones
 
 - When the phone is open like a book and bent (vertical fold, half open), the glide, full and 12-key keyboards split on either side of the fold, and no key sits on the fold (qwert | yuiop, asdfg | ghjkl, zxcv | vbnm, with g, v and Space on both halves). Opened flat, the keyboard joins back into one
-- "Split at the fold" in Settings → On-screen keyboard → Size chooses between "Even flat" (split even when opened flat), "When folded" (the default) and "Never"
+- "Split at the fold" in Settings → On-screen keyboard → Size chooses between "Even flat" (split even when opened flat), "When folded" (the default) and "Never", separately for Glide, Full keyboard and 12-key
 - When it is half open (L shape) with a horizontal fold (a Fold held sideways, a Flip held upright), the keyboard fills the screen from the bottom up to the fold. The upper half stays with the app. Opened flat, the keyboard goes back to the height in settings
 - Folding and unfolding moves the keys smoothly between the layouts
 - Neither happens while the keyboard is floating

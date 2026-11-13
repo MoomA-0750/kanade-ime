@@ -133,10 +133,14 @@ class KanadeSettings(context: Context) {
         get() = prefs.getInt(KEY_REPEAT_INTERVAL, KeyRepeat.DEFAULT_INTERVAL_MS).coerceIn(KeyRepeat.INTERVAL_RANGE)
         set(value) = prefs.edit().putInt(KEY_REPEAT_INTERVAL, value).apply()
 
-    /** 縦の折り目で画面キーボードを左右に分ける: ALWAYS（平らでも）・FOLDED（折り曲げたときだけ）・NEVER */
-    var foldSplit: FoldSplit
-        get() = FoldSplit.of(prefs.getString(KEY_FOLD_SPLIT, null))
-        set(value) = prefs.edit().putString(KEY_FOLD_SPLIT, value.name).apply()
+    /**
+     * 配列（GLIDE・QWERTY・FLICK）ごとに、縦の折り目で画面キーボードを左右に分けるか: ALWAYS（平らでも）・FOLDED（折り曲げたときだけ）・NEVER。
+     * 配列ごとの値がなければ、前の全体の設定（[KEY_FOLD_SPLIT]）、それもなければ FOLDED
+     */
+    fun foldSplit(layout: String): FoldSplit =
+        FoldSplit.of(prefs.getString(KEY_FOLD_SPLIT + "_" + layout, null) ?: prefs.getString(KEY_FOLD_SPLIT, null))
+
+    fun setFoldSplit(layout: String, value: FoldSplit) = prefs.edit().putString(KEY_FOLD_SPLIT + "_" + layout, value.name).apply()
 
     /** 話して句読点を入れる（「くてん」→「。」など） */
     var spokenPunctuation: Boolean

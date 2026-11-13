@@ -73,7 +73,7 @@
     <string name="input_fold_split_always">Even flat</string>
     <string name="input_fold_split_folded">When folded</string>
     <string name="input_fold_split_never">Never</string>
-    <string name="input_fold_split_note">Whether to split the keyboard on both sides of the fold when you hold a foldable upright. "Never" also stops the 12-key keyboard from splitting on wide non-foldable screens.</string>
+    <string name="input_fold_split_note">Whether to split the keyboard on both sides of the fold when you hold a foldable upright, for each layout. "Never" also stops the 12-key keyboard from splitting on wide non-foldable screens.</string>
     <string name="input_gestures_title">Gestures</string>
     <string name="input_gesture_swipe_keys">• Swipe a key toward a corner or edge to get the small character (number or symbol) printed on it.</string>
     <string name="input_gesture_modifiers">• Shift, Ctrl, Alt, and Fn apply to the next key only; press twice to lock. You can also hold one while pressing another key.</string>

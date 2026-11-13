@@ -898,11 +898,10 @@ class KanadeInputMethodService : InputMethodService() {
         flickView?.floating = floating
         KeyRepeat.delayMs = settings.repeatDelayMs.toLong()
         KeyRepeat.intervalMs = settings.repeatIntervalMs.toLong()
-        val foldSplit = settings.foldSplit
-        keyboardView?.foldSplit = foldSplit
-        flickView?.foldSplit = foldSplit
+        flickView?.foldSplit = settings.foldSplit("FLICK")
         keyboardView?.let { k ->
             k.glideLayout = settings.softKeyboardLayout == "GLIDE"
+            k.foldSplit = settings.foldSplit(if (k.glideLayout) "GLIDE" else "QWERTY")
             if (k.glideLayout) loadGlide()
             if (settings.tapCorrection && settings.softKeyboardLayout != "QWERTY") loadTapModels()
             k.japanese = engine.japanese
