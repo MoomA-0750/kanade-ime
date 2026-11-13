@@ -70,8 +70,10 @@ object SettingsBackup {
         val prefs = root.optJSONObject("prefs") ?: JSONObject()
         val shared = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val keep = shared.all.filterKeys { it in LOCAL_KEYS }
-        val editor = shared.edit().clear()
-        for ((key, value) in keep) if (value is Long) editor.putLong(key, value)
+        // Windows・Linux・macOS の書き出し（source が desktop）は Android 版の項目の一部しか持たないので、ファイルに無い項目は今のまま残す
+        val fromDesktop = root.optString("source") == "desktop"
+        val editor = if (fromDesktop) shared.edit() else shared.edit().clear()
+        if (!fromDesktop) for ((key, value) in keep) if (value is Long) editor.putLong(key, value)
         var count = 0
         for (key in prefs.keys()) {
             if (key in LOCAL_KEYS) continue

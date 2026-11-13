@@ -34,10 +34,13 @@ Android 版・Windows 版・Linux 版と同じ入力（ライブ変換・zenz �
 
 ## 設定
 
-入力メニューの「設定…」「音声入力…」「ユーザー辞書…」「スニペット…」か、`~/Applications/Kanade Settings.app` で開く。中身は入力・音声入力・ユーザー辞書・スニペット・Android 版の設定の読み込みと書き出し。変えると、エンジンが 2 秒ほどで読み直す。ファイル（`~/Library/Application Support/Kanade/settings.properties` など）を直接書き換えてもよい。項目は Linux 版と同じ（`docs/LINUX-USAGE.md`）。
+入力メニューの「設定…」「音声入力…」「ユーザー辞書…」「スニペット…」か、`~/Applications/Kanade Settings.app` で開く。中身は Linux 版・Windows 版と同じで、入力・音声入力（録音キーを押して決める、モデルを落とす・消す）・ユーザー辞書とスニペット（一覧で足す・直す・消す、テキストでまとめて編集）・設定の保存と読み込み・使い方。変えると、エンジンが 2 秒ほどで読み直す。ファイル（`~/Library/Application Support/Kanade/settings.properties` など）を直接書き換えてもよい。項目は Linux 版と同じ（`docs/LINUX-USAGE.md`）。
+
+## ほかの Kanade との行き来
+
+設定の画面の「設定の保存と読み込み」で、設定・ユーザー辞書・スニペットを1つのファイル（kanade-settings-….json）に書き出し、ほかの Kanade で読み込む。Android・Windows・Linux・Mac のどれで書き出したものも、どれでも読める。録音キー・英語のモデル・表示の言語は Windows・Linux・Mac のあいだで引き継ぎ、Android 版は読み飛ばす（Android 版は、PC の版から読んだときは、ファイルに無い Android 版だけの設定を今のまま残す）。
 
 ## まだできないこと
 
 - 聞き続けるモード、声のコマンド・取り消しなど Android 版だけの音声の機能（Windows 版・Linux 版と同じ）
-- 設定の画面からの音声のモデルの取得（`install.sh --voice` で落とす）
 - メニューバーの印は「日本語」のときも直接入力のときも同じ

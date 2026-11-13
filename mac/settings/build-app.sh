@@ -7,6 +7,6 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 echo "設定の画面をビルドする"
 swiftc -O -parse-as-library -target "$(uname -m)-apple-macos14.0" -framework SwiftUI -framework AppKit \
-  SettingsApp.swift -o "$APP/Contents/MacOS/KanadeSettings"
+  *.swift -o "$APP/Contents/MacOS/KanadeSettings"
 cp Info.plist "$APP/Contents/Info.plist"
 codesign --force --sign - "$APP"

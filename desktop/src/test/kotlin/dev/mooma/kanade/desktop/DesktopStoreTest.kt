@@ -78,6 +78,27 @@ class DesktopStoreTest {
         assertEquals("かなで Kanade\nもあ MoomA\n", b.read(b.userDictionaryFile))
     }
 
+    /** Windows・Linux・macOS のあいだでは、表示の言語・英語のモデル・録音キーも持ち出せる。Android 版には source=desktop で知らせる */
+    @Test
+    fun desktopOnlySettingsTravel() {
+        val a = store()
+        a.ensureFiles()
+        a.saveSettings(DesktopSettings(uiLanguage = "en", voiceFinalEn = "whisper-turbo", voiceHoldKeys = "F9,Super_R", voiceToggleKey = ""))
+        val json = File(a.dir, "out.json")
+        a.exportAndroid(json)
+        val root = org.json.JSONObject(json.readText())
+        assertEquals("desktop", root.getString("source"))
+        assertFalse(root.getJSONObject("prefs").has("voice_hold_keys"))
+        val b = store()
+        b.ensureFiles()
+        b.importAndroid(json)
+        val s = b.loadSettings()
+        assertEquals("en", s.uiLanguage)
+        assertEquals("whisper-turbo", s.voiceFinalEn)
+        assertEquals("F9,Super_R", s.voiceHoldKeys)
+        assertEquals("", s.voiceToggleKey)
+    }
+
     @Test
     fun rejectsOtherFiles() {
         val s = store()

@@ -11,6 +11,11 @@
 	<key>CFBundleVersion</key><string>1</string>
 	<key>LSMinimumSystemVersion</key><string>14.0</string>
 	<key>NSPrincipalClass</key><string>NSApplication</string>
+	<key>CFBundleURLTypes</key>
+	<array><dict>
+		<key>CFBundleURLName</key><string>dev.mooma.kanade.Settings</string>
+		<key>CFBundleURLSchemes</key><array><string>kanade-settings</string></array>
+	</dict></array>
 	<key>CFBundleDevelopmentRegion</key><string>ja</string>
 	<key>CFBundleLocalizations</key><array><string>ja</string><string>en</string></array>
 </dict>

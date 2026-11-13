@@ -154,7 +154,17 @@ class DesktopStore(val dir: File = defaultDir()) {
             spokenPunctuation = take(KEY_SPOKEN_PUNCT, { it as? Boolean }, now.spokenPunctuation),
             learning = take(KEY_LEARNING, { it as? Boolean }, now.learning),
             voiceFinal = take(KEY_VOICE_FINAL, { v -> (v as? String)?.takeIf { id -> VoiceFinal.entries.any { it.id == id } } }, now.voiceFinal),
-        )
+        ).let { base ->
+            // Windows・Linux・macOS だけの項目（Android 版は持たないので、prefs ではなく "desktop" に入れる）
+            val d = root.optJSONObject("desktop") ?: return@let base
+            fun str(key: String) = if (d.has(key)) d.optString(key) else null
+            base.copy(
+                uiLanguage = str(KEY_UI_LANGUAGE)?.takeIf { it in UI_LANGUAGES }?.also { count++ } ?: base.uiLanguage,
+                voiceFinalEn = str(KEY_VOICE_FINAL_EN)?.takeIf { id -> VoiceFinal.entries.any { it.id == id && it.english } }?.also { count++ } ?: base.voiceFinalEn,
+                voiceHoldKeys = str(KEY_VOICE_HOLD)?.let(::keyList)?.also { count++ } ?: base.voiceHoldKeys,
+                voiceToggleKey = str(KEY_VOICE_TOGGLE)?.let(::keyList)?.also { count++ } ?: base.voiceToggleKey,
+            )
+        }
         val files = root.optJSONObject("files") ?: JSONObject()
         var fileCount = 0
         for ((name, target) in listOf("user_dictionary.txt" to userDictionaryFile, "snippets.txt" to snippetsFile)) {
@@ -169,6 +179,7 @@ class DesktopStore(val dir: File = defaultDir()) {
 
     /**
      * Android 版の「設定の読み込み」で読める形（kanade-settings の JSON）で書き出す。項目名と型は Android 版と同じ。
+     * Windows・Linux・macOS だけの項目（表示の言語・英語のモデル・録音キー）は "desktop" に入れ、ほかの PC 版で読み込める。
      * 学習・前回の日本語のオン/オフは入れない（Android 版の書き出しと同じく、その端末での記録のため）
      */
     fun exportAndroid(json: File) {
@@ -186,11 +197,19 @@ class DesktopStore(val dir: File = defaultDir()) {
         val files = JSONObject()
         if (userDictionaryFile.exists()) files.put("user_dictionary.txt", userDictionaryFile.readText())
         if (snippetsFile.exists()) files.put("snippets.txt", snippetsFile.readText())
+        val desktop = JSONObject()
+            .put(KEY_UI_LANGUAGE, s.uiLanguage)
+            .put(KEY_VOICE_FINAL_EN, s.voiceFinalEn)
+            .put(KEY_VOICE_HOLD, s.voiceHoldKeys)
+            .put(KEY_VOICE_TOGGLE, s.voiceToggleKey)
         val root = JSONObject()
             .put("format", "kanade-settings")
             .put("version", 1)
             .put("exportedAt", System.currentTimeMillis())
+            // Android 版はこれを見て、ファイルに無い項目を今のまま残す（Windows・Linux・macOS の書き出しは Android 版の項目の一部しか持たないため）
+            .put("source", "desktop")
             .put("prefs", prefs)
+            .put("desktop", desktop)
             .put("files", files)
         write(json, root.toString(2))
     }

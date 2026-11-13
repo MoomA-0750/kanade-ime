@@ -52,7 +52,8 @@ bash mac/settings/build-app.sh "$D"
 cat > "$E/bin/kanade-settings" <<'SH'
 #!/bin/sh
 # Kanade の設定の画面を開く。引数は開くページ（input・voice・dictionary・snippets・backup）
-exec open -a "$HOME/Applications/Kanade Settings.app" --args "$@"
+# kanade-settings://<ページ>。開いていなければ起こし、開いていればそのページへ移る
+exec open "kanade-settings://${1:-input}"
 SH
 chmod +x "$E/bin/kanade-settings"
 cp mac/install.sh mac/uninstall.sh docs/THIRD-PARTY.md "$D/" 2>/dev/null || true
