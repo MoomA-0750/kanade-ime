@@ -128,6 +128,14 @@
 - 11-4（仮）設定の画面は、同じ中身の GTK 版（GTK4・libadwaita、`linux/settings/kanade-settings-gtk.py`、Python）と QML 版（C++・Qt Quick・Material、`linux/settings/qt`）の2つ。入力・音声入力（録音キー、話した句読点、日本語と英語のモデルを選んで落とす・消す）・ユーザー辞書とスニペット（一覧で足す/直す/消す、テキストでまとめて編集）・Android 版の設定の読み込みと書き出し・使い方。変えたらすぐ保存し、エンジンが読み直す。どちらで変えても同じファイルに同じ形で書く。fcitx5 のメニューの「Kanade: 設定・音声入力・ユーザー辞書・スニペット」とアプリの一覧の「Kanade の設定」から開く。開く入口は選び役の `kanade-settings`（引数は開くページ）で、`KANADE_UI=gtk|qt` があればそれ、なければ QML 版が入っていて `XDG_CURRENT_DESKTOP` に GNOME が含まれないときは QML 版、ほかは GTK 版（選んだ方が無ければもう一方）。QML 版は Omarchy のテーマ（`~/.local/state/omarchy/current/theme/colors.toml`）の色と、Hyprland の角の丸み（`decoration:rounding`）に合わせ、テーマを替えるとその場で変わる。Omarchy が無ければ Material の基本の色。確かめ方: 選び役は `linux/settings/tests/test-selector.sh`、QML 版の中身は `linux/settings/qt/tests/tst_backend`（テーマの読み取りと見張りの付け直し・設定のファイル・キーの名前・エンジンへの頼みごと）と `tests/compat.sh`（GTK 版と同じ操作で同じファイルができる）、見た目は `tests/shoot.sh` で Omarchy の暗いテーマ・明るいテーマ・角の丸みあり・狭い幅・英語を撮って見た（`docs/decisions.md` 2026-11-09）
 - 11-5（仮）配布物は使う機械の上でビルドする（`scripts/linux.sh build <ssh の相手>`。ネイティブは -mcpu=native）。入れる先はエンジンとアドオンが `~/.local/share/kanade`、アドオンの設定が `~/.local/share/fcitx5`（Library にフルパスを書く。sudo は要らない）、設定が `~/.config/kanade`、記録が `~/.local/state/kanade/engine.log`
 
+## 12. macOS 版
+
+- 12-1（仮）Windows 版・Linux 版と同じエンジン（desktop）を、macOS の入力ソース「Kanade」（InputMethodKit のアプリ、`mac/ime`、Swift）として使える。アプリがキーを Windows の仮想キーに写してエンジンへソケット（`~/Library/Application Support/Kanade/engine.sock`）で送り、返ってきた命令で入力中の文字（未変換は下線、変換中の文節は細い下線、選んでいる文節は太い下線。IMK の mark(forStyle:) の見た目）・確定・候補の窓（自分で描く。9件ずつの頁で、2頁以上なら「1/3」。説明も出し、クリックで選べる。macOS 26 からは Liquid Glass、それより前はぼかし）・カーソルの近くの表示（「あ」「A」、音声入力）を書く。エンジンが止まっていれば、アプリが起動したときと最初のキーで起こす（起動のあいだのキーは素通し）。入力メニューに「設定・音声入力・ユーザー辞書・スニペット・記録」。macOS 13 以上、Apple シリコンと Intel。確かめ方: エンジンは Mac（M1・macOS 27）で `kanade-engine send` をソケット越しに流して変換と確定を見た。入力ソースとしての動きはまだ画面で確かめていない（ssh からは入力ソースを選べない）
+- 12-2（仮）日本語と英字の切り替えは macOS の入力ソースが受け持つ（英字は ABC など。Control+Space・地球儀キー）。Kanade に入ったとき（入力欄に戻ったときも）はいつも日本語。JIS 配列のかなキーは日本語、英数キーはエンジンの直接入力。右 Option の単押しは日本語のオン/オフ（ただし既定では右 Option は録音キーなので、音声入力が先に取る）
+- 12-3（仮）音声入力はどの入力ソースでも使える（Linux 版の 11-3 と同じ決まり。録音キーの名前も同じで、Alt_R は右 Option、Super_R は右 Command）。アプリがシステム全体のキーを見る（CGEventTap。アクセシビリティの許可が要り、許可されるまで数秒ごとに試す）。Kanade のときは日本語のモデル、ほかの入力ソースのときは英語のモデル。ほかの入力ソースのときの確定は、キー配列（ABC など）なら文字のキーとして書き、ほかの入力方式（ことえりなど）ならクリップボードを借りて Command+V で入れ、0.6 秒後に戻す。途中の文字はカーソルの近く（アクセシビリティで取れなければマウスの近く）に出す。マイクの許可は Kanade.app に付く（エンジンは Kanade.app の子として動く）。確かめ方: 音声認識は Mac で `kanade-engine voice` に見本の音声を流して句読点付きの文になるのを見た。録音キーとマイクはまだ確かめていない
+- 12-4（仮）設定の画面は SwiftUI のアプリ（`mac/settings`、「Kanade の設定」、`~/Applications/Kanade Settings.app`、macOS 14 以上）。入力・音声入力（録音キーは名前で書く、日本語と英語のモデルを選ぶ。落としていないモデルは「未取得」）・ユーザー辞書とスニペット（テキストでまとめて編集）・Android 版の設定の読み込みと書き出し・覚えた変換を消す。settings.properties は変えた行だけ書き換え、エンジンが読み直す。入力メニューから開く（エンジンが `engine/bin/kanade-settings <ページ>` を呼ぶ）
+- 12-5（仮）配布物は使う Mac の上でビルドする（`scripts/mac.sh build <ssh の相手>`。JDK と cmake は手元から送るので Homebrew は要らない。Xcode が要る）。入れる先はエンジンが `~/Library/Application Support/Kanade/engine`、入力ソースが `~/Library/Input Methods/Kanade.app`（ad-hoc 署名、`Kanade --install` で登録して有効にする）、設定・辞書・学習が `~/Library/Application Support/Kanade`、記録が `~/Library/Logs/Kanade`（`engine.log`・`ime.log`）。sudo は要らない。入れ直しても落とした音声のモデルは残す
+
 ## 予定（作ると決めたもの）
 
 - DeX のキー表（`docs/DEX-KEYS.md`）を作る。作り終えたら、キー記録（9-4）を既定でオフにする（2026-10-14、本人。次にこのリポジトリで作業するとき最初に行う）
@@ -143,4 +151,5 @@
 - zenz の使い方の既定を「確かめて直す」にした（評価セット 202 文で正解は並べ替えと同じ 187、Fold 7 で中央値 5.8ms と 24.7ms）。間違え方は違う（「また後で寝」「ひなたぼっこ」は並べ替えのほうが良く、「着いたら」「仕様を」「開いている」は確かめて直すほうが良い）。使ってみて本人が決める
 - Windows 版・Linux 版（desktop）は zenz の使い方の設定がなく、並べ替えのまま。予測の候補の並べ替えには対応した
 - Linux 版: 本人が実際に話した声ではまだ確かめていない（仮のマイクに見本の音声を流して確かめた）。入力欄のないところ（アプリの外）では録音キーは効かない。IBus には対応していない
+- macOS 版: 入力ソースとしての打ち心地（入力中の文字の見た目、候補の窓の位置、アプリごとの違い）、録音キー、マイクとアクセシビリティの許可の流れを、Mac の画面でまだ確かめていない。モードは「日本語」1つだけで、メニューバーの印は「あ」「A」に変わらない（英字は ABC へ切り替える）
 - 公開する前の確認: zenz-v3.2 の許諾（Apache-2.0 は HuggingFace のタグでしか確かめていない）、使い方の文体（設定画面は「〜します。」にそろえた）

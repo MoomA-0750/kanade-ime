@@ -215,9 +215,10 @@ class DesktopStore(val dir: File = defaultDir()) {
             value.split(',').map { k -> k.trim().filter { it.isLetterOrDigit() || it == '+' || it == '_' } }.filter { it.isNotEmpty() }.joinToString(",")
         val UI_LANGUAGES = listOf("auto", "ja", "en")
 
-        /** Windows は %APPDATA%\Kanade、Linux は $XDG_CONFIG_HOME/kanade（ふつうは ~/.config/kanade） */
+        /** Windows は %APPDATA%\Kanade、macOS は ~/Library/Application Support/Kanade、Linux は $XDG_CONFIG_HOME/kanade（ふつうは ~/.config/kanade） */
         fun defaultDir(): File {
             System.getenv("APPDATA")?.let { return File(it, "Kanade") }
+            if (Os.isMac) return Os.macSupport()
             val config = System.getenv("XDG_CONFIG_HOME")?.takeIf { it.isNotEmpty() } ?: (System.getProperty("user.home") + "/.config")
             return File(config, "kanade")
         }

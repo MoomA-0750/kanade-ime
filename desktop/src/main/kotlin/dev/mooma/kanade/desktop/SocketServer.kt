@@ -103,12 +103,14 @@ class SocketServer(private val path: Path, private val host: EngineHost, private
         }.getOrDefault(false)
 
         /**
-         * Windows は %USERPROFILE%\.kanade\engine.sock、ほかは $XDG_RUNTIME_DIR/kanade-engine.sock。
+         * Windows は %USERPROFILE%\.kanade\engine.sock、macOS は ~/Library/Application Support/Kanade/engine.sock、ほかは $XDG_RUNTIME_DIR/kanade-engine.sock。
          * AppData に置かないのは、パッケージ化されたアプリ（Windows Terminal など）では AppData が仮想化され、
          * そこに置いたソケットへの接続が WSAEINVAL（10022）になるため
          */
         fun defaultPath(): Path {
             if (System.getenv("LOCALAPPDATA") != null) return Path.of(System.getProperty("user.home"), ".kanade", "engine.sock")
+            // macOS: 入力方式のアプリ（mac/）と同じ場所を見る
+            if (Os.isMac) return Os.macSupport().toPath().resolve("engine.sock")
             val runtime = System.getenv("XDG_RUNTIME_DIR") ?: System.getProperty("java.io.tmpdir")
             return Path.of(runtime, "kanade-engine.sock")
         }

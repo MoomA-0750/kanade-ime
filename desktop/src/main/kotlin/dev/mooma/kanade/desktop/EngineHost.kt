@@ -64,8 +64,8 @@ class EngineHost(
         when (f[0]) {
             "hello" -> synchronized(lock) {
                 client.send(reply(0, listOf(ImeCommand.ModeChanged(engine.japanese)), false))
-                // fcitx5 のアドオンには、どの入力方式でも効く録音キーを教える（Windows の DLL は F12 をキーとして送ってくる）
-                if (f.getOrNull(3) == "fcitx5") {
+                // fcitx5 のアドオンと macOS の入力方式には、どの入力方式でも効く録音キーを教える（Windows の DLL は F12 をキーとして送ってくる）
+                if (f.getOrNull(3) == "fcitx5" || f.getOrNull(3) == "macos") {
                     fcitxClients.add(client)
                     client.send(voiceKeysLines())
                 }

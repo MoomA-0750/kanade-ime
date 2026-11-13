@@ -48,9 +48,10 @@ fun main(args: Array<String>) {
     }
 }
 
-/** エンジンの記録: Windows は %LOCALAPPDATA%\Kanade\engine.log、Linux は $XDG_STATE_HOME/kanade/engine.log（ふつうは ~/.local/state/kanade） */
+/** エンジンの記録: Windows は %LOCALAPPDATA%\Kanade\engine.log、macOS は ~/Library/Logs/Kanade/engine.log、Linux は $XDG_STATE_HOME/kanade/engine.log（ふつうは ~/.local/state/kanade） */
 fun logFile(): File {
     System.getenv("LOCALAPPDATA")?.let { return File(it, "Kanade\\engine.log") }
+    if (Os.isMac) return File(Os.macLibrary("Logs"), "engine.log")
     val state = System.getenv("XDG_STATE_HOME")?.takeIf { it.isNotEmpty() } ?: (System.getProperty("user.home") + "/.local/state")
     return File(state, "kanade/engine.log")
 }

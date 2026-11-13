@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key><string>ja</string>
+	<key>CFBundleExecutable</key><string>Kanade</string>
+	<key>CFBundleIdentifier</key><string>dev.mooma.inputmethod.Kanade</string>
+	<key>CFBundleName</key><string>Kanade</string>
+	<key>CFBundleDisplayName</key><string>Kanade</string>
+	<key>CFBundlePackageType</key><string>APPL</string>
+	<key>CFBundleShortVersionString</key><string>0.1</string>
+	<key>CFBundleVersion</key><string>1</string>
+	<key>LSMinimumSystemVersion</key><string>13.0</string>
+	<key>LSBackgroundOnly</key><true/>
+	<key>LSUIElement</key><true/>
+	<key>NSPrincipalClass</key><string>NSApplication</string>
+	<key>NSMicrophoneUsageDescription</key><string>音声入力で、録音キーを押している間だけ声を録音して文字にします。</string>
+	<key>InputMethodConnectionName</key><string>dev.mooma.inputmethod.Kanade_Connection</string>
+	<key>InputMethodServerControllerClass</key><string>KanadeInputController</string>
+	<key>TISInputSourceID</key><string>dev.mooma.inputmethod.Kanade</string>
+	<key>TISIntendedLanguage</key><string>ja</string>
+	<key>tsInputMethodCharacterRepertoireKey</key><array><string>Hira</string><string>Kana</string><string>Latn</string></array>
+	<key>tsInputMethodIconFileKey</key><string>icon.tiff</string>
+	<key>ComponentInputModeDict</key>
+	<dict>
+		<key>tsInputModeListKey</key>
+		<dict>
+			<key>dev.mooma.inputmethod.Kanade.Japanese</key>
+			<dict>
+				<key>TISInputSourceID</key><string>dev.mooma.inputmethod.Kanade.Japanese</string>
+				<key>TISIntendedLanguage</key><string>ja</string>
+				<key>TISIconIsTemplate</key><true/>
+				<key>tsInputModeScriptKey</key><string>smJapanese</string>
+				<key>tsInputModePrimaryInScriptKey</key><true/>
+				<key>tsInputModeIsVisibleKey</key><true/>
+				<key>tsInputModeDefaultStateKey</key><true/>
+				<key>tsInputModeMenuIconFileKey</key><string>icon.tiff</string>
+				<key>tsInputModeAlternateMenuIconFileKey</key><string>icon.tiff</string>
+				<key>tsInputModePaletteIconFileKey</key><string>icon.tiff</string>
+				<key>tsInputModeCharacterRepertoireKey</key><array><string>Hira</string><string>Kana</string><string>Latn</string></array>
+			</dict>
+		</dict>
+		<key>tsVisibleInputModeOrderedArrayKey</key><array><string>dev.mooma.inputmethod.Kanade.Japanese</string></array>
+	</dict>
+</dict>
+</plist>

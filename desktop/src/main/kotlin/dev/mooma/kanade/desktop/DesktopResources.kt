@@ -63,6 +63,7 @@ class DesktopResources(private val dataDir: File, private val cacheDir: File = d
         fun defaultCacheDir(): File {
             val local = System.getenv("LOCALAPPDATA")
             if (local != null) return File(local, "Kanade\\cache")
+            if (Os.isMac) return Os.macLibrary("Caches")
             val cache = System.getenv("XDG_CACHE_HOME")?.takeIf { it.isNotEmpty() } ?: (System.getProperty("user.home") + "/.cache")
             return File(cache, "kanade")
         }

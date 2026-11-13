@@ -136,8 +136,11 @@ class DesktopApp(
 
     /** メモ帳で開く（保存するとエンジンが読み直す） */
     private fun open(file: File) {
-        if (System.getProperty("os.name").startsWith("Windows")) {
+        if (Os.isWindows) {
             ProcessBuilder("notepad.exe", file.absolutePath).start()
+        } else if (Os.isMac) {
+            // macOS: テキストエディットなど、ふだんのテキストのエディタで開く
+            runCatching { ProcessBuilder("open", "-t", file.absolutePath).start() }.onFailure { log("開けない: ${file.path} $it") }
         } else {
             // Linux: xdg-open で、ふだん使うエディタで開く（java.awt.Desktop は Wayland だけの環境で使えないことがある）
             runCatching { ProcessBuilder("xdg-open", file.absolutePath).start() }.onFailure { log("開けない: ${file.path} $it") }
