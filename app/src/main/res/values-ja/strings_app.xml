@@ -2,7 +2,7 @@
 <!-- 設定アプリの全体・試験と記録・書き出しと読み込み・表示言語（日本語。既定の英語は values/strings_app.xml） -->
 <resources>
     <!-- 見出し -->
-    <string name="app_header_subtitle">物理キーボードのための日本語入力</string>
+    <string name="app_header_subtitle">物理キーボードと画面キーボードの日本語入力・音声入力</string>
     <string name="app_back">戻る</string>
 
     <!-- 左の一覧の区画 -->

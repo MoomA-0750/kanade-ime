@@ -39,6 +39,8 @@ class SoftKeyboardView(
     private val onText: (String) -> Unit = {},
     /** 🎤 を押したまま払って離した: 録音を捨てる */
     private val onVoiceCancel: () -> Unit = { onVoice(false) },
+    /** 設定の画面を開く（Esc を上に払う・グライドの ?123 を左に払う） */
+    private val onSettings: () -> Unit = {},
 ) : View(context) {
 
     /** なぞった軌跡と、そのときの文字のキーの中心・幅（同じ座標） */
@@ -82,6 +84,8 @@ class SoftKeyboardView(
         data object SwitchLayout : Action
         /** 浮かせる・固定に戻す */
         data object Float : Action
+        /** Kanade の設定の画面を開く */
+        data object Settings : Action
         /** グライドの配列のページを替える（?123・ABC・=\\<） */
         data class ToPage(val page: Page) : Action
     }
@@ -596,7 +600,7 @@ class SoftKeyboardView(
 
     /** 修飾・Esc・Tab・⌫・あ/A・🎤 は機能のキーの色にする */
     private fun isFunctionKey(action: Action) = when (action) {
-        is Action.Modifier, Action.ToggleJapanese, Action.Voice, Action.Emoji, Action.Clipboard, Action.SwitchLayout, Action.Float, is Action.ToPage -> true
+        is Action.Modifier, Action.ToggleJapanese, Action.Voice, Action.Emoji, Action.Clipboard, Action.SwitchLayout, Action.Float, Action.Settings, is Action.ToPage -> true
         is Action.Code -> true
         is Action.Text -> false
     }
@@ -627,6 +631,7 @@ class SoftKeyboardView(
         Action.Clipboard -> R.drawable.sym_content_paste
         Action.SwitchLayout -> R.drawable.sym_dialpad
         Action.Float -> R.drawable.sym_picture_in_picture_alt
+        Action.Settings -> R.drawable.sym_settings
         is Action.Text -> if (action.char == ' ') R.drawable.sym_space_bar else null
         Action.ToggleJapanese, is Action.ToPage -> null
     }
@@ -663,6 +668,7 @@ class SoftKeyboardView(
         Action.Clipboard -> "📋"
         Action.SwitchLayout -> "⌨"
         Action.Float -> "▭"
+        Action.Settings -> "⚙"
         is Action.ToPage -> when (action.page) {
             Page.LETTERS -> "ABC"
             Page.SYMBOLS -> "?123"
@@ -894,6 +900,7 @@ class SoftKeyboardView(
             Action.Clipboard -> onClipboard()
             Action.SwitchLayout -> onSwitchLayout()
             Action.Float -> onFloat()
+            Action.Settings -> onSettings()
             is Action.ToPage -> {
                 // 数字/記号を使わない設定のグライドでは、?123 で数字/記号を使える別の配列へ（IME が引き受けたら true）
                 if (page == Page.LETTERS && action.page == Page.SYMBOLS && onSymbolsPage?.invoke() == true) return
@@ -1012,13 +1019,14 @@ class SoftKeyboardView(
          */
         /**
          * グライドの配列（Gboard に近い）。文字のキーには払いを置かない（なぞるとグライドになるため）。
-         * 左下の ?123 で記号のページ、上に払うと配列の切り替え、下に払うとフロート。あ/A は上で絵文字・下でクリップボード
+         * 左下の ?123 で記号のページ、上に払うと配列の切り替え、下に払うとフロート、左に払うと設定の画面。あ/A は上で絵文字・下でクリップボード
          */
         fun glideLayout(page: Page): List<List<Key>> {
             val bottom = listOf(
                 Key(
                     1.3f, Action.ToPage(if (page == Page.LETTERS) Page.SYMBOLS else Page.LETTERS),
-                    mapOf(Dir.N to Action.SwitchLayout, Dir.S to Action.Float),
+                    // 左に払うと設定の画面
+                    mapOf(Dir.N to Action.SwitchLayout, Dir.S to Action.Float, Dir.W to Action.Settings),
                 ),
                 Key(1f, Action.ToggleJapanese, mapOf(Dir.N to Action.Emoji, Dir.S to Action.Clipboard)),
                 Key(0.9f, Action.Voice),
@@ -1091,8 +1099,8 @@ class SoftKeyboardView(
                 Key(0.8f, Action.Modifier(Mod.FN)),
                 // Meta（Windows キー・⌘ にあたる。DeX のショートカットなど）は Alt を上に払う
                 Key(0.8f, Action.Modifier(Mod.ALT), mapOf(Dir.N to Action.Modifier(Mod.META))),
-                // Esc のキーを上に払うと、フリック配列に切り替える
-                Key(1f, code(KeyEvent.KEYCODE_ESCAPE, "Esc")),
+                // Esc のキーを上に払うと、設定の画面を開く
+                Key(1f, code(KeyEvent.KEYCODE_ESCAPE, "Esc"), mapOf(Dir.N to Action.Settings)),
                 Key(
                     2.4f, t(' '),
                     mapOf(

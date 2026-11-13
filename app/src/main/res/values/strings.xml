@@ -2,5 +2,5 @@
 <!-- 既定（英語）。日本語は values-ja。画面ごとの文字は strings_*.xml に分けてある -->
 <resources>
     <string name="app_name">Kanade</string>
-    <string name="subtype_ja">Japanese (physical keyboard)</string>
+    <string name="subtype_ja">Japanese</string>
 </resources>

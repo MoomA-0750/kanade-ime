@@ -2,7 +2,7 @@
 <!-- 設定アプリの全体・試験と記録・書き出しと読み込み・表示言語（英語。日本語は values-ja/strings_app.xml） -->
 <resources>
     <!-- Header -->
-    <string name="app_header_subtitle">Japanese input for physical keyboards</string>
+    <string name="app_header_subtitle">Japanese input and voice typing for physical and on-screen keyboards</string>
     <string name="app_back">Back</string>
 
     <!-- List groups -->

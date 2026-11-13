@@ -50,6 +50,8 @@ class FlickKeyboardView(
         fun switchToQwerty()
         /** 浮かせる・固定に戻す */
         fun toggleFloat()
+        /** 設定の画面を開く */
+        fun openSettings() = Unit
     }
 
     enum class Layout(val table: List<FlickTables.Key>) { KANA(FlickTables.KANA), ALPHABET(FlickTables.ALPHABET), NUMBER(FlickTables.NUMBER) }
@@ -427,6 +429,7 @@ class FlickKeyboardView(
             if (fn == "mode") {
                 drawIcon(canvas, R.drawable.sym_keyboard, cx, cell.rect.top + 10 * density, 11 * density, palette.dim)
                 drawIcon(canvas, R.drawable.sym_picture_in_picture_alt, cx, cell.rect.bottom - 10 * density, 11 * density, palette.dim)
+                drawIcon(canvas, R.drawable.sym_settings, cell.rect.left + 10 * density, cy, 11 * density, palette.dim)
             }
             return
         }
@@ -631,6 +634,8 @@ class FlickKeyboardView(
                     "mode" -> when (t.dir) {
                         FlickTables.Dir.UP -> actions.switchToQwerty()
                         FlickTables.Dir.DOWN -> actions.toggleFloat()
+                        // 左に払うと設定の画面
+                        FlickTables.Dir.LEFT -> actions.openSettings()
                         else -> actions.nextSource()
                     }
                 }

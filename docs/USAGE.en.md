@@ -1,6 +1,6 @@
 # How to use Kanade
 
-Kanade is a Japanese input method built for physical keyboards. When no physical keyboard is connected, you can type with the on-screen keyboard.
+Kanade is a Japanese input method with voice typing, for physical and on-screen keyboards. When no physical keyboard is connected, you can type with the on-screen keyboard.
 
 ## Getting started
 
@@ -173,7 +173,7 @@ Slide your finger across the QWERTY letter keys without lifting it to enter a wo
 - Spellings with doubled letters (like kk for "っ") or differing vowel length (たのし vs. たのしい) produce the same glide shape. The more common one comes first, so pick from the candidates when it's wrong
 - Glide one word at a time (Japanese uses about 60,000 readings from the Mozc dictionary; English has about 32,000 words, including contractions like i'm and don't)
 - ?123 at the bottom left switches to the numbers and symbols page, and =\< there switches to a page of more symbols (「」, €, etc.). ABC brings you back to letters
-- Swipe ?123 up to switch layouts, or down to float the keyboard. Swipes on あ/A, Space, and Backspace work the same as on the full keyboard
+- Swipe ?123 up to switch layouts, down to float the keyboard, or left to open settings. Swipes on あ/A, Space, and Backspace work the same as on the full keyboard
 
 ### Tap correction
 
@@ -187,6 +187,7 @@ Works the same way as Unexpected Keyboard, and shortcuts work as-is.
 - Shift, Ctrl, Alt, and Fn apply to the next keystroke only. Press twice to lock them (press again to release). While active, the key becomes pill-shaped. Switching layouts (to Glide or the 12-key) releases them
 - You can also hold a modifier while pressing another key (hold Ctrl and press a to select all; hold Shift and swipe Space left to select one character at a time). Modifier presses and releases are sent to the app too, so Shift+arrow selection and app shortcuts work just like on a physical keyboard
 - Swipe Ctrl up to switch to the 12-key layout, or down to float the keyboard (same position and directions as "あa1" on 12-key)
+- Swipe Esc up to open settings
 - Swipe Alt up for Meta (⌘, the equivalent of the Windows key)
 - Fn+digits gives F1–F10, and Fn+`-` `=` gives F11 and F12 (`-` is at the top right of g, `=` at the top right of h)
 - Drag Space sideways to move the cursor along with your finger (it selects if Shift or similar is active). A short swipe moves one character
@@ -202,7 +203,7 @@ A 12-key layout that works like Gboard's. Tap the center character of a key for 
 - "小゛゜" adds or removes a voiced mark, semi-voiced mark, or small form on the previous character (か→が, は→ば→ぱ, つ→っ→づ)
 - Pressing the same key repeatedly cycles to the next character (toggle input; you can turn this off in settings). ↶ steps back one
 - Swipe ↶ left to select all, right to redo, up to copy, and down to paste (it sends Ctrl+A, Ctrl+Shift+Z, Ctrl+C, and Ctrl+V)
-- "あa1" switches between kana, letters, and numbers. Swipe it up for QWERTY
+- "あa1" switches between kana, letters, and numbers. Swipe it up for QWERTY, or left to open settings
 - Tap ☺ for emoji, or swipe it for the clipboard
 - The mic key records only while you hold it (same as the mic on QWERTY). A short tap keeps listening
 - The left column is ↶, ☺, mic, and あa1; the right column is Backspace, Tab, Space (converts while composing), and Enter

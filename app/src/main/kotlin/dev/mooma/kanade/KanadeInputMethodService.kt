@@ -190,7 +190,7 @@ class KanadeInputMethodService : InputMethodService() {
         val keyboard = SoftKeyboardView(
             this, ::softKey, ::nextSource, ::softVoice, ::showEmojiPanel,
             onClipboard = ::showClipboard, onSwitchLayout = ::switchLayout, onFloat = ::toggleFloat,
-            onGlide = ::onGlide, onText = { flickActions.text(it) }, onVoiceCancel = ::cancelVoice,
+            onGlide = ::onGlide, onText = { flickActions.text(it) }, onVoiceCancel = ::cancelVoice, onSettings = ::openSettings,
         )
         keyboard.tapCorrector = ::correctLetterTap
         keyboard.onSymbolsPage = ::symbolsElsewhere
@@ -291,6 +291,16 @@ class KanadeInputMethodService : InputMethodService() {
         override fun voiceCancel() = cancelVoice()
         override fun switchToQwerty() = switchLayout()
         override fun toggleFloat() = this@KanadeInputMethodService.toggleFloat()
+        override fun openSettings() = this@KanadeInputMethodService.openSettings()
+    }
+
+    /** 画面キーボードから設定の画面を開く（キーボードは閉じる。入力欄から外れるので） */
+    private fun openSettings() {
+        requestHideSelf(0)
+        startActivity(
+            android.content.Intent(this, SettingsActivity::class.java)
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED),
+        )
     }
 
     /** クリップボードの履歴（コピーされるたびに足す。設定で切れる） */
