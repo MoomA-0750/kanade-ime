@@ -23,6 +23,7 @@ const QMap<QString, QString> &defaults()
         {"live_conversion", "true"},
         {"punctuation", "、。"},
         {"pair_brackets", "true"},
+        {"emoji_shortcodes", "true"},
         {"spoken_punctuation", "true"},
         {"voice_final", "parakeet"},
         {"learning", "true"},
@@ -38,6 +39,7 @@ const QMap<QString, QString> &defaults()
 const QMap<QString, QString> &comments()
 {
     static const QMap<QString, QString> c{
+        {"emoji_shortcodes", "# : に続けて絵文字の名前を打つと絵文字を候補に出す（:rocket → 🚀）"},
         {"voice_final_en", "# Linux 版: 英語の口述のモデル（Kanade 以外の入力方式で録音キーを押したとき。parakeet-en・whisper-small・whisper-turbo）"},
         {"voice_hold_keys", "# Linux 版: どの入力方式でも、押している間だけ録音するキー（fcitx5 のキーの名前をカンマ区切り。例 F12,Alt_R,F9）"},
         {"voice_toggle_key", "# Linux 版: 押すたびに録音を始める・終えるキー（例 Control+Alt+space。空なら使わない）。録音中の Esc で取り消す"},

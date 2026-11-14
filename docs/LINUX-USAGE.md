@@ -24,6 +24,7 @@ Android 版・Windows 版と同じ入力（ライブ変換・zenz の並べ替�
 - ローマ字で打つと、打つたびに変換した結果が出る（ライブ変換）。Enter で確定
 - Space で変換し、候補の窓（fcitx5 が描く）から Space・↑↓・数字・クリックで選ぶ。9件ずつの頁で、頁が2つ以上なら窓の上に「1/3」のように出る。←→ で文節を移り、Shift+←→ で区切りを変える
 - F6〜F10（または Ctrl+U/I/O/P/T）でひらがな・カタカナ・半角カナ・全角英数・半角英数
+- `:` に続けて絵文字の英語の名前を打つと、合う絵文字が候補に出る（`:rocket` → 🚀。Enter・数字・閉じの `:` で入る。Esc でふつうの文字に戻る。詳しくは `docs/USAGE.md` の「絵文字を名前で入れる」）
 
 ## 音声入力（どの入力方式でも）
 
@@ -45,7 +46,7 @@ Android 版・Windows 版と同じ入力（ライブ変換・zenz の並べ替�
 
 ファイルを直接書き換えてもよい:
 
-- `~/.config/kanade/settings.properties`: 項目は Windows 版と同じ（`live_conversion`・`full_width_symbols`・`punctuation`・`pair_brackets`・`toggle_triggers`・`spoken_punctuation`・`voice_final`・`learning`・`ui_language`）と、Linux 版だけの `voice_final_en`（parakeet-en・whisper-small・whisper-turbo）・`voice_hold_keys`（fcitx5 のキーの名前をカンマ区切り。例 `F12,Alt_R`）・`voice_toggle_key`（例 `Control+Alt+space`。空なら使わない）
+- `~/.config/kanade/settings.properties`: 項目は Windows 版と同じ（`live_conversion`・`full_width_symbols`・`punctuation`・`pair_brackets`・`emoji_shortcodes`・`toggle_triggers`・`spoken_punctuation`・`voice_final`・`learning`・`ui_language`）と、Linux 版だけの `voice_final_en`（parakeet-en・whisper-small・whisper-turbo）・`voice_hold_keys`（fcitx5 のキーの名前をカンマ区切り。例 `F12,Alt_R`）・`voice_toggle_key`（例 `Control+Alt+space`。空なら使わない）
   - `voice_final` は parakeet・reazon・sensevoice・whisper-small・whisper-kotoba・whisper-turbo（落としたものだけ使える。parakeet と reazon 以外は自分で `~/.local/share/kanade/data` に置く）
   - `ui_language`（auto・ja・en）: auto は LANG に合わせる（日本語でなければ英語）
 - `~/.config/kanade/user_dictionary.txt`・`snippets.txt`: 書式は Android 版と同じ

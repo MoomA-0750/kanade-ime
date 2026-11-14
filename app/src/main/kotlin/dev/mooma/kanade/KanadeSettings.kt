@@ -285,9 +285,14 @@ class KanadeSettings(context: Context) {
         get() = prefs.getBoolean(KEY_PAIR_BRACKETS, true)
         set(value) = prefs.edit().putBoolean(KEY_PAIR_BRACKETS, value).apply()
 
+    /** `:` に続けて絵文字の名前を打つと絵文字を候補に出す（`:rocket` → 🚀） */
+    var emojiShortcodes: Boolean
+        get() = prefs.getBoolean(KEY_EMOJI_SHORTCODES, true)
+        set(value) = prefs.edit().putBoolean(KEY_EMOJI_SHORTCODES, value).apply()
+
     fun engineSettings() = EngineSettings(
         fullWidthSymbols = fullWidthSymbols, liveConversion = liveConversion, punctuation = punctuation, pairBrackets = pairBrackets,
-        prediction = prediction,
+        prediction = prediction, emojiShortcodes = emojiShortcodes,
     )
 
     private companion object {
@@ -316,6 +321,7 @@ class KanadeSettings(context: Context) {
         const val KEY_ENABLED_LAYOUTS = "enabled_layouts"
         const val KEY_GLIDE_ZENZ = "glide_zenz"
         const val KEY_PAIR_BRACKETS = "pair_brackets"
+        const val KEY_EMOJI_SHORTCODES = "emoji_shortcodes"
         const val KEY_SWIPE = "soft_keyboard_swipe"
         const val KEY_TAP_CORRECTION = "tap_correction"
         const val KEY_LAYOUT_MODES = "layout_modes_"

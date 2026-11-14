@@ -15,6 +15,8 @@
     <string name="input_full_width_symbols_summary">When off, they are typed in half width. Both appear as conversion candidates.</string>
     <string name="input_pair_brackets_title">Insert brackets in pairs</string>
     <string name="input_pair_brackets_summary">Typing 「 or （ also inserts the closing bracket and puts the cursor inside. Pressing Space on empty brackets cycles through 「」『』【】 and more.</string>
+    <string name="input_emoji_shortcodes_title">Emoji by name</string>
+    <string name="input_emoji_shortcodes_summary">Type : and an emoji name to pick the emoji from the candidates (:rocket → 🚀). Names are the same as on Slack and GitHub. Press Enter, a number, or : to insert it; Esc types the letters as usual.</string>
     <string name="input_punctuation_label">Punctuation (typed with , and .)</string>
     <string name="input_conversion_title">Conversion</string>
     <string name="input_live_conversion_title">Live conversion</string>

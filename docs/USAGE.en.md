@@ -107,6 +107,18 @@ Register a reading (in hiragana) and a word. Registered words are preferred in c
 でっくす DeX
 ```
 
+## Emoji by name
+
+Type `:` and an emoji's English name to see matching emoji in the candidate window (`:rocket` → 🚀, `:+1` → 👍, `:sushi` → 🍣). The names are the same as on Slack and GitHub (the 1,870 names of gemoji). This works both in Japanese input and in direct input.
+
+- Names that start with what you typed come first (`:rock` shows 🚀 🪨 🤘 and more). Tags match too (`:launch` → 🚀). Emoji you picked recently come first
+- Enter inserts the highlighted emoji and a number inserts that one. Typing the closing `:` (`:rocket:`) also inserts it. Space (in Japanese input), ↑↓ and Tab move the highlight. You can also click or tap a candidate
+- When no emoji matches any more, the text turns back into ordinary typing (`:arigatou` becomes 「：ありがとう」). Esc does the same
+- A `:` right after a letter or digit does not start it (`10:30`, `http://`). A `:` in the middle of typing kana stays 「：」 as before
+- In direct input, Space types a space without inserting an emoji (for emoticons like `:p `)
+- Snippets whose key starts with `:` (like `:)`) take priority
+- Turn it off with "Emoji by name" in settings. You can still convert Japanese readings to emoji (すし → 🍣)
+
 ## Snippets
 
 The moment you finish typing a key, it is replaced with its output. Snippets work both in Japanese input and in direct input.

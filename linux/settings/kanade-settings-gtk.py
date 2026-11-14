@@ -48,6 +48,7 @@ DEFAULTS = {
     "live_conversion": "true",
     "punctuation": "、。",
     "pair_brackets": "true",
+    "emoji_shortcodes": "true",
     "spoken_punctuation": "true",
     "voice_final": "parakeet",
     "learning": "true",
@@ -59,6 +60,7 @@ DEFAULTS = {
 
 # ファイルにないときに足す説明（エンジンが書くものと同じ）
 COMMENTS = {
+    "emoji_shortcodes": "# : に続けて絵文字の名前を打つと絵文字を候補に出す（:rocket → 🚀）",
     "voice_final_en": "# Linux 版: 英語の口述のモデル（Kanade 以外の入力方式で録音キーを押したとき。parakeet-en・whisper-small・whisper-turbo）",
     "voice_hold_keys": "# Linux 版: どの入力方式でも、押している間だけ録音するキー（fcitx5 のキーの名前をカンマ区切り。例 F12,Alt_R,F9）",
     "voice_toggle_key": "# Linux 版: 押すたびに録音を始める・終えるキー（例 Control+Alt+space。空なら使わない）。録音中の Esc で取り消す",
@@ -419,6 +421,9 @@ class SettingsWindow(Adw.ApplicationWindow):
                          T("開き括弧を打つと閉じ括弧も入れ、カーソルを中に置きます。空の括弧で Space を押すと括弧の種類が替わります",
                            "Typing an opening bracket also inserts the closing one and puts the cursor between them. "
                            "Press Space in empty brackets to change their kind"), "pair_brackets"))
+        g.add(switch_row(T("絵文字を名前で入れる", "Emoji by name"),
+                         T(":（コロン）に続けて絵文字の英語の名前を打つと、候補から選べます（:rocket → 🚀）。名前は Slack・GitHub と同じ。Enter・数字・: で入り、Esc でふつうの文字に戻ります",
+                           "Type : and an emoji name to pick it from the candidates (:rocket → 🚀). Names are the same as on Slack and GitHub. Enter, a number or : inserts it; Esc types the letters as usual"), "emoji_shortcodes"))
         page.add(g)
 
         g = group(T("日本語と英字の切り替え", "Switching between Japanese and English"),

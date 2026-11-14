@@ -65,6 +65,12 @@ class KanadeInputMethodService : InputMethodService() {
     private var bar: CandidateBar? = null
     private var barShown = false
 
+    /**
+     * 入力中に帯だけを閉じた（帯だけの窓を requestHideSelf で隠した）。このとき呼ばれる onFinishInputView は、
+     * 既定ではアプリの未確定文字列を確定してしまうので、入力を続けられるよう確定させない（絵文字の名前・予測の窓を閉じたとき）
+     */
+    private var hidingBarWhileComposing = false
+
     /** 重ねる窓の帯（権限があればこちらを使う） */
     private var overlay: OverlayBar? = null
 
@@ -2002,9 +2008,18 @@ class KanadeInputMethodService : InputMethodService() {
         overlay?.hide()
         if (barShown) {
             barShown = false
+            hidingBarWhileComposing = engine.isComposing
             setCandidatesViewShown(false)
             requestHideSelf(0)
         }
+    }
+
+    override fun onFinishInputView(finishingInput: Boolean) {
+        val keepComposing = hidingBarWhileComposing && !finishingInput && engine.isComposing
+        hidingBarWhileComposing = false
+        log("finish-input-view finishing=$finishingInput keep=$keepComposing")
+        // 既定の動き（未確定文字列を確定する）は、帯を閉じただけのときはしない
+        if (!keepComposing) super.onFinishInputView(finishingInput)
     }
 
     private fun updateStatusIcon() {

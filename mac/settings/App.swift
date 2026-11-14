@@ -161,6 +161,11 @@ struct InputPage: View {
                     Text(T("開き括弧を打つと閉じ括弧も入れ、カーソルを中に置きます。空の括弧で Space を押すと括弧の種類が替わります",
                            "Typing an opening bracket also inserts the closing one and puts the cursor between them. Press Space in empty brackets to change their kind"))
                 }
+                Toggle(isOn: settings.bool("emoji_shortcodes")) {
+                    Text(T("絵文字を名前で入れる", "Emoji by name"))
+                    Text(T(":（コロン）に続けて絵文字の英語の名前を打つと、候補から選べます（:rocket → 🚀）。名前は Slack・GitHub と同じ。Enter・数字・: で入り、Esc でふつうの文字に戻ります",
+                           "Type : and an emoji name to pick it from the candidates (:rocket → 🚀). Names are the same as on Slack and GitHub. Enter, a number or : inserts it; Esc types the letters as usual"))
+                }
             }
             Section {
                 LabeledContent(T("切り替えのキーを変える", "Change the switching keys")) {

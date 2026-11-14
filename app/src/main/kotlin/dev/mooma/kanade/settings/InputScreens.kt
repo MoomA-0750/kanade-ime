@@ -58,6 +58,11 @@ fun ColumnScope.InputScreen() {
             stringResource(R.string.input_pair_brackets_title), pairBrackets, { pairBrackets = it },
             stringResource(R.string.input_pair_brackets_summary),
         )
+        var emojiShortcodes by rememberPref({ settings.emojiShortcodes }, { settings.emojiShortcodes = it })
+        SwitchRow(
+            stringResource(R.string.input_emoji_shortcodes_title), emojiShortcodes, { emojiShortcodes = it },
+            stringResource(R.string.input_emoji_shortcodes_summary),
+        )
         Text(stringResource(R.string.input_punctuation_label))
         var punctuation by rememberPref({ settings.punctuation }, { settings.punctuation = it })
         ConnectedChoices(listOf("、。", "，．", "、．", "，。").map { it to it }, punctuation, { punctuation = it })

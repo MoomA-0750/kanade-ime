@@ -1,5 +1,6 @@
 package dev.mooma.kanade.core
 
+import dev.mooma.kanade.core.dict.EmojiShortcodes
 import dev.mooma.kanade.core.dict.Snippets
 
 /** Android のキーイベントから独立した入力。どの物理キーがどれになるかは IME 側が決める */
@@ -119,6 +120,8 @@ data class EngineSettings(
     val prediction: Boolean = false,
     /** 予測の候補の数 */
     val predictionCount: Int = 5,
+    /** `:` に続けて英字で絵文字の名前を打つと、合う絵文字を候補に出す（`:rocket` → 🚀。[EmojiShortcodes]） */
+    val emojiShortcodes: Boolean = true,
 )
 
 /** 文節（読みと、いま選んでいる表記） */
@@ -216,6 +219,18 @@ class InputEngine(
     /** スニペット（打った文字の末尾がキーになった瞬間に置き換える） */
     var snippets: Snippets = Snippets.EMPTY
 
+    /** 絵文字の短い名前の表。null なら core に入れてある表（試験で差し替える） */
+    var emojiTable: EmojiShortcodes? = null
+    private val emoji: EmojiShortcodes get() = emojiTable ?: EmojiShortcodes.default
+
+    /** `:` から打っている絵文字の名前（`:` の後ろ）。null なら絵文字の名前を打っていない */
+    private var emojiQuery: String? = null
+    private var emojiMatches: List<EmojiShortcodes.Match> = emptyList()
+    private var emojiSelected = 0
+
+    /** 最近選んだ絵文字（新しい順）。名前が合う候補の中で先に出す */
+    private val emojiRecent = ArrayList<String>()
+
     /** 直接入力（日本語オフ）で続けて打った文字。スニペットのキーを見るため。文字以外のキーで捨てる */
     private val directTyped = StringBuilder()
 
@@ -306,7 +321,7 @@ class InputEngine(
     /** 直前の F6〜F10 の変換先（英字のときの F8 を半角英字にするため） */
     private var lastWidth: WidthTarget? = null
 
-    val isComposing: Boolean get() = units.isNotEmpty() || romaji.pending.isNotEmpty()
+    val isComposing: Boolean get() = units.isNotEmpty() || romaji.pending.isNotEmpty() || emojiQuery != null
     val isConverting: Boolean get() = segs.isNotEmpty()
 
     /** 確定済みのかな（読み）。綴りの途中は含まない */
@@ -332,6 +347,7 @@ class InputEngine(
 
     val composingText: String
         get() {
+            emojiQuery?.let { return ":$it" }
             if (isConverting) return segs.joinToString("") { it.surface }
             if (editingInside) return textBeforeCaret() + units.drop(caret).joinToString("") { it.text }
             val closers = trailingClosers
@@ -352,10 +368,12 @@ class InputEngine(
     private fun textBeforeCaret() = units.take(caret).joinToString("") { it.text } + romaji.pending
 
     fun handle(input: KeyInput): EngineResult {
-        val result = when (input) {
-            is KeyInput.SetJapanese -> setMode(input.on)
-            KeyInput.ToggleJapanese -> setMode(!japanese)
-            else -> if (japanese) handleJapanese(input) else handleDirect(input)
+        val result = when {
+            input is KeyInput.SetJapanese -> setMode(input.on)
+            input == KeyInput.ToggleJapanese -> setMode(!japanese)
+            emojiQuery != null -> handleEmoji(input)
+            japanese -> handleJapanese(input)
+            else -> handleDirect(input)
         }
         return result.copy(commands = result.commands + predictionView())
     }
@@ -560,9 +578,11 @@ class InputEngine(
             directTyped.clear()
             return pass()
         }
+        val prev = directTyped.lastOrNull()
         directTyped.append(input.char)
         if (directTyped.length > MAX_TYPED) directTyped.delete(0, directTyped.length - MAX_TYPED)
-        val (key, output) = snippets.matchSuffix(directTyped) ?: return pass()
+        val (key, output) = snippets.matchSuffix(directTyped)
+            ?: return if (startsEmoji(input.char, prev)) startEmoji() else pass()
         directTyped.clear()
         return EngineResult(listOf(ImeCommand.ReplaceBeforeCursor(key.dropLast(1), input.char, output)), consumed = true)
     }
@@ -607,6 +627,14 @@ class InputEngine(
 
     /** アプリ側の事情（入力欄の切り替えなど）や Enter で、いま出しているものを確定させる */
     fun commitAll(): List<ImeCommand> {
+        if (emojiQuery != null) {
+            // 見えているとおり（`:` と打った名前）を確定する
+            val text = composingText
+            val shown = emojiMatches.isNotEmpty()
+            endEmoji()
+            leftContext = (leftContext + text).takeLast(MAX_CONTEXT)
+            return listOfNotNull(ImeCommand.Commit(text), ImeCommand.HideCandidates.takeIf { shown })
+        }
         if (!isComposing) return emptyList()
         flushPending()
         // 末尾の「n」が「ん」になるなどで読みが変わったら、辞書の1位を取り直す（並べ替えの依頼は捨てる）
@@ -649,12 +677,13 @@ class InputEngine(
         predictionsFor = null
         predictionSelected = -1
         reconvertOriginal = null
+        endEmoji()
         requestId++
     }
 
     private fun setMode(on: Boolean): EngineResult {
         val commands = mutableListOf<ImeCommand>()
-        if (!on) commands += commitAll()
+        if (!on || emojiQuery != null) commands += commitAll()
         if (japanese != on) {
             japanese = on
             commands += ImeCommand.ModeChanged(on)
@@ -663,6 +692,7 @@ class InputEngine(
     }
 
     private fun handleJapanese(input: KeyInput): EngineResult {
+        if (!isComposing && input is KeyInput.Text && startsEmoji(input.char, leftContext.lastOrNull())) return startEmoji()
         if (!isComposing) {
             // 未確定がないときは、文字以外はアプリの通常動作に任せる
             if (input !is KeyInput.Text) return pass()
@@ -992,6 +1022,173 @@ class InputEngine(
         return listOf(rerankRequest(leftContext, r, fromDictionary, sentence = true))
     }
 
+    /** 絵文字の名前を打ち始めない間（打ち直しの途中）。true のあいだは `:` をふつうの文字にする */
+    private var replayingEmoji = false
+
+    /**
+     * [c] で絵文字の名前を打ち始めるか。`:` を、英数字の直後でないところで打ったとき（`10:30`・`http://` では始めない）
+     */
+    private fun startsEmoji(c: Char, before: Char?): Boolean =
+        c == ':' && settings.emojiShortcodes && !replayingEmoji && emoji.size > 0 &&
+            (before == null || !(before.code < 0x80 && before.isLetterOrDigit()))
+
+    private fun startEmoji(): EngineResult {
+        emojiQuery = ""
+        emojiMatches = emptyList()
+        emojiSelected = 0
+        return EngineResult(listOf(ImeCommand.SetComposing(":")), consumed = true)
+    }
+
+    private fun endEmoji() {
+        emojiQuery = null
+        emojiMatches = emptyList()
+        emojiSelected = 0
+    }
+
+    /** いまの名前に合う絵文字を出す。合うものがなければ、絵文字の名前ではなかったとして打ち直す */
+    private fun emojiView(): EngineResult {
+        val q = emojiQuery.orEmpty()
+        val wasShown = emojiMatches.isNotEmpty()
+        emojiMatches = emoji.search(q, emojiRecent)
+        emojiSelected = 0
+        if (q.isNotEmpty() && emojiMatches.isEmpty()) return EngineResult(replayEmoji(wasShown), consumed = true)
+        val commands = mutableListOf<ImeCommand>(ImeCommand.SetComposing(composingText))
+        commands += if (emojiMatches.isEmpty()) {
+            if (wasShown) ImeCommand.HideCandidates else return EngineResult(commands, consumed = true)
+        } else {
+            emojiCandidates()
+        }
+        return EngineResult(commands, consumed = true)
+    }
+
+    private fun emojiCandidates() =
+        ImeCommand.ShowCandidates(emojiMatches.map { it.emoji }, emojiSelected, labels = emojiMatches.map { ":${it.name}:" })
+
+    private fun commitEmoji(e: String): EngineResult {
+        endEmoji()
+        emojiRecent.remove(e)
+        emojiRecent.add(0, e)
+        while (emojiRecent.size > MAX_RECENT_EMOJI) emojiRecent.removeAt(emojiRecent.lastIndex)
+        leftContext = (leftContext + e).takeLast(MAX_CONTEXT)
+        directTyped.clear()
+        return EngineResult(listOf(ImeCommand.Commit(e), ImeCommand.HideCandidates), consumed = true)
+    }
+
+    /**
+     * 絵文字の名前ではなかった: `:` から打った文字を、ふつうに打ったのと同じに入れ直す
+     * （日本語入力中はかなの入力に、直接入力ではそのまま確定）
+     */
+    private fun replayEmoji(shown: Boolean = emojiMatches.isNotEmpty()): List<ImeCommand> {
+        val text = composingText
+        endEmoji()
+        val commands = mutableListOf<ImeCommand>()
+        if (shown) commands += ImeCommand.HideCandidates
+        if (japanese) {
+            replayingEmoji = true
+            try {
+                for (c in text) commands += handleJapanese(KeyInput.Text(c)).commands
+            } finally {
+                replayingEmoji = false
+            }
+        } else {
+            commands += ImeCommand.Commit(text)
+            directTyped.clear()
+            directTyped.append(text)
+        }
+        return squash(commands)
+    }
+
+    /**
+     * 打ち直しで1文字ずつ出た操作を、最後の形だけにする（入力中の文字の書き換えと並べ替えの依頼は、最後のものだけが要る。
+     * アプリに何度も書き換えを送ると、カーソルの知らせが遅れて届いて入力が途切れることがある）
+     */
+    private fun squash(commands: List<ImeCommand>): List<ImeCommand> {
+        val lastCompose = commands.indexOfLast { it is ImeCommand.SetComposing }
+        val lastRerank = commands.indexOfLast { it is ImeCommand.RequestRerank }
+        return commands.filterIndexed { i, c ->
+            (c !is ImeCommand.SetComposing || i == lastCompose) && (c !is ImeCommand.RequestRerank || i == lastRerank)
+        }
+    }
+
+    /** 打ち直してから、[input] をふつうに扱う */
+    private fun replayThen(input: KeyInput): EngineResult {
+        val before = replayEmoji()
+        val rest = if (japanese) handleJapanese(input) else handleDirect(input)
+        return rest.copy(commands = squash(before + rest.commands))
+    }
+
+    /**
+     * `:` から絵文字の名前を打っているときのキー。名前の文字（英小文字・数字・`_` `+` `-`）で絞り込み、
+     * Space・↑↓・Tab で選び、Enter・数字・閉じの `:` で入れる。Esc やほかの文字では、ふつうに打ったのと同じに戻す
+     */
+    private fun handleEmoji(input: KeyInput): EngineResult {
+        val q = emojiQuery.orEmpty()
+        val has = emojiMatches.isNotEmpty()
+        fun move(step: Int): EngineResult {
+            emojiSelected = (emojiSelected + step).mod(emojiMatches.size)
+            return EngineResult(listOf(emojiCandidates()), consumed = true)
+        }
+        return when (input) {
+            is KeyInput.Text -> {
+                val c = input.char
+                val typed = ":$q$c"
+                // スニペットのキーを先に見る（`:)` などを登録していれば、そちら）
+                snippets.matchSuffix(typed)?.let { (key, output) ->
+                    val shown = has
+                    endEmoji()
+                    val head = typed.dropLast(key.length)
+                    leftContext = (leftContext + head + output).takeLast(MAX_CONTEXT)
+                    return EngineResult(
+                        listOfNotNull(
+                            ImeCommand.Commit(head).takeIf { head.isNotEmpty() }, ImeCommand.Commit(output), ImeCommand.HideCandidates.takeIf { shown },
+                            ImeCommand.SetComposing("").takeIf { head.isEmpty() },
+                        ),
+                        consumed = true,
+                    )
+                }
+                when {
+                    // 名前の続きにならない数字は、候補の番号（いま見えている頁の中）
+                    c in '1'..'9' && has && !emoji.hasNameStartingWith(q + c) -> {
+                        val index = emojiSelected / PAGE * PAGE + (c - '1')
+                        if (index < emojiMatches.size) commitEmoji(emojiMatches[index].emoji) else EngineResult(emptyList(), consumed = true)
+                    }
+                    EmojiShortcodes.isNameChar(c) -> {
+                        emojiQuery = q + c
+                        emojiView()
+                    }
+                    c == ':' && q.isNotEmpty() -> {
+                        val e = emoji.exact(q) ?: emojiMatches.getOrNull(emojiSelected)?.emoji
+                        if (e != null) commitEmoji(e) else replayThen(input)
+                    }
+                    else -> replayThen(input)
+                }
+            }
+            KeyInput.Backspace -> if (q.isEmpty()) {
+                endEmoji()
+                EngineResult(listOf(ImeCommand.SetComposing("")), consumed = true)
+            } else {
+                emojiQuery = q.dropLast(1)
+                emojiView()
+            }
+            KeyInput.Enter -> if (has) commitEmoji(emojiMatches[emojiSelected].emoji) else replayThen(input)
+            // 直接入力の Space は、絵文字にせず空白を入れる（`:p ` のような顔文字のため）
+            KeyInput.Space -> if (has && japanese) move(1) else replayThen(input)
+            KeyInput.Down, KeyInput.Tab -> if (has) move(1) else replayThen(input)
+            KeyInput.ShiftSpace, KeyInput.Up -> if (has) move(-1) else replayThen(input)
+            is KeyInput.SelectCandidate -> if (input.index in emojiMatches.indices) {
+                commitEmoji(emojiMatches[input.index].emoji)
+            } else {
+                EngineResult(emptyList(), consumed = true)
+            }
+            KeyInput.Escape -> {
+                val commands = replayEmoji()
+                EngineResult(commands.ifEmpty { listOf(ImeCommand.SetComposing("")) }, consumed = true)
+            }
+            KeyInput.Other -> EngineResult(commitAll(), consumed = false)
+            else -> replayThen(input)
+        }
+    }
+
     /**
      * 打った文字（綴りの途中を含む）の末尾がスニペットのキーなら、キーの分を未確定から外し、
      * それより前の未確定を（いま見えている形で）確定してから出力を確定する。置き換えたら操作の列を返す
@@ -1148,6 +1345,9 @@ class InputEngine(
 
         /** 再変換のために覚えておく、確定した表記の数 */
         private const val MAX_REMEMBERED = 300
+
+        /** 先に出す、最近選んだ絵文字の数 */
+        private const val MAX_RECENT_EMOJI = 30
 
         /** 直接入力で覚えておく打鍵の数（スニペットのキーの長さの上限） */
         private const val MAX_TYPED = 64

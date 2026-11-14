@@ -26,7 +26,7 @@ final class SettingsFile {
     private let url = support.appendingPathComponent("settings.properties")
     private var lines: [String] = []
     static let defaults: [String: String] = [
-        "full_width_symbols": "true", "live_conversion": "true", "punctuation": "、。", "pair_brackets": "true",
+        "full_width_symbols": "true", "live_conversion": "true", "punctuation": "、。", "pair_brackets": "true", "emoji_shortcodes": "true",
         "spoken_punctuation": "true", "voice_final": "parakeet", "learning": "true", "ui_language": "auto",
         "voice_final_en": "parakeet-en", "voice_hold_keys": "F12,Alt_R", "voice_toggle_key": "Control+Alt+space",
     ]

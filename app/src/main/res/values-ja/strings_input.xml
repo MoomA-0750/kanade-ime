@@ -15,6 +15,8 @@
     <string name="input_full_width_symbols_summary">オフにすると半角で入力します（変換の候補には両方出ます）。</string>
     <string name="input_pair_brackets_title">括弧を対で入れる</string>
     <string name="input_pair_brackets_summary">「（ などを打つと閉じ括弧も入れ、カーソルを中に置きます。空の括弧で Space を押すと、「」『』【】などに替わります。</string>
+    <string name="input_emoji_shortcodes_title">絵文字を名前で入れる</string>
+    <string name="input_emoji_shortcodes_summary">「:」に続けて絵文字の英語の名前を打つと、候補から絵文字を選べます（:rocket → 🚀）。名前は Slack・GitHub と同じです。Enter・数字・「:」で入り、Esc でふつうの文字に戻ります。</string>
     <string name="input_punctuation_label">句読点（, と . で入るもの）</string>
     <string name="input_conversion_title">変換</string>
     <string name="input_live_conversion_title">ライブ変換</string>

@@ -164,10 +164,11 @@ class EngineHost(
         val input = mapper.onKeyDown(key) ?: return false
         return when (input) {
             is KeyInput.SetJapanese, KeyInput.ToggleJapanese -> true
-            else -> if (engine.japanese) {
+            else -> if (engine.japanese || (active === client && engine.isComposing)) {
                 input != KeyInput.Other || (active === client && engine.isComposing)
             } else {
-                input is KeyInput.Text && engine.snippets.size > 0
+                // 直接入力では、スニペットと絵文字の名前（`:` から）に使う文字だけを回す
+                input is KeyInput.Text && (engine.snippets.size > 0 || (input.char == ':' && engine.settings.emojiShortcodes))
             }
         }
     }
