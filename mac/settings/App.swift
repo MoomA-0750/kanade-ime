@@ -342,7 +342,7 @@ struct ModelSection: View {
             ForEach(models) { m in
                 let ready = m.ready
                 let current = settings.values[key] == m.id
-                HStack(spacing: 12) {
+                HStack(spacing: Kasane.Space.s3) {
                     Image(systemName: current ? "largecircle.fill.circle" : "circle")
                         .foregroundStyle(current ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
                         .opacity(ready ? 1 : 0.4)
@@ -495,7 +495,7 @@ struct PairEditor: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: Kasane.Space.s4) {
             Text(entry == nil ? T("足す", "Add") : T("直す", "Edit")).font(.headline)
             Form {
                 TextField(keyLabel, text: $key)
@@ -516,7 +516,7 @@ struct PairEditor: View {
                 .disabled(!valid)
             }
         }
-        .padding(20)
+        .padding(Kasane.Space.s5)
         .frame(width: 420)
         .onAppear {
             key = entry?.key ?? ""
