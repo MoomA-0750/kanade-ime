@@ -24,9 +24,14 @@ endif()
 if (ANDROID)
     set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
     if (ANDROID_ABI STREQUAL "arm64-v8a")
-        # 内積命令（dotprod）と半精度を使う。Fold 7（Snapdragon 8 Elite）も Pixel 3（Snapdragon 845）も対応している。
-        # i8mm は Pixel 3 にないので使わない
-        set(GGML_CPU_ARM_ARCH "armv8.2-a+dotprod+fp16" CACHE STRING "" FORCE)
+        # 内積命令（dotprod）と半精度を使う（Fold 7 の Snapdragon 8 Elite など）。dotprod の無い CPU（Pixel 3 の Snapdragon 845 など。
+        # /proc/cpuinfo に asimddp が無い）では落ちるので、KANADE_ARM_BASELINE で armv8-a だけの版（libkanade_zenz_v80.so、
+        # native-zenz-v80 のモジュール）も作り、アプリが CPU を見てどちらを読むか選ぶ
+        if (KANADE_ARM_BASELINE)
+            set(GGML_CPU_ARM_ARCH "armv8-a" CACHE STRING "" FORCE)
+        else()
+            set(GGML_CPU_ARM_ARCH "armv8.2-a+dotprod+fp16" CACHE STRING "" FORCE)
+        endif()
     endif()
 endif()
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -40,6 +45,9 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../third_party/llama.cpp llama.cpp 
 
 find_package(JNI QUIET)
 add_library(kanade_zenz SHARED zenz_bridge.cpp)
+if (KANADE_ARM_BASELINE)
+    set_target_properties(kanade_zenz PROPERTIES OUTPUT_NAME kanade_zenz_v80)
+endif()
 target_link_libraries(kanade_zenz PRIVATE llama)
 if (ANDROID)
     target_link_libraries(kanade_zenz PRIVATE log)

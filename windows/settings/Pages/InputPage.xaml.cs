@@ -16,6 +16,8 @@ public sealed partial class InputPage : Page
         Punctuation.SelectedItem = Punctuation.Items.Contains(store.Punctuation) ? store.Punctuation : "、。";
         Brackets.IsOn = store.PairBrackets;
         EmojiNames.IsOn = store.EmojiShortcodes;
+        EmojiPrefix.SelectedItem = EmojiPrefix.Items.Contains(store.EmojiPrefix) ? store.EmojiPrefix : ":";
+        EmojiTwice.IsOn = store.EmojiPrefixTwice;
         RightAlt.IsOn = store.Toggles.Contains("RIGHT_ALT_TAP");
         CtrlSpace.IsOn = store.Toggles.Contains("CTRL_SPACE");
         F13.IsOn = store.Toggles.Contains("F13");
@@ -33,6 +35,8 @@ public sealed partial class InputPage : Page
         store.Punctuation = Punctuation.SelectedItem as string ?? "、。";
         store.PairBrackets = Brackets.IsOn;
         store.EmojiShortcodes = EmojiNames.IsOn;
+        store.EmojiPrefix = EmojiPrefix.SelectedItem as string ?? ":";
+        store.EmojiPrefixTwice = EmojiTwice.IsOn;
         store.Toggles = new HashSet<string>();
         if (RightAlt.IsOn) store.Toggles.Add("RIGHT_ALT_TAP");
         if (CtrlSpace.IsOn) store.Toggles.Add("CTRL_SPACE");

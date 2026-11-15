@@ -125,6 +125,9 @@ dependencies {
     implementation(project(":zenz"))
     implementation(project(":whisper"))
     implementation(project(":native-whisper"))
+    // dotprod の無い arm64 の CPU 向けの zenz と whisper（NativeLibs が CPU を見て選ぶ）
+    implementation(project(":native-zenz-v80"))
+    implementation(project(":native-whisper-v80"))
     // 話しながら文字が出る音声認識（ReazonSpeech）に使う sherpa-onnx。prepareKanadeAssets が .cache/ へ取得する
     implementation(files(rootProject.file(".cache/sherpa-aar/sherpa-onnx-static-link-onnxruntime-1.13.8.aar")))
 

@@ -49,6 +49,8 @@ DEFAULTS = {
     "punctuation": "、。",
     "pair_brackets": "true",
     "emoji_shortcodes": "true",
+    "emoji_prefix": ":",
+    "emoji_prefix_twice": "false",
     "spoken_punctuation": "true",
     "voice_final": "parakeet",
     "learning": "true",
@@ -60,6 +62,8 @@ DEFAULTS = {
 
 # ファイルにないときに足す説明（エンジンが書くものと同じ）
 COMMENTS = {
+    "emoji_prefix": "# 絵文字の名前の入り口の文字（: ; / @ ! など、記号1文字）",
+    "emoji_prefix_twice": "# 入り口の文字を2回続けて打ったときだけ絵文字の名前にする（::rocket）",
     "emoji_shortcodes": "# : に続けて絵文字の名前を打つと絵文字を候補に出す（:rocket → 🚀）",
     "voice_final_en": "# Linux 版: 英語の口述のモデル（Kanade 以外の入力方式で録音キーを押したとき。parakeet-en・whisper-small・whisper-turbo）",
     "voice_hold_keys": "# Linux 版: どの入力方式でも、押している間だけ録音するキー（fcitx5 のキーの名前をカンマ区切り。例 F12,Alt_R,F9）",
@@ -422,8 +426,12 @@ class SettingsWindow(Adw.ApplicationWindow):
                            "Typing an opening bracket also inserts the closing one and puts the cursor between them. "
                            "Press Space in empty brackets to change their kind"), "pair_brackets"))
         g.add(switch_row(T("絵文字を名前で入れる", "Emoji by name"),
-                         T(":（コロン）に続けて絵文字の英語の名前を打つと、候補から選べます（:rocket → 🚀）。名前は Slack・GitHub と同じ。Enter・数字・: で入り、Esc でふつうの文字に戻ります",
-                           "Type : and an emoji name to pick it from the candidates (:rocket → 🚀). Names are the same as on Slack and GitHub. Enter, a number or : inserts it; Esc types the letters as usual"), "emoji_shortcodes"))
+                         T("入り口の文字（既定は :）に続けて絵文字の英語の名前を打つと、候補から選べます（:rocket → 🚀）。名前は Slack・GitHub と同じ。Enter・数字・入り口の文字で入り、Esc でふつうの文字に戻ります",
+                           "Type the start character (: by default) and an emoji name to pick it from the candidates (:rocket → 🚀). Names are the same as on Slack and GitHub. Enter, a number or the start character inserts it; Esc types the letters as usual"), "emoji_shortcodes"))
+        g.add(combo_row(T("絵文字の名前の入り口の文字", "Character that starts an emoji name"), "", "emoji_prefix", [(p, p) for p in [":", ";", "/", "@", "!"]]))
+        g.add(switch_row(T("2回続けて打ったときだけ始める", "Start only when typed twice"),
+                         T("入り口の文字を1回打つとふつうの文字になり、2回続けて打つと絵文字の名前を打てます（::rocket → 🚀）",
+                           "Typing the start character once types it as usual; typing it twice in a row starts an emoji name (::rocket → 🚀)"), "emoji_prefix_twice"))
         page.add(g)
 
         g = group(T("日本語と英字の切り替え", "Switching between Japanese and English"),

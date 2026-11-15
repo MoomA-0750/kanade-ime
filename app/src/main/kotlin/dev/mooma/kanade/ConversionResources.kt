@@ -54,7 +54,7 @@ object ConversionResources {
         // 以前の版で取り込めた small（74MB）は使わなくなったので消す（xsmall と体感が変わらず遅いだけだったため）
         runCatching { java.io.File(app.getExternalFilesDir("models"), "zenz-v3.2-small-Q5_K_M.gguf").delete() }
         return runCatching {
-            System.loadLibrary("kanade_zenz")
+            NativeLibs.load("kanade_zenz")
             val threads = KanadeSettings(app).zenzThreads.coerceIn(1, Runtime.getRuntime().availableProcessors())
             ZenzModel.open(copyModel(app).absolutePath, threads = threads)
         }.getOrNull().also { zenz = it }

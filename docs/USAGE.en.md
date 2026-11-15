@@ -117,6 +117,7 @@ Type `:` and an emoji's English name to see matching emoji in the candidate wind
 - A `:` right after a letter or digit does not start it (`10:30`, `http://`). A `:` in the middle of typing kana stays 「：」 as before
 - In direct input, Space types a space without inserting an emoji (for emoticons like `:p `)
 - Snippets whose key starts with `:` (like `:)`) take priority
+- You can change the start character to `:` `;` `/` `@` or `!` in settings. With "Start only when typed twice", only two in a row start an emoji name (`::rocket`), and a single one is an ordinary character. Close it with one (`::rocket:`)
 - Turn it off with "Emoji by name" in settings. You can still convert Japanese readings to emoji (すし → 🍣)
 
 ## Snippets

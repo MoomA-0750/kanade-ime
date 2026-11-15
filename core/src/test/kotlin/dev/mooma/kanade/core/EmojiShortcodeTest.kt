@@ -172,4 +172,44 @@ class EmojiShortcodeTest {
         assertEquals(":ro", e.commitAll().commits())
         assertNull(e.type("").lastCandidates())
     }
+    @Test
+    fun otherPrefixChar() {
+        val e = engine(settings = EngineSettings(liveConversion = false, emojiPrefix = ';'))
+        val c = e.type(";rocket").lastCandidates()!!
+        assertEquals(";rocket", e.composingText)
+        assertEquals(";rocket;", c.labels.first())
+        assertEquals("🚀", e.type(";").commits())
+        // `:` はふつうの文字
+        e.type(":ro")
+        assertEquals("：ろ", e.composingText)
+    }
+
+    @Test
+    fun prefixTwice() {
+        val e = engine(settings = EngineSettings(liveConversion = false, emojiPrefixTwice = true))
+        // 1回だけなら、ふつうの「：」
+        e.type(":ro")
+        assertEquals("：ろ", e.composingText)
+        e.handle(KeyInput.Escape)
+        val f = engine(settings = EngineSettings(liveConversion = false, emojiPrefixTwice = true))
+        f.type("::rock")
+        assertEquals("::rock", f.composingText)
+        assertEquals("::rocket:", f.type("e").lastCandidates()!!.labels.first())
+        assertEquals("🚀", f.type("t:").commits())
+        // Backspace で2回目の入り口の文字だけ消える
+        val g = engine(settings = EngineSettings(liveConversion = false, emojiPrefixTwice = true))
+        g.type("::")
+        g.handle(KeyInput.Backspace)
+        assertEquals(":", g.composingText)
+        g.type("a")
+        assertEquals("：あ", g.composingText)
+    }
+
+    @Test
+    fun invalidPrefixFallsBackToColon() {
+        val s = EngineSettings(emojiPrefix = '_')
+        assertEquals(':', s.emojiLeadChar)
+        assertFalse(EngineSettings.isEmojiPrefix('a'))
+        assertTrue(EngineSettings.isEmojiPrefix('@'))
+    }
 }

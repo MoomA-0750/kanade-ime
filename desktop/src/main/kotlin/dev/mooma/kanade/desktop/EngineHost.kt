@@ -167,8 +167,8 @@ class EngineHost(
             else -> if (engine.japanese || (active === client && engine.isComposing)) {
                 input != KeyInput.Other || (active === client && engine.isComposing)
             } else {
-                // 直接入力では、スニペットと絵文字の名前（`:` から）に使う文字だけを回す
-                input is KeyInput.Text && (engine.snippets.size > 0 || (input.char == ':' && engine.settings.emojiShortcodes))
+                // 直接入力では、スニペットと絵文字の名前（入り口の文字から）に使う文字だけを回す
+                input is KeyInput.Text && (engine.snippets.size > 0 || (input.char == engine.settings.emojiLeadChar && engine.settings.emojiShortcodes))
             }
         }
     }

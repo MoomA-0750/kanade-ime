@@ -34,9 +34,24 @@
                 <ToggleSwitch x:Name="Brackets" Toggled="OnChanged" OnContent="{local:L Ja='オン', En='On'}" OffContent="{local:L Ja='オフ', En='Off'}" />
             </tk:SettingsCard>
             <tk:SettingsCard Header="{local:L Ja='絵文字を名前で入れる', En='Emoji by name'}"
-                             Description="{local:L Ja=':（コロン）に続けて絵文字の英語の名前を打つと、候補から選べます（:rocket → 🚀）。名前は Slack・GitHub と同じ。Enter・数字・: で入り、Esc でふつうの文字に戻ります', En='Type : and an emoji name to pick it from the candidates (:rocket → 🚀). Names are the same as on Slack and GitHub. Enter, a number or : inserts it; Esc types the letters as usual'}">
+                             Description="{local:L Ja='入り口の文字（既定は :）に続けて絵文字の英語の名前を打つと、候補から選べます（:rocket → 🚀）。名前は Slack・GitHub と同じ。Enter・数字・入り口の文字で入り、Esc でふつうの文字に戻ります', En='Type the start character (: by default) and an emoji name to pick it from the candidates (:rocket → 🚀). Names are the same as on Slack and GitHub. Enter, a number or the start character inserts it; Esc types the letters as usual'}">
                 <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE76E;" /></tk:SettingsCard.HeaderIcon>
                 <ToggleSwitch x:Name="EmojiNames" Toggled="OnChanged" OnContent="{local:L Ja='オン', En='On'}" OffContent="{local:L Ja='オフ', En='Off'}" />
+            </tk:SettingsCard>
+            <tk:SettingsCard Header="{local:L Ja='絵文字の名前の入り口の文字', En='Character that starts an emoji name'}">
+                <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE76E;" /></tk:SettingsCard.HeaderIcon>
+                <ComboBox x:Name="EmojiPrefix" SelectionChanged="OnChanged" MinWidth="120">
+                    <x:String>:</x:String>
+                    <x:String>;</x:String>
+                    <x:String>/</x:String>
+                    <x:String>@</x:String>
+                    <x:String>!</x:String>
+                </ComboBox>
+            </tk:SettingsCard>
+            <tk:SettingsCard Header="{local:L Ja='2回続けて打ったときだけ始める', En='Start only when typed twice'}"
+                             Description="{local:L Ja='入り口の文字を1回打つとふつうの文字になり、2回続けて打つと絵文字の名前を打てます（::rocket → 🚀）', En='Typing the start character once types it as usual; typing it twice in a row starts an emoji name (::rocket → 🚀)'}">
+                <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE76E;" /></tk:SettingsCard.HeaderIcon>
+                <ToggleSwitch x:Name="EmojiTwice" Toggled="OnChanged" OnContent="{local:L Ja='オン', En='On'}" OffContent="{local:L Ja='オフ', En='Off'}" />
             </tk:SettingsCard>
 
             <TextBlock Text="{local:L Ja='日本語のオン/オフ', En='Turning Japanese on and off'}" Style="{StaticResource SectionHeader}" />

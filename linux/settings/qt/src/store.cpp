@@ -24,6 +24,8 @@ const QMap<QString, QString> &defaults()
         {"punctuation", "、。"},
         {"pair_brackets", "true"},
         {"emoji_shortcodes", "true"},
+        {"emoji_prefix", ":"},
+        {"emoji_prefix_twice", "false"},
         {"spoken_punctuation", "true"},
         {"voice_final", "parakeet"},
         {"learning", "true"},
@@ -39,6 +41,8 @@ const QMap<QString, QString> &defaults()
 const QMap<QString, QString> &comments()
 {
     static const QMap<QString, QString> c{
+        {"emoji_prefix", "# 絵文字の名前の入り口の文字（: ; / @ ! など、記号1文字）"},
+        {"emoji_prefix_twice", "# 入り口の文字を2回続けて打ったときだけ絵文字の名前にする（::rocket）"},
         {"emoji_shortcodes", "# : に続けて絵文字の名前を打つと絵文字を候補に出す（:rocket → 🚀）"},
         {"voice_final_en", "# Linux 版: 英語の口述のモデル（Kanade 以外の入力方式で録音キーを押したとき。parakeet-en・whisper-small・whisper-turbo）"},
         {"voice_hold_keys", "# Linux 版: どの入力方式でも、押している間だけ録音するキー（fcitx5 のキーの名前をカンマ区切り。例 F12,Alt_R,F9）"},

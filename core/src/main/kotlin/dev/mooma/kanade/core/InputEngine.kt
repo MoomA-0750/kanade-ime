@@ -122,7 +122,19 @@ data class EngineSettings(
     val predictionCount: Int = 5,
     /** `:` に続けて英字で絵文字の名前を打つと、合う絵文字を候補に出す（`:rocket` → 🚀。[EmojiShortcodes]） */
     val emojiShortcodes: Boolean = true,
-)
+    /** 絵文字の名前の入り口の文字（`:`・`;`・`/` など。名前に使う文字・英数字・空白は使えず、そのときは `:`） */
+    val emojiPrefix: Char = ':',
+    /** 入り口の文字を2回続けて打ったときだけ始める（`::rocket`。1回だけなら、ふつうの文字） */
+    val emojiPrefixTwice: Boolean = false,
+) {
+    /** 使える入り口の文字（[emojiPrefix] が使えなければ `:`） */
+    val emojiLeadChar: Char get() = emojiPrefix.takeIf { isEmojiPrefix(it) } ?: ':'
+
+    companion object {
+        /** 入り口に使える文字: ASCII の記号のうち、名前に使う文字（`_` `+` `-`）とローマ字の `'` を除いたもの */
+        fun isEmojiPrefix(c: Char) = c in '!'..'~' && !c.isLetterOrDigit() && !EmojiShortcodes.isNameChar(c) && c != '\''
+    }
+}
 
 /** 文節（読みと、いま選んでいる表記） */
 data class Segment(val reading: String, val surface: String)
@@ -223,8 +235,14 @@ class InputEngine(
     var emojiTable: EmojiShortcodes? = null
     private val emoji: EmojiShortcodes get() = emojiTable ?: EmojiShortcodes.default
 
-    /** `:` から打っている絵文字の名前（`:` の後ろ）。null なら絵文字の名前を打っていない */
+    /** 入り口の文字の後ろに打っている絵文字の名前。null なら絵文字の名前を打っていない */
     private var emojiQuery: String? = null
+
+    /** 打った入り口の文字（`:` か、2回打つ設定なら `::`。2回目を待っているあいだは1文字） */
+    private var emojiLead = ""
+
+    /** 入り口の文字を打ち終えたか（2回打つ設定で1回目だけのときは false） */
+    private val emojiLeadDone: Boolean get() = emojiLead.length >= (if (settings.emojiPrefixTwice) 2 else 1)
     private var emojiMatches: List<EmojiShortcodes.Match> = emptyList()
     private var emojiSelected = 0
 
@@ -347,7 +365,7 @@ class InputEngine(
 
     val composingText: String
         get() {
-            emojiQuery?.let { return ":$it" }
+            emojiQuery?.let { return emojiLead + it }
             if (isConverting) return segs.joinToString("") { it.surface }
             if (editingInside) return textBeforeCaret() + units.drop(caret).joinToString("") { it.text }
             val closers = trailingClosers
@@ -1029,18 +1047,20 @@ class InputEngine(
      * [c] で絵文字の名前を打ち始めるか。`:` を、英数字の直後でないところで打ったとき（`10:30`・`http://` では始めない）
      */
     private fun startsEmoji(c: Char, before: Char?): Boolean =
-        c == ':' && settings.emojiShortcodes && !replayingEmoji && emoji.size > 0 &&
+        c == settings.emojiLeadChar && settings.emojiShortcodes && !replayingEmoji && emoji.size > 0 &&
             (before == null || !(before.code < 0x80 && before.isLetterOrDigit()))
 
     private fun startEmoji(): EngineResult {
         emojiQuery = ""
+        emojiLead = settings.emojiLeadChar.toString()
         emojiMatches = emptyList()
         emojiSelected = 0
-        return EngineResult(listOf(ImeCommand.SetComposing(":")), consumed = true)
+        return EngineResult(listOf(ImeCommand.SetComposing(emojiLead)), consumed = true)
     }
 
     private fun endEmoji() {
         emojiQuery = null
+        emojiLead = ""
         emojiMatches = emptyList()
         emojiSelected = 0
     }
@@ -1062,7 +1082,7 @@ class InputEngine(
     }
 
     private fun emojiCandidates() =
-        ImeCommand.ShowCandidates(emojiMatches.map { it.emoji }, emojiSelected, labels = emojiMatches.map { ":${it.name}:" })
+        ImeCommand.ShowCandidates(emojiMatches.map { it.emoji }, emojiSelected, labels = emojiMatches.map { "$emojiLead${it.name}${settings.emojiLeadChar}" })
 
     private fun commitEmoji(e: String): EngineResult {
         endEmoji()
@@ -1131,7 +1151,8 @@ class InputEngine(
         return when (input) {
             is KeyInput.Text -> {
                 val c = input.char
-                val typed = ":$q$c"
+                val lead = settings.emojiLeadChar
+                val typed = "$emojiLead$q$c"
                 // スニペットのキーを先に見る（`:)` などを登録していれば、そちら）
                 snippets.matchSuffix(typed)?.let { (key, output) ->
                     val shown = has
@@ -1147,6 +1168,13 @@ class InputEngine(
                     )
                 }
                 when {
+                    // 2回打つ設定の、2回目の入り口の文字。ほかの文字なら、ふつうの文字として打ち直す
+                    !emojiLeadDone -> if (c == lead) {
+                        emojiLead += c
+                        EngineResult(listOf(ImeCommand.SetComposing(composingText)), consumed = true)
+                    } else {
+                        replayThen(input)
+                    }
                     // 名前の続きにならない数字は、候補の番号（いま見えている頁の中）
                     c in '1'..'9' && has && !emoji.hasNameStartingWith(q + c) -> {
                         val index = emojiSelected / PAGE * PAGE + (c - '1')
@@ -1156,14 +1184,17 @@ class InputEngine(
                         emojiQuery = q + c
                         emojiView()
                     }
-                    c == ':' && q.isNotEmpty() -> {
+                    c == lead && q.isNotEmpty() -> {
                         val e = emoji.exact(q) ?: emojiMatches.getOrNull(emojiSelected)?.emoji
                         if (e != null) commitEmoji(e) else replayThen(input)
                     }
                     else -> replayThen(input)
                 }
             }
-            KeyInput.Backspace -> if (q.isEmpty()) {
+            KeyInput.Backspace -> if (q.isEmpty() && emojiLead.length > 1) {
+                emojiLead = emojiLead.dropLast(1)
+                EngineResult(listOf(ImeCommand.SetComposing(composingText)), consumed = true)
+            } else if (q.isEmpty()) {
                 endEmoji()
                 EngineResult(listOf(ImeCommand.SetComposing("")), consumed = true)
             } else {

@@ -163,8 +163,18 @@ struct InputPage: View {
                 }
                 Toggle(isOn: settings.bool("emoji_shortcodes")) {
                     Text(T("絵文字を名前で入れる", "Emoji by name"))
-                    Text(T(":（コロン）に続けて絵文字の英語の名前を打つと、候補から選べます（:rocket → 🚀）。名前は Slack・GitHub と同じ。Enter・数字・: で入り、Esc でふつうの文字に戻ります",
-                           "Type : and an emoji name to pick it from the candidates (:rocket → 🚀). Names are the same as on Slack and GitHub. Enter, a number or : inserts it; Esc types the letters as usual"))
+                    Text(T("入り口の文字（既定は :）に続けて絵文字の英語の名前を打つと、候補から選べます（:rocket → 🚀）。名前は Slack・GitHub と同じ。Enter・数字・入り口の文字で入り、Esc でふつうの文字に戻ります",
+                           "Type the start character (: by default) and an emoji name to pick it from the candidates (:rocket → 🚀). Names are the same as on Slack and GitHub. Enter, a number or the start character inserts it; Esc types the letters as usual"))
+                }
+                Picker(selection: settings.string("emoji_prefix")) {
+                    ForEach([":", ";", "/", "@", "!"], id: \.self) { p in Text(p).tag(p) }
+                } label: {
+                    Text(T("絵文字の名前の入り口の文字", "Character that starts an emoji name"))
+                }
+                Toggle(isOn: settings.bool("emoji_prefix_twice")) {
+                    Text(T("2回続けて打ったときだけ始める", "Start only when typed twice"))
+                    Text(T("入り口の文字を1回打つとふつうの文字になり、2回続けて打つと絵文字の名前を打てます（::rocket → 🚀）",
+                           "Typing the start character once types it as usual; typing it twice in a row starts an emoji name (::rocket → 🚀)"))
                 }
             }
             Section {

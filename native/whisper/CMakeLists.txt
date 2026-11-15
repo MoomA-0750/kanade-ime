@@ -18,8 +18,13 @@ endif()
 if (ANDROID)
     set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
     if (ANDROID_ABI STREQUAL "arm64-v8a")
-        # zenz と同じく、Fold 7 と Pixel 3 の両方で動く命令まで
-        set(GGML_CPU_ARM_ARCH "armv8.2-a+dotprod+fp16" CACHE STRING "" FORCE)
+        # zenz と同じく dotprod と半精度を使う。KANADE_ARM_BASELINE なら dotprod の無い CPU 向けの armv8-a だけの版
+        # （libkanade_whisper_v80.so、native-whisper-v80 のモジュール）
+        if (KANADE_ARM_BASELINE)
+            set(GGML_CPU_ARM_ARCH "armv8-a" CACHE STRING "" FORCE)
+        else()
+            set(GGML_CPU_ARM_ARCH "armv8.2-a+dotprod+fp16" CACHE STRING "" FORCE)
+        endif()
     endif()
 endif()
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -32,6 +37,9 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/whisper.cpp whisp
 
 find_package(JNI QUIET)
 add_library(kanade_whisper SHARED whisper_bridge.cpp)
+if (KANADE_ARM_BASELINE)
+    set_target_properties(kanade_whisper PROPERTIES OUTPUT_NAME kanade_whisper_v80)
+endif()
 target_link_libraries(kanade_whisper PRIVATE whisper)
 if (ANDROID)
     target_link_libraries(kanade_whisper PRIVATE log)

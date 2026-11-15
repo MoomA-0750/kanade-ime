@@ -16,7 +16,10 @@
     <string name="input_pair_brackets_title">括弧を対で入れる</string>
     <string name="input_pair_brackets_summary">「（ などを打つと閉じ括弧も入れ、カーソルを中に置きます。空の括弧で Space を押すと、「」『』【】などに替わります。</string>
     <string name="input_emoji_shortcodes_title">絵文字を名前で入れる</string>
-    <string name="input_emoji_shortcodes_summary">「:」に続けて絵文字の英語の名前を打つと、候補から絵文字を選べます（:rocket → 🚀）。名前は Slack・GitHub と同じです。Enter・数字・「:」で入り、Esc でふつうの文字に戻ります。</string>
+    <string name="input_emoji_shortcodes_summary">入り口の文字（既定は「:」）に続けて絵文字の英語の名前を打つと、候補から絵文字を選べます（:rocket → 🚀）。名前は Slack・GitHub と同じです。Enter・数字・入り口の文字で入り、Esc でふつうの文字に戻ります。</string>
+    <string name="input_emoji_prefix_label">絵文字の名前の入り口の文字</string>
+    <string name="input_emoji_twice_title">2回続けて打ったときだけ始める（%1$s%1$s）</string>
+    <string name="input_emoji_twice_summary">%1$s を1回打つとふつうの文字になり、2回続けて打つと絵文字の名前を打てます（%1$s%1$srocket → 🚀）。</string>
     <string name="input_punctuation_label">句読点（, と . で入るもの）</string>
     <string name="input_conversion_title">変換</string>
     <string name="input_live_conversion_title">ライブ変換</string>

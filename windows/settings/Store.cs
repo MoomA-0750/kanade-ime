@@ -21,6 +21,10 @@ public sealed class Store
     public bool PairBrackets { get; set; } = true;
     /// <summary>: に続けて絵文字の名前を打つと絵文字を候補に出す（:rocket → 🚀）</summary>
     public bool EmojiShortcodes { get; set; } = true;
+    /// <summary>絵文字の名前の入り口の文字（記号1文字）</summary>
+    public string EmojiPrefix { get; set; } = ":";
+    /// <summary>入り口の文字を2回続けたときだけ始める（::rocket）</summary>
+    public bool EmojiPrefixTwice { get; set; }
     public HashSet<string> Toggles { get; set; } = new() { "RIGHT_ALT_TAP", "CTRL_SPACE", "F13" };
     public bool SpokenPunctuation { get; set; } = true;
     public bool Learning { get; set; } = true;
@@ -49,6 +53,8 @@ public sealed class Store
                 case "punctuation": if (value.Length == 2) s.Punctuation = value; break;
                 case "pair_brackets": s.PairBrackets = Bool(s.PairBrackets); break;
                 case "emoji_shortcodes": s.EmojiShortcodes = Bool(s.EmojiShortcodes); break;
+                case "emoji_prefix": if (value.Length == 1) s.EmojiPrefix = value; break;
+                case "emoji_prefix_twice": s.EmojiPrefixTwice = Bool(s.EmojiPrefixTwice); break;
                 case "toggle_triggers": s.Toggles = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToHashSet(); break;
                 case "spoken_punctuation": s.SpokenPunctuation = Bool(s.SpokenPunctuation); break;
                 case "learning": s.Learning = Bool(s.Learning); break;
@@ -78,6 +84,10 @@ public sealed class Store
             .AppendLine($"pair_brackets={B(PairBrackets)}")
             .AppendLine("# : に続けて絵文字の名前を打つと絵文字を候補に出す（:rocket → 🚀）")
             .AppendLine($"emoji_shortcodes={B(EmojiShortcodes)}")
+            .AppendLine("# 絵文字の名前の入り口の文字（: ; / @ ! など、記号1文字）")
+            .AppendLine($"emoji_prefix={EmojiPrefix}")
+            .AppendLine("# 入り口の文字を2回続けて打ったときだけ絵文字の名前にする（::rocket）")
+            .AppendLine($"emoji_prefix_twice={B(EmojiPrefixTwice)}")
             .AppendLine("# 日本語のオン/オフに使うキー（RIGHT_ALT_TAP・CTRL_SPACE・F13 をカンマ区切りで。変換/無変換・半角/全角はいつでも使える）")
             .AppendLine($"toggle_triggers={string.Join(",", order.Where(Toggles.Contains))}")
             .AppendLine("# 音声入力で「まる」「てん」などを句読点にする")

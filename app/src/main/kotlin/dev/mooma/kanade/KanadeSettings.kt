@@ -290,9 +290,19 @@ class KanadeSettings(context: Context) {
         get() = prefs.getBoolean(KEY_EMOJI_SHORTCODES, true)
         set(value) = prefs.edit().putBoolean(KEY_EMOJI_SHORTCODES, value).apply()
 
+    /** 絵文字の名前の入り口の文字（1文字） */
+    var emojiPrefix: String
+        get() = prefs.getString(KEY_EMOJI_PREFIX, ":")?.takeIf { it.length == 1 && EngineSettings.isEmojiPrefix(it[0]) } ?: ":"
+        set(value) = prefs.edit().putString(KEY_EMOJI_PREFIX, value).apply()
+
+    /** 入り口の文字を2回続けて打ったときだけ始める（`::rocket`） */
+    var emojiPrefixTwice: Boolean
+        get() = prefs.getBoolean(KEY_EMOJI_TWICE, false)
+        set(value) = prefs.edit().putBoolean(KEY_EMOJI_TWICE, value).apply()
+
     fun engineSettings() = EngineSettings(
         fullWidthSymbols = fullWidthSymbols, liveConversion = liveConversion, punctuation = punctuation, pairBrackets = pairBrackets,
-        prediction = prediction, emojiShortcodes = emojiShortcodes,
+        prediction = prediction, emojiShortcodes = emojiShortcodes, emojiPrefix = emojiPrefix.single(), emojiPrefixTwice = emojiPrefixTwice,
     )
 
     private companion object {
@@ -322,6 +332,8 @@ class KanadeSettings(context: Context) {
         const val KEY_GLIDE_ZENZ = "glide_zenz"
         const val KEY_PAIR_BRACKETS = "pair_brackets"
         const val KEY_EMOJI_SHORTCODES = "emoji_shortcodes"
+        const val KEY_EMOJI_PREFIX = "emoji_prefix"
+        const val KEY_EMOJI_TWICE = "emoji_prefix_twice"
         const val KEY_SWIPE = "soft_keyboard_swipe"
         const val KEY_TAP_CORRECTION = "tap_correction"
         const val KEY_LAYOUT_MODES = "layout_modes_"

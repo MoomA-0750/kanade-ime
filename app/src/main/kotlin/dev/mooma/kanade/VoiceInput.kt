@@ -267,7 +267,7 @@ object VoiceInput {
         loadedFile = null
         if (!file.exists()) return null
         return runCatching {
-            System.loadLibrary("kanade_whisper")
+            NativeLibs.load("kanade_whisper")
             WhisperModel.open(file.absolutePath, threads)
         }.getOrNull()?.also {
             model = it

@@ -46,7 +46,7 @@ Android 版・Windows 版と同じ入力（ライブ変換・zenz の並べ替�
 
 ファイルを直接書き換えてもよい:
 
-- `~/.config/kanade/settings.properties`: 項目は Windows 版と同じ（`live_conversion`・`full_width_symbols`・`punctuation`・`pair_brackets`・`emoji_shortcodes`・`toggle_triggers`・`spoken_punctuation`・`voice_final`・`learning`・`ui_language`）と、Linux 版だけの `voice_final_en`（parakeet-en・whisper-small・whisper-turbo）・`voice_hold_keys`（fcitx5 のキーの名前をカンマ区切り。例 `F12,Alt_R`）・`voice_toggle_key`（例 `Control+Alt+space`。空なら使わない）
+- `~/.config/kanade/settings.properties`: 項目は Windows 版と同じ（`live_conversion`・`full_width_symbols`・`punctuation`・`pair_brackets`・`emoji_shortcodes`・`emoji_prefix`（入り口の文字。既定 `:`）・`emoji_prefix_twice`（2回続けたときだけ）・`toggle_triggers`・`spoken_punctuation`・`voice_final`・`learning`・`ui_language`）と、Linux 版だけの `voice_final_en`（parakeet-en・whisper-small・whisper-turbo）・`voice_hold_keys`（fcitx5 のキーの名前をカンマ区切り。例 `F12,Alt_R`）・`voice_toggle_key`（例 `Control+Alt+space`。空なら使わない）
   - `voice_final` は parakeet・reazon・sensevoice・whisper-small・whisper-kotoba・whisper-turbo（落としたものだけ使える。parakeet と reazon 以外は自分で `~/.local/share/kanade/data` に置く）
   - `ui_language`（auto・ja・en）: auto は LANG に合わせる（日本語でなければ英語）
 - `~/.config/kanade/user_dictionary.txt`・`snippets.txt`: 書式は Android 版と同じ

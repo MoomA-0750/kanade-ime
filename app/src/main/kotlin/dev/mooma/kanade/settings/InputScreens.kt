@@ -63,6 +63,16 @@ fun ColumnScope.InputScreen() {
             stringResource(R.string.input_emoji_shortcodes_title), emojiShortcodes, { emojiShortcodes = it },
             stringResource(R.string.input_emoji_shortcodes_summary),
         )
+        if (emojiShortcodes) {
+            Text(stringResource(R.string.input_emoji_prefix_label))
+            var emojiPrefix by rememberPref({ settings.emojiPrefix }, { settings.emojiPrefix = it })
+            ConnectedChoices(EMOJI_PREFIXES.map { it to it }, emojiPrefix, { emojiPrefix = it })
+            var emojiTwice by rememberPref({ settings.emojiPrefixTwice }, { settings.emojiPrefixTwice = it })
+            SwitchRow(
+                stringResource(R.string.input_emoji_twice_title, emojiPrefix), emojiTwice, { emojiTwice = it },
+                stringResource(R.string.input_emoji_twice_summary, emojiPrefix),
+            )
+        }
         Text(stringResource(R.string.input_punctuation_label))
         var punctuation by rememberPref({ settings.punctuation }, { settings.punctuation = it })
         ConnectedChoices(listOf("、。", "，．", "、．", "，。").map { it to it }, punctuation, { punctuation = it })
@@ -297,3 +307,6 @@ private fun LayoutModesRow(settings: dev.mooma.kanade.KanadeSettings, layout: St
         }
     }
 }
+
+/** 絵文字の名前の入り口に選べる文字（設定ファイルではほかの記号も使える） */
+private val EMOJI_PREFIXES = listOf(":", ";", "/", "@", "!")

@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "kanade-ime"
-include(":core", ":zenz", ":whisper", ":native-whisper", ":dictool", ":desktop", ":app")
+include(":core", ":zenz", ":whisper", ":native-whisper", ":native-zenz-v80", ":native-whisper-v80", ":dictool", ":desktop", ":app")
