@@ -16,7 +16,7 @@ target_link_libraries(kanade_backend PUBLIC Qt6::Gui Qt6::Network PkgConfig::XKB
 target_include_directories(kanade_backend PUBLIC src)
 
 qt_add_executable(kanade-settings-qt src/main.cpp)
-set(QML Main Pal Icon KButton IconButton PrefPage PrefGroup PrefRow SwitchRow ComboRow KDialog
+set(QML Main Pal Kasane Icon KButton IconButton PrefPage PrefGroup PrefRow SwitchRow ComboRow KDialog
   InputPage VoicePage PairPage BackupPage UsagePage)
 set(QML_FILES)
 foreach(name ${QML})

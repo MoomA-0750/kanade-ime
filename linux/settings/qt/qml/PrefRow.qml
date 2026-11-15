@@ -19,7 +19,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         anchors.margins: 1
-        radius: Math.max(0, Pal.panelRadius - 1)
+        radius: Pal.innerRadius(Pal.panelRadius, 1)
         color: Pal.fg
         opacity: mouse.pressed ? 0.1 : mouse.containsMouse ? 0.05 : 0
     }
@@ -34,13 +34,13 @@ Item {
     RowLayout {
         id: layout
         anchors.fill: parent
-        anchors.leftMargin: 16
-        anchors.rightMargin: 12
-        spacing: 12
+        anchors.leftMargin: Pal.space.s4
+        anchors.rightMargin: Pal.space.s3
+        spacing: Pal.space.s3
         RowLayout {
             id: prefixRow
             Layout.alignment: Qt.AlignVCenter
-            spacing: 8
+            spacing: Pal.space.s2
             visible: children.length > 0
         }
         ColumnLayout {

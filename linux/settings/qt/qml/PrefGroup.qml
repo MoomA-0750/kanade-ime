@@ -15,7 +15,7 @@ Column {
 
     Column {
         width: parent.width
-        spacing: 4
+        spacing: Pal.space.s1
         visible: group.title.length > 0 || group.description.length > 0
         Label {
             width: parent.width

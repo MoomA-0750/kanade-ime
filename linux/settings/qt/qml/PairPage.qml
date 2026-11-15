@@ -28,7 +28,7 @@ PrefPage {
             : Pal.t("読みと単語を登録すると、変換の候補の先頭に出ます", "Words you add here are shown first among the conversion candidates for their reading")
         header: RowLayout {
             width: parent ? parent.width : 0
-            spacing: 8
+            spacing: Pal.space.s2
             TextField {
                 id: search
                 Layout.fillWidth: true
@@ -80,7 +80,7 @@ PrefPage {
     Column {
         visible: page.textMode
         width: parent ? parent.width : 0
-        spacing: 12
+        spacing: Pal.space.s3
         Rectangle {
             width: parent.width
             height: 380
@@ -98,8 +98,8 @@ PrefPage {
                     wrapMode: TextEdit.NoWrap
                     leftPadding: 10
                     rightPadding: 10
-                    topPadding: 8
-                    bottomPadding: 8
+                    topPadding: Pal.space.s2
+                    bottomPadding: Pal.space.s2
                     background: null
                     selectByMouse: true
                 }

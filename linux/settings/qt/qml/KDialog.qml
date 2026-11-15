@@ -13,7 +13,7 @@ Dialog {
     modal: true
     anchors.centerIn: Overlay.overlay
     width: Math.min(440, (parent ? parent.width : 440) - 48)
-    padding: 24
+    padding: Pal.space.s6
     Material.roundedScale: Pal.dialogRadius
     Material.background: Pal.raised
     Material.elevation: 6
@@ -27,7 +27,7 @@ Dialog {
     Overlay.modal: Rectangle { color: Qt.rgba(0, 0, 0, 0.5) }
 
     contentItem: ColumnLayout {
-        spacing: 16
+        spacing: Pal.space.s4
         Label {
             Layout.fillWidth: true
             text: dialog.heading
@@ -48,14 +48,14 @@ Dialog {
         ColumnLayout {
             id: extraColumn
             Layout.fillWidth: true
-            spacing: 8
+            spacing: Pal.space.s2
             visible: children.length > 0
         }
         Row {
             id: buttonRow
             Layout.alignment: Qt.AlignRight
-            Layout.topMargin: 4
-            spacing: 8
+            Layout.topMargin: Pal.space.s1
+            spacing: Pal.space.s2
         }
     }
 }

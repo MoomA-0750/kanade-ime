@@ -93,7 +93,7 @@ ApplicationWindow {
                     id: list
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.topMargin: 8
+                    Layout.topMargin: Pal.space.s2
                     clip: true
                     model: win.pages
                     spacing: 2
@@ -111,7 +111,7 @@ ApplicationWindow {
                                  : item.hovered ? Qt.rgba(Pal.fg.r, Pal.fg.g, Pal.fg.b, 0.06) : "transparent"
                         }
                         contentItem: RowLayout {
-                            spacing: 12
+                            spacing: Pal.space.s3
                             Icon { name: item.modelData.icon; color: Pal.fg; Layout.leftMargin: 4 }
                             Label {
                                 Layout.fillWidth: true
@@ -182,7 +182,7 @@ ApplicationWindow {
         id: toastBox
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: 24
+        anchors.bottomMargin: Pal.space.s6
         width: Math.min(toastLabel.implicitWidth + 40, parent.width - 48)
         height: toastLabel.implicitHeight + 24
         radius: Pal.rounding >= 0 ? Pal.rounding : height / 2

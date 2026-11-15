@@ -12,14 +12,14 @@ Button {
     highlighted: filled
     Material.accent: fill
     Material.elevation: 0
-    Material.roundedScale: Pal.rounding >= 0 ? Pal.rounding : Material.FullScale
+    Material.roundedScale: Pal.buttonRadius
     font.pixelSize: 14
 
     // 地: アクセント・赤・なし、ふつうは一覧の地の色に線（カードの上で見分けられるように）
     background: Rectangle {
         implicitWidth: 64
         implicitHeight: 36
-        radius: Pal.rounding >= 0 ? Pal.rounding : height / 2
+        radius: Pal.buttonRadius
         color: control.filled ? control.fill : control.flat ? "transparent" : control.checked ? Pal.selected : Pal.view
         border.width: control.filled || control.flat ? 0 : 1
         border.color: control.checked ? Pal.accent : Pal.border
