@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.mooma.kanade.TextStore
 import dev.mooma.kanade.core.dict.UserDictionary
+import kasane.KasaneSpace
 
 /** ユーザー辞書・スニペット・話して入れる記号。どれも1行に「キー 値」のテキストファイル */
 enum class PairKind(
@@ -141,7 +142,7 @@ fun ColumnScope.PairEditorScreen(kind: PairKind) {
                 Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.shapes.small)
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                    .padding(horizontal = KasaneSpace.s3, vertical = 6.dp),
             ) {
                 val header = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.onSecondaryContainer)
                 Text(stringResource(kind.keyLabelRes), Modifier.width(128.dp), style = header)
@@ -152,7 +153,7 @@ fun ColumnScope.PairEditorScreen(kind: PairKind) {
                     Modifier
                         .fillMaxWidth()
                         .clickable { editing = e }
-                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                        .padding(horizontal = KasaneSpace.s3, vertical = KasaneSpace.s3),
                 ) {
                     // キーと値を2列に並べる（値に「→」のような記号があっても区切りと紛れないように）
                     Text(
@@ -168,7 +169,7 @@ fun ColumnScope.PairEditorScreen(kind: PairKind) {
             }
             Button(onClick = { adding = true }) {
                 Icon(painterResource(R.drawable.sym_add), contentDescription = null)
-                Text(stringResource(R.string.input_add), Modifier.padding(start = 8.dp))
+                Text(stringResource(R.string.input_add), Modifier.padding(start = KasaneSpace.s2))
             }
         }
     } else {
@@ -214,7 +215,7 @@ private fun EntryDialog(kind: PairKind, entry: Entry?, onSave: (String, String) 
         onDismissRequest = onDismiss,
         title = { Text(stringResource(if (entry == null) R.string.input_add else R.string.input_edit)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(KasaneSpace.s3)) {
                 OutlinedTextField(key, { key = it.trim() }, label = { Text(stringResource(kind.keyLabelRes)) }, singleLine = true)
                 OutlinedTextField(value, { value = it }, label = { Text(stringResource(kind.valueLabelRes)) })
             }

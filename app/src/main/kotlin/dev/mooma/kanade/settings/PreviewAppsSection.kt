@@ -42,6 +42,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.mooma.kanade.R
+import kasane.KasaneSpace
 
 /** 端末のアプリ（ホーム画面に出るもの）の名前・パッケージ名・アイコン */
 private data class AppInfo(val label: String, val packageName: String, val icon: ImageBitmap?)
@@ -95,7 +96,7 @@ fun ColumnScope.PreviewAppsSection() {
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.shapes.small)
-                .padding(horizontal = 12.dp, vertical = 6.dp),
+                .padding(horizontal = KasaneSpace.s3, vertical = 6.dp),
         ) {
             Text(stringResource(R.string.input_preview_apps_header), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
         }
@@ -106,7 +107,7 @@ fun ColumnScope.PreviewAppsSection() {
         }
         Button(onClick = { adding = true }) {
             Icon(painterResource(R.drawable.sym_add), contentDescription = null)
-            Text(stringResource(R.string.input_add), Modifier.padding(start = 8.dp))
+            Text(stringResource(R.string.input_add), Modifier.padding(start = KasaneSpace.s2))
         }
     }
 
@@ -139,9 +140,9 @@ fun ColumnScope.PreviewAppsSection() {
 @Composable
 private fun AppRow(app: AppInfo, modifier: Modifier = Modifier) {
     Row(
-        modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+        modifier.fillMaxWidth().padding(horizontal = KasaneSpace.s3, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(KasaneSpace.s3),
     ) {
         Box(Modifier.size(36.dp)) {
             app.icon?.let { Image(it, contentDescription = null, Modifier.size(36.dp)) }
@@ -171,14 +172,14 @@ private fun AddAppDialog(exclude: Set<String>, onAdd: (String) -> Unit, onDismis
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.input_add_app_title)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(KasaneSpace.s2)) {
                 OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text(stringResource(R.string.input_add_app_search)) })
                 LazyColumn(Modifier.height(360.dp)) {
                     if (typedPackage != null && shown.none { it.packageName == typedPackage }) {
                         item {
                             Text(
                                 stringResource(R.string.input_add_app_package, typedPackage),
-                                Modifier.fillMaxWidth().clickable { onAdd(typedPackage) }.padding(12.dp),
+                                Modifier.fillMaxWidth().clickable { onAdd(typedPackage) }.padding(KasaneSpace.s3),
                                 color = MaterialTheme.colorScheme.primary,
                             )
                         }

@@ -24,6 +24,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.mooma.kanade.R
 import dev.mooma.kanade.SettingsBackup
+import kasane.KasaneSpace
 
 /** 終わったときの知らせ（読み込んだ後に画面を作り直しても残るよう、画面の外に置く） */
 private object BackupUi {
@@ -50,20 +51,20 @@ fun ColumnScope.BackupScreen() {
         stringResource(R.string.app_backup_export_description),
     ) {
         Note(stringResource(R.string.app_backup_export_note))
-        Button(onClick = { exporter.launch(SettingsBackup.suggestedName()) }, modifier = Modifier.padding(top = 8.dp)) {
+        Button(onClick = { exporter.launch(SettingsBackup.suggestedName()) }, modifier = Modifier.padding(top = KasaneSpace.s2)) {
             Text(stringResource(R.string.app_backup_export_button))
         }
     }
 
     Section(stringResource(R.string.app_backup_import_title), stringResource(R.string.app_backup_import_description)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(KasaneSpace.s2), modifier = Modifier.padding(top = KasaneSpace.s2)) {
             OutlinedButton(onClick = { importer.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) }) {
                 Text(stringResource(R.string.app_backup_import_button))
             }
         }
     }
 
-    BackupUi.message?.let { Note(it, Modifier.padding(horizontal = 4.dp)) }
+    BackupUi.message?.let { Note(it, Modifier.padding(horizontal = KasaneSpace.s1)) }
 
     pending?.let { uri ->
         AlertDialog(

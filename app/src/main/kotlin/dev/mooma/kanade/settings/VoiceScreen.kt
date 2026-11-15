@@ -61,6 +61,7 @@ import dev.mooma.kanade.R
 import dev.mooma.kanade.VoiceCatalog
 import dev.mooma.kanade.VoiceModelSpec
 import dev.mooma.kanade.VoiceTag
+import kasane.KasaneSpace
 
 /** モデルの取得の進み具合（画面を移っても残るよう、画面の外に置く） */
 object DownloadUi {
@@ -210,7 +211,7 @@ private fun ModelsSection(tick: Int, onChanged: () -> Unit) {
     }
     OutlinedButton(onClick = { pick.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) {
         Icon(painterResource(R.drawable.sym_upload_file), contentDescription = null, modifier = Modifier.size(20.dp))
-        Text(stringResource(R.string.voice_import_button), Modifier.padding(start = 8.dp))
+        Text(stringResource(R.string.voice_import_button), Modifier.padding(start = KasaneSpace.s2))
     }
 
     confirmDownload?.let { model ->
@@ -265,12 +266,12 @@ private fun ModelCard(model: VoiceModelSpec, ready: Boolean, applied: Boolean, o
             containerColor = if (applied && ready) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer,
         ),
     ) {
-        Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.padding(horizontal = KasaneSpace.s5, vertical = KasaneSpace.s4), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(model.name, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
                 if (applied && ready) {
                     Icon(painterResource(R.drawable.sym_check_circle), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                    Text(stringResource(R.string.voice_model_in_use), Modifier.padding(start = 4.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.voice_model_in_use), Modifier.padding(start = KasaneSpace.s1), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                 }
             }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -284,7 +285,7 @@ private fun ModelCard(model: VoiceModelSpec, ready: Boolean, applied: Boolean, o
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(horizontalArrangement = Arrangement.spacedBy(KasaneSpace.s2), verticalAlignment = Alignment.CenterVertically) {
                 when {
                     downloading -> OutlinedButton(onClick = onDownload) { Text(stringResource(R.string.voice_cancel)) }
                     !ready -> Button(onClick = onDownload, enabled = DownloadUi.id == null) {
@@ -319,7 +320,7 @@ private fun Tag(tag: VoiceTag) {
         color = bg,
         border = if (tag.kind == VoiceTag.Kind.SIZE) androidx.compose.foundation.BorderStroke(1.dp, scheme.outlineVariant) else null,
     ) {
-        Text(tag.textRes?.let { stringResource(it) } ?: tag.literal.orEmpty(), Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, color = fg)
+        Text(tag.textRes?.let { stringResource(it) } ?: tag.literal.orEmpty(), Modifier.padding(horizontal = 10.dp, vertical = KasaneSpace.s1), style = MaterialTheme.typography.labelMedium, color = fg)
     }
 }
 
@@ -342,7 +343,7 @@ private fun ImportDialog(uris: List<Uri>, onDone: (String?) -> Unit) {
         onDismissRequest = { if (!copying) onDone(null) },
         title = { Text(stringResource(R.string.voice_import_dialog_title)) },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(KasaneSpace.s2)) {
                 Note(stringResource(R.string.voice_import_selected_files, names.joinToString(separator)))
                 OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.voice_import_name_label)) }, singleLine = true)
                 Text(stringResource(R.string.voice_import_format_label), style = MaterialTheme.typography.labelLarge)
@@ -378,7 +379,7 @@ private fun SampleBench(threads: Int, tick: Int) {
     val context = LocalContext.current
     var running by remember { mutableStateOf(false) }
     var lines by remember { mutableStateOf(listOf<String>()) }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(KasaneSpace.s3)) {
         Button(onClick = {
             val models = VoiceCatalog.all(context).filter { it.isReady(context) }
             if (models.isEmpty()) {

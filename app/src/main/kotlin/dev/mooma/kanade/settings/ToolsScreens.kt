@@ -34,12 +34,12 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mooma.kanade.ConversionBench
 import dev.mooma.kanade.KeyLog
 import dev.mooma.kanade.R
+import kasane.KasaneSpace
 
 /** 試し打ち・変換の試験・キー記録 */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -71,7 +71,7 @@ fun ColumnScope.ToolsScreen() {
         var threads by rememberPref({ settings.zenzThreads }, { settings.zenzThreads = it })
         SliderRow(stringResource(R.string.app_tools_zenz_threads), threads, 1..8, 1, { threads = it }) { "$it" }
         OutlinedTextField(reading, { reading = it }, Modifier.fillMaxWidth(), placeholder = { Text(stringResource(R.string.app_tools_reading_example)) }, singleLine = true)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(horizontalArrangement = Arrangement.spacedBy(KasaneSpace.s2), verticalAlignment = Alignment.CenterVertically) {
             Button(onClick = { run { ConversionBench.tryConvert(context, reading.trim()) } }, enabled = !running && reading.isNotBlank()) { Text(stringResource(R.string.app_tools_convert)) }
             OutlinedButton(onClick = { run { progress -> ConversionBench.runEval(context, progress) } }, enabled = !running) { Text(stringResource(R.string.app_tools_run_eval)) }
             if (running) LoadingIndicator(Modifier.size(40.dp))
@@ -85,7 +85,7 @@ fun ColumnScope.ToolsScreen() {
         SwitchRow(stringResource(R.string.app_tools_key_log_enable), enabled, { enabled = it })
         var version by remember { mutableIntStateOf(0) }
         val log = remember(version) { keyLog.read().lines().takeLast(200).joinToString("\n") }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(KasaneSpace.s2)) {
             OutlinedButton(onClick = { version++ }) { Text(stringResource(R.string.app_tools_reload)) }
             OutlinedButton(onClick = {
                 keyLog.clear()
@@ -126,10 +126,10 @@ fun ColumnScope.UsageScreen() {
     for ((title, lines) in blocks) {
         Section(title) {
             SelectionContainer {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(KasaneSpace.s1)) {
                     for (line in lines) {
                         when {
-                            line.startsWith("### ") -> Text(line.removePrefix("### "), Modifier.padding(top = 8.dp), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            line.startsWith("### ") -> Text(line.removePrefix("### "), Modifier.padding(top = KasaneSpace.s2), style = MaterialTheme.typography.titleSmallEmphasized)
                             line.startsWith("- ") || line.matches(Regex("^\\d+\\. .*")) || line.startsWith("   ") ->
                                 Text(bullet + line.trimStart().removePrefix("- ").replace(Regex("^\\d+\\. "), ""), style = MaterialTheme.typography.bodyMedium)
                             line.startsWith("|") -> Text(line.trim('|').split('|').joinToString(cellGap) { it.trim() }, style = MaterialTheme.typography.bodyMedium)

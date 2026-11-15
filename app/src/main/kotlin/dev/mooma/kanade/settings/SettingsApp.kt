@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -36,11 +35,10 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -59,6 +57,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import dev.mooma.kanade.R
 import androidx.compose.ui.unit.dp
+import kasane.KasaneSpace
 
 /** 左の一覧の区画（見出しは文字列リソース） */
 enum class CategoryGroup(val title: Int) { INPUT(R.string.app_group_input), WORDS(R.string.app_group_words), OTHER(R.string.app_group_other) }
@@ -130,12 +129,12 @@ private fun ListPane(resumeTick: Int, selected: Category?, onSelect: (Category) 
             Modifier
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = KasaneSpace.s4, vertical = KasaneSpace.s2),
+            verticalArrangement = Arrangement.spacedBy(KasaneSpace.s3),
         ) {
             SetupCards(resumeTick)
             CategoryList(selected, onSelect)
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(KasaneSpace.s6))
         }
     }
 }
@@ -146,7 +145,7 @@ private fun CategoryList(selected: Category?, onSelect: (Category) -> Unit) {
     for (group in CategoryGroup.entries) {
         Text(
             stringResource(group.title),
-            Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp),
+            Modifier.padding(start = KasaneSpace.s4, top = KasaneSpace.s2, bottom = KasaneSpace.s1),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.primary,
         )
@@ -154,35 +153,30 @@ private fun CategoryList(selected: Category?, onSelect: (Category) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun CategoryGroupList(items: List<Category>, selected: Category?, onSelect: (Category) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
         items.forEachIndexed { i, c ->
-            val big = 24.dp
-            val small = 6.dp
-            val shape = RoundedCornerShape(
-                topStart = if (i == 0) big else small, topEnd = if (i == 0) big else small,
-                bottomStart = if (i == items.lastIndex) big else small, bottomEnd = if (i == items.lastIndex) big else small,
-            )
             val isSelected = c == selected
-            Surface(
+            // 隙間で区切った塗りのリスト。角の丸みはテーマの shapes（kasane の角丸）から
+            SegmentedListItem(
                 onClick = { onSelect(c) },
-                shape = shape,
-                color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+                shapes = ListItemDefaults.segmentedShapes(i, items.size),
+                colors = ListItemDefaults.colors(
+                    containerColor = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+                ),
+                leadingContent = {
+                    Box(
+                        Modifier.size(40.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(painterResource(c.icon), contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    }
+                },
+                supportingContent = { Text(stringResource(c.summary)) },
             ) {
-                ListItem(
-                    headlineContent = { Text(stringResource(c.title), style = MaterialTheme.typography.titleMedium) },
-                    supportingContent = { Text(stringResource(c.summary)) },
-                    leadingContent = {
-                        Box(
-                            Modifier.size(40.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(painterResource(c.icon), contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        }
-                    },
-                    colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-                )
+                Text(stringResource(c.title), style = MaterialTheme.typography.titleMedium)
             }
         }
     }
@@ -201,7 +195,7 @@ private fun SetupCards(resumeTick: Int) {
         micGranted = granted
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(KasaneSpace.s3)) {
         if (!state.imeEnabled) {
             SetupCard(
                 stringResource(R.string.app_setup_enable_title),
@@ -248,10 +242,10 @@ private fun SetupCard(title: String, why: String, action: String, onClick: () ->
             contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
         ),
     ) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(KasaneSpace.s5), verticalArrangement = Arrangement.spacedBy(KasaneSpace.s2)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(painterResource(R.drawable.sym_warning), contentDescription = null, modifier = Modifier.size(20.dp))
-                Text(title, Modifier.padding(start = 8.dp), style = MaterialTheme.typography.titleMedium)
+                Text(title, Modifier.padding(start = KasaneSpace.s2), style = MaterialTheme.typography.titleMedium)
             }
             Text(why, style = MaterialTheme.typography.bodyMedium)
             Button(onClick = onClick, modifier = Modifier.align(Alignment.End)) { Text(action) }
@@ -298,8 +292,8 @@ private fun DetailPane(category: Category, onBack: (() -> Unit)?, modifier: Modi
                     .widthIn(max = 840.dp)
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                    .padding(horizontal = KasaneSpace.s4, vertical = KasaneSpace.s2),
+                verticalArrangement = Arrangement.spacedBy(KasaneSpace.s4),
             ) {
                 when (category) {
                     Category.INPUT -> InputScreen()
@@ -313,7 +307,7 @@ private fun DetailPane(category: Category, onBack: (() -> Unit)?, modifier: Modi
                     Category.TOOLS -> ToolsScreen()
                     Category.USAGE -> UsageScreen()
                 }
-                Spacer(Modifier.height(32.dp))
+                Spacer(Modifier.height(KasaneSpace.s8))
             }
         }
     }

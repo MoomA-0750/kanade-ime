@@ -27,6 +27,7 @@ import dev.mooma.kanade.KanadeSettings
 import dev.mooma.kanade.R
 import dev.mooma.kanade.ToggleTrigger
 import java.io.File
+import kasane.KasaneSpace
 
 @Composable
 fun rememberSettings(): KanadeSettings {
@@ -209,7 +210,7 @@ fun ColumnScope.KeyboardScreen() {
         }
         if (on) {
             var expiry by rememberPref({ settings.clipboardExpiryHours }, { settings.clipboardExpiryHours = it })
-            Text(stringResource(R.string.input_clipboard_expiry), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
+            Text(stringResource(R.string.input_clipboard_expiry), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = KasaneSpace.s2))
             RadioRows(
                 listOf(
                     0 to stringResource(R.string.input_clipboard_expiry_never),
@@ -230,7 +231,7 @@ fun ColumnScope.KeyboardScreen() {
         var bottom by rememberPref({ settings.softKeyboardBottom }, { settings.softKeyboardBottom = it })
         SliderRow(stringResource(R.string.input_bottom_margin), bottom, 0..64, 4, { bottom = it }) { "${it}dp" }
         Note(stringResource(R.string.input_size_note))
-        Text(stringResource(R.string.input_fold_split), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
+        Text(stringResource(R.string.input_fold_split), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = KasaneSpace.s2))
         val splitChoices = listOf(
             dev.mooma.kanade.FoldSplit.ALWAYS to stringResource(R.string.input_fold_split_always),
             dev.mooma.kanade.FoldSplit.FOLDED to stringResource(R.string.input_fold_split_folded),
@@ -244,7 +245,7 @@ fun ColumnScope.KeyboardScreen() {
         // 配列ごとに選ぶ
         for (id in LAYOUTS) androidx.compose.runtime.key(id) {
             var split by rememberPref({ settings.foldSplit(id) }, { settings.setFoldSplit(id, it) })
-            Text(layoutNames.getValue(id), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
+            Text(layoutNames.getValue(id), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = KasaneSpace.s1))
             ConnectedChoices(splitChoices, split, { split = it })
         }
         Note(stringResource(R.string.input_fold_split_note))
@@ -289,8 +290,8 @@ private fun LayoutModesRow(settings: dev.mooma.kanade.KanadeSettings, layout: St
         "NUM" to stringResource(R.string.ime_mode_num),
     )
     androidx.compose.foundation.layout.FlowRow(
-        Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        Modifier.fillMaxWidth().padding(start = KasaneSpace.s1, bottom = KasaneSpace.s1),
+        horizontalArrangement = Arrangement.spacedBy(KasaneSpace.s2),
     ) {
         for (mode in dev.mooma.kanade.KeyboardSources.choosableModes(layout)) {
             androidx.compose.material3.FilterChip(

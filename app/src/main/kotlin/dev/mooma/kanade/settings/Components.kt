@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kasane.KasaneSpace
 
 /**
  * 設定の値（SharedPreferences）を Compose の状態として持つ。書き換えると、すぐ保存もする
@@ -57,7 +58,7 @@ fun Section(title: String, description: String? = null, content: @Composable Col
         shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
-        Column(Modifier.padding(horizontal = 20.dp, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(horizontal = KasaneSpace.s5, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(KasaneSpace.s2)) {
             Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
             if (description != null) Note(description)
             content()
@@ -80,7 +81,7 @@ fun SwitchRow(title: String, checked: Boolean, onChange: (Boolean) -> Unit, summ
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f).padding(end = 16.dp)) {
+        Column(Modifier.weight(1f).padding(end = KasaneSpace.s4)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
             if (summary != null) Note(summary)
         }
@@ -97,11 +98,11 @@ fun <T> RadioRows(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> 
                 Modifier
                     .fillMaxWidth()
                     .selectable(selected = value == selected, role = Role.RadioButton, onClick = { onSelect(value) })
-                    .padding(vertical = 4.dp),
+                    .padding(vertical = KasaneSpace.s1),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RadioButton(selected = value == selected, onClick = null)
-                Text(label, Modifier.padding(start = 12.dp), style = MaterialTheme.typography.bodyLarge)
+                Text(label, Modifier.padding(start = KasaneSpace.s3), style = MaterialTheme.typography.bodyLarge)
             }
         }
     }

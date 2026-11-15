@@ -33,6 +33,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import dev.mooma.kanade.settings.KanadeTheme
+import kasane.KasaneSpace
 
 /**
  * クリップボードの履歴の文字を編集する画面。IME のパネルの中では文字を打てないので、ふつうの入力欄の画面として開き、
@@ -49,8 +50,8 @@ class ClipboardEditActivity : ComponentActivity() {
             KanadeTheme {
                 Surface(color = MaterialTheme.colorScheme.surface) {
                     Column(
-                        Modifier.fillMaxSize().systemBarsPadding().imePadding().padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        Modifier.fillMaxSize().systemBarsPadding().imePadding().padding(KasaneSpace.s4),
+                        verticalArrangement = Arrangement.spacedBy(KasaneSpace.s3),
                     ) {
                         Text(stringResource(R.string.ime_clipboard_edit_title), style = MaterialTheme.typography.titleLarge)
                         if (item?.text == null) {
@@ -62,7 +63,7 @@ class ClipboardEditActivity : ComponentActivity() {
                         val focus = remember { FocusRequester() }
                         OutlinedTextField(value, { value = it }, Modifier.fillMaxWidth().weight(1f).focusRequester(focus))
                         LaunchedEffect(Unit) { focus.requestFocus() }
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, androidx.compose.ui.Alignment.End)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(KasaneSpace.s2, androidx.compose.ui.Alignment.End)) {
                             TextButton(onClick = { finish() }) { Text(stringResource(R.string.ime_clipboard_cancel)) }
                             Button(
                                 onClick = {
