@@ -17,6 +17,7 @@ class DesktopApp(
     private val source: DictionaryCandidateSource,
     private val voice: DesktopVoice?,
     private val log: (String) -> Unit,
+    private val zenz: ZenzReranker? = null,
 ) {
     private var known = emptyList<Long>()
     private var settings = DesktopSettings()
@@ -57,6 +58,7 @@ class DesktopApp(
             if (first && s.lastJapanese) host.engine.handle(KeyInput.SetJapanese(true))
         }
         host.toggles = s.toggles
+        zenz?.correct = s.zenzMode == "CORRECT"
         voice?.spokenPunctuation = s.spokenPunctuation
         voice?.finalModel = VoiceFinal.of(s.voiceFinal)
         voice?.finalModelEn = VoiceFinal.english(s.voiceFinalEn)

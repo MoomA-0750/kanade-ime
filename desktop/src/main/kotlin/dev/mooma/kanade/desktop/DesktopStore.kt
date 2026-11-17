@@ -18,6 +18,8 @@ data class DesktopSettings(
     val emojiPrefix: String = ":",
     /** 入り口の文字を2回続けたときだけ始める（`::rocket`） */
     val emojiPrefixTwice: Boolean = false,
+    /** zenz の使い方（Android 版と同じ）。CORRECT は1位を確かめて直す（軽い）、RERANK は候補を全部並べ替える（打つたびに重い） */
+    val zenzMode: String = "CORRECT",
     val toggles: Set<WinToggle> = WinToggle.entries.toSet(),
     val spokenPunctuation: Boolean = true,
     val learning: Boolean = true,
@@ -72,6 +74,7 @@ class DesktopStore(val dir: File = defaultDir()) {
             emojiShortcodes = bool(KEY_EMOJI, d.emojiShortcodes),
             emojiPrefix = p.getProperty(KEY_EMOJI_PREFIX)?.trim()?.let(::emojiPrefixOrNull) ?: d.emojiPrefix,
             emojiPrefixTwice = bool(KEY_EMOJI_TWICE, d.emojiPrefixTwice),
+            zenzMode = p.getProperty(KEY_ZENZ_MODE)?.trim()?.uppercase()?.takeIf { it in ZENZ_MODES } ?: d.zenzMode,
             toggles = p.getProperty(KEY_TRIGGERS)?.split(',')?.mapNotNull { name -> WinToggle.entries.find { it.name == name.trim() } }?.toSet()
                 ?: d.toggles,
             spokenPunctuation = bool(KEY_SPOKEN_PUNCT, d.spokenPunctuation),
@@ -102,6 +105,8 @@ class DesktopStore(val dir: File = defaultDir()) {
             appendLine("$KEY_EMOJI_PREFIX=${s.emojiPrefix}")
             appendLine("# 入り口の文字を2回続けて打ったときだけ絵文字の名前にする（::rocket）")
             appendLine("$KEY_EMOJI_TWICE=${s.emojiPrefixTwice}")
+            appendLine("# zenz の使い方（CORRECT は1位を確かめて直す・軽い、RERANK は候補を全部並べ替える・打つたびに重い）")
+            appendLine("$KEY_ZENZ_MODE=${s.zenzMode}")
             appendLine("# 日本語のオン/オフに使うキー（RIGHT_ALT_TAP・CTRL_SPACE・F13 をカンマ区切りで。変換/無変換・半角/全角はいつでも使える）")
             appendLine("$KEY_TRIGGERS=${s.toggles.joinToString(",") { it.name }}")
             appendLine("# 音声入力で「まる」「てん」などを句読点にする")
@@ -167,6 +172,7 @@ class DesktopStore(val dir: File = defaultDir()) {
             emojiShortcodes = take(KEY_EMOJI, { it as? Boolean }, now.emojiShortcodes),
             emojiPrefix = take(KEY_EMOJI_PREFIX, { (it as? String)?.let(::emojiPrefixOrNull) }, now.emojiPrefix),
             emojiPrefixTwice = take(KEY_EMOJI_TWICE, { it as? Boolean }, now.emojiPrefixTwice),
+            zenzMode = take(KEY_ZENZ_MODE, { (it as? String)?.takeIf { m -> m in ZENZ_MODES } }, now.zenzMode),
             toggles = take(KEY_TRIGGERS, { v ->
                 (v as? org.json.JSONArray)?.let { arr -> (0 until arr.length()).mapNotNull { i -> WinToggle.entries.find { it.name == arr.getString(i) } }.toSet() }
             }, now.toggles),
@@ -212,6 +218,7 @@ class DesktopStore(val dir: File = defaultDir()) {
             .put(KEY_EMOJI, entry("boolean", s.emojiShortcodes))
             .put(KEY_EMOJI_PREFIX, entry("string", s.emojiPrefix))
             .put(KEY_EMOJI_TWICE, entry("boolean", s.emojiPrefixTwice))
+            .put(KEY_ZENZ_MODE, entry("string", s.zenzMode))
             .put(KEY_TRIGGERS, entry("stringSet", org.json.JSONArray(s.toggles.map { it.name }.sorted())))
             .put(KEY_SPOKEN_PUNCT, entry("boolean", s.spokenPunctuation))
             .put(KEY_LEARNING, entry("boolean", s.learning))
@@ -245,6 +252,8 @@ class DesktopStore(val dir: File = defaultDir()) {
         const val KEY_EMOJI = "emoji_shortcodes"
         const val KEY_EMOJI_PREFIX = "emoji_prefix"
         const val KEY_EMOJI_TWICE = "emoji_prefix_twice"
+        const val KEY_ZENZ_MODE = "zenz_mode"
+        val ZENZ_MODES = setOf("CORRECT", "RERANK")
 
         /** 入り口の文字として使える1文字なら、その文字 */
         fun emojiPrefixOrNull(s: String): String? = s.takeIf { it.length == 1 && EngineSettings.isEmojiPrefix(it[0]) }

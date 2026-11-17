@@ -58,7 +58,7 @@ fun logFile(): File {
 
 private fun log(s: String) = System.err.println("[kanade] ${java.time.LocalTime.now().withNano(0)} $s")
 
-private class Built(val host: EngineHost, val source: dev.mooma.kanade.core.convert.DictionaryCandidateSource, val voice: DesktopVoice?)
+private class Built(val host: EngineHost, val source: dev.mooma.kanade.core.convert.DictionaryCandidateSource, val voice: DesktopVoice?, val zenz: ZenzReranker?)
 
 private fun newHost(data: File): EngineHost = build(data).host
 
@@ -69,7 +69,7 @@ private fun build(data: File): Built {
     log("辞書を読んだ ${(System.nanoTime() - started) / 1_000_000}ms")
     val library = ZenzReranker.libraryFile()
     val model = resources.zenzModel
-    val reranker = if (library.exists() && model != null) ZenzReranker(library, model, ::log) else {
+    val reranker = if (library.exists() && model != null) ZenzReranker(library, model, ::log, source) else {
         log("zenz なし（${library.path}、モデル ${model?.path}）")
         null
     }
@@ -77,7 +77,7 @@ private fun build(data: File): Built {
     val reazon = ReazonPartial(File(data, "reazonspeech"), ::log)
     // 確定の文のモデルは設定の画面から落として選べるので、いま入っていなくても音声入力は用意しておく
     val voice = DesktopVoice(DesktopVoice.libraryFile(), data, ::log, reazon)
-    return Built(EngineHost(InputEngine(candidateSource = source), reranker, voice), source, voice)
+    return Built(EngineHost(InputEngine(candidateSource = source), reranker, voice), source, voice, reranker)
 }
 
 
@@ -95,7 +95,7 @@ private fun serve(data: File, socket: Path) {
     }
     val built = build(data)
     val host = built.host
-    val app = DesktopApp(DesktopStore(), host, built.source, built.voice, ::log)
+    val app = DesktopApp(DesktopStore(), host, built.source, built.voice, ::log, built.zenz)
     app.start()
     host.onMenu = app::handleMenu
     host.onAdmin = app::handleAdmin

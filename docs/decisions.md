@@ -513,3 +513,11 @@ SPEC.md の未決事項に本人が答えた。
 - 設定の画面は `Kanade.app` の中に入れて運び、`~/Applications` へ写す（`kanade-settings://` の URL で開くので、LaunchServices に登録される置き場所に置く）。
 - 署名: 本人は Apple Developer に登録済みだが、組む Mac（Reiyas-Air）には「Apple Development」の証明書しかなく、「Developer ID Application」の証明書と公証の資格情報（notarytool のプロファイル）が無い。組み立ては、Developer ID の証明書があれば Hardened Runtime と時刻印で署名し（java には JIT・署名の無い実行メモリ・ライブラリの検証を切る・録音の entitlements）、`KANADE_NOTARY_PROFILE` があれば公証に出す。jar の中の sherpa-onnx の dylib も取り出して署名し直す（公証は jar の中も見るため）。どれも無いあいだは ad-hoc で、ダウンロードしたものを初めて開くと止められる。公証はまだ一度も通していないので、通らなければ直す。
 - 確かめたこと: Mac（M1・macOS 27）でディスクイメージを開いて `Kanade.app` を `open` すると、エンジンを写して登録し、前の `Kanade.app` はゴミ箱へ移った。写したエンジンで `:rocket:` → 🚀、zenz の変換が動いた。知らせの窓の見た目と、入れたあと入力ソースとして選んで打つところは、ssh からは画面を撮れず見ていない。
+
+## 2026-11-18 PC の版の zenz を「確かめて直す」にする（Mac が熱くなる件）
+
+- 本人の報告: cramshell（MacBook Air M1、ファンなし）で日本語入力を始めるとみるみる熱くなり、重くなる。
+- 調べたこと: 止まっているあいだ Kanade のプロセスは CPU をほぼ使わない。エンジンのソケットへ人の速さ（0.15 秒に1キー）でキーを送る再現（`typesim.py`）で、30 秒にエンジンの CPU 時間が 12.9 秒（java が 30〜75%）、そのあいだ kernel_task（熱を抑えるために CPU を止める）が 12〜16% から 30〜60% に上がった。PC の版は、打つたびに辞書の上位 10 件を zenz（4 スレッド）で採点する「並べ替え」しか使っていなかった。新しいキーが来ると待っている依頼は捨てるが、走り始めた推論は最後まで回る。
+- ほかに重かったもの（Kanade と関係なく、もとから）: Zen の plugin-container 4つで合計 110% ほど、WindowServer 43%、Zen の GPU Helper 31%、はじめのうち iPhone ミラーリング 87%。ファンのない Air では、ここに Kanade の分が乗ると熱で抑えられる。
+- 決めたこと（仮）: PC の版も Android 版の既定と同じ「確かめて直す」を既定にし、`settings.properties` の `zenz_mode`（CORRECT・RERANK）で戻せるようにした。同じ打ち方で CPU 時間は 13.5 秒 → 4.8 秒。並べ替えと確かめて直すの正解の数は Android 版の評価で同じ（202 文で 187）。
+- まだ: 設定の画面（Windows・Linux・macOS）に選ぶ所を足していない。スレッド数（4）を減らすと、さらに下がるかは試していない。
