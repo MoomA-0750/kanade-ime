@@ -17,6 +17,8 @@ public sealed class Store
 
     public bool FullWidthSymbols { get; set; } = true;
     public bool LiveConversion { get; set; } = true;
+    /// <summary>zenz の使い方（CORRECT は1位を確かめて直す・軽い、RERANK は候補を全部並べ替える・打つたびに重い）</summary>
+    public string ZenzMode { get; set; } = "CORRECT";
     public string Punctuation { get; set; } = "、。";
     public bool PairBrackets { get; set; } = true;
     /// <summary>: に続けて絵文字の名前を打つと絵文字を候補に出す（:rocket → 🚀）</summary>
@@ -50,6 +52,7 @@ public sealed class Store
             {
                 case "full_width_symbols": s.FullWidthSymbols = Bool(s.FullWidthSymbols); break;
                 case "live_conversion": s.LiveConversion = Bool(s.LiveConversion); break;
+                case "zenz_mode": if (value.ToUpperInvariant() is "CORRECT" or "RERANK") s.ZenzMode = value.ToUpperInvariant(); break;
                 case "punctuation": if (value.Length == 2) s.Punctuation = value; break;
                 case "pair_brackets": s.PairBrackets = Bool(s.PairBrackets); break;
                 case "emoji_shortcodes": s.EmojiShortcodes = Bool(s.EmojiShortcodes); break;
@@ -78,6 +81,8 @@ public sealed class Store
             .AppendLine($"full_width_symbols={B(FullWidthSymbols)}")
             .AppendLine("# 打鍵ごとに変換結果を出す（ライブ変換）")
             .AppendLine($"live_conversion={B(LiveConversion)}")
+            .AppendLine("# zenz の使い方（CORRECT は1位を確かめて直す・軽い、RERANK は候補を全部並べ替える・打つたびに重い）")
+            .AppendLine($"zenz_mode={ZenzMode}")
             .AppendLine("# 句読点（、。 ，． 、． ，。 のどれか）")
             .AppendLine($"punctuation={Punctuation}")
             .AppendLine("# 開き括弧を打ったら閉じ括弧も入れ、カーソルを中に置く")

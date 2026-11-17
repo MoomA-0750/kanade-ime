@@ -21,6 +21,7 @@ const QMap<QString, QString> &defaults()
     static const QMap<QString, QString> d{
         {"full_width_symbols", "true"},
         {"live_conversion", "true"},
+        {"zenz_mode", "CORRECT"},
         {"punctuation", "、。"},
         {"pair_brackets", "true"},
         {"emoji_shortcodes", "true"},
@@ -41,6 +42,7 @@ const QMap<QString, QString> &defaults()
 const QMap<QString, QString> &comments()
 {
     static const QMap<QString, QString> c{
+        {"zenz_mode", "# zenz の使い方（CORRECT は1位を確かめて直す・軽い、RERANK は候補を全部並べ替える・打つたびに重い）"},
         {"emoji_prefix", "# 絵文字の名前の入り口の文字（: ; / @ ! など、記号1文字）"},
         {"emoji_prefix_twice", "# 入り口の文字を2回続けて打ったときだけ絵文字の名前にする（::rocket）"},
         {"emoji_shortcodes", "# : に続けて絵文字の名前を打つと絵文字を候補に出す（:rocket → 🚀）"},

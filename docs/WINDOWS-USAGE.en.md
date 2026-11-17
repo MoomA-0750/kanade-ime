@@ -25,7 +25,7 @@ Kanade brings the input of the Android app (live conversion, zenz reranking and 
 
 Open them from the right-click menu of the taskbar input indicator or from "Kanade Settings" in the Start menu:
 
-- Input: live conversion, full width, punctuation, bracket pairs, emoji by name, keys to switch, learning (and clearing it), display language
+- Input: live conversion, zenz mode, full width, punctuation, bracket pairs, emoji by name, keys to switch, learning (and clearing it), display language
 - Voice input: spoken punctuation, the model for the final text (parakeet, ReazonSpeech, SenseVoice, whisper small/kotoba/turbo: download, delete, use), microphone settings
 - User dictionary and snippets: add, edit and delete in a list, or edit everything as text
 - Import and export: import Android settings (the JSON from Export settings), export a file the Android app can read, open the settings folder and the log
