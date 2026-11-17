@@ -29,7 +29,9 @@ class ZenzReranker(
         val started = System.nanoTime()
         zenz = runCatching {
             System.load(library.absolutePath)
-            val threads = Runtime.getRuntime().availableProcessors().coerceIn(1, 4)
+            // 試験用に -Dkanade.zenzThreads で変えられる
+            val threads = System.getProperty("kanade.zenzThreads")?.toIntOrNull()?.coerceAtLeast(1)
+                ?: Runtime.getRuntime().availableProcessors().coerceIn(1, 2)
             ZenzModel.open(model.absolutePath, threads = threads)
         }.onFailure { log("zenz を読めない: $it") }.getOrNull()
         failed = zenz == null
