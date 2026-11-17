@@ -4,6 +4,8 @@
     { "from": "android/kasane/Shape.kt", "to": "app/src/main/kotlin/kasane/Shape.kt" },
     { "from": "android/kasane/Dimens.kt", "to": "app/src/main/kotlin/kasane/Dimens.kt" },
     { "from": "apps/kanade-ime/android/kasane/Color.kt", "to": "app/src/main/kotlin/kasane/Color.kt" },
-    { "from": "apps/kanade-ime/qml/Kasane.qml", "to": "linux/settings/qt/qml/Kasane.qml" }
+    { "from": "apps/kanade-ime/qml/Kasane.qml", "to": "linux/settings/qt/qml/Kasane.qml" },
+    { "from": "apple/KasaneTokens.swift", "to": "mac/settings/KasaneTokens.swift" },
+    { "from": "windows/Kasane.xaml", "to": "windows/settings/Kasane.xaml" }
   ]
 }

@@ -48,7 +48,7 @@ struct KeyCaptureSheet: View {
     @State private var monitor: Any?
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: Kasane.Space.s4) {
             Image(systemName: "keyboard").font(.largeTitle).foregroundStyle(.secondary)
             Text(T("キーを押してください", "Press a key")).font(.headline)
             Text(combo ? T("Control・Option などと組み合わせたキーを押します（Esc でやめる）", "Press a key together with Control, Option or similar (Esc to cancel)")
@@ -58,7 +58,7 @@ struct KeyCaptureSheet: View {
             Button(T("やめる", "Cancel")) { finish(nil) }
                 .keyboardShortcut(.cancelAction)
         }
-        .padding(24)
+        .padding(Kasane.Space.s6)
         .frame(width: 360)
         .onAppear {
             monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { e in

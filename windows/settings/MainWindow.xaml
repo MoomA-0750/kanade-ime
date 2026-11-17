@@ -13,8 +13,8 @@
         </Grid.RowDefinitions>
         <!-- タイトルバー（内容を伸ばして、Windows 11 の設定アプリと同じ見た目にする） -->
         <Grid x:Name="TitleBar" Height="48" Padding="16,0,0,0">
-            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                <Border Width="20" Height="20" CornerRadius="4" Background="{ThemeResource AccentFillColorDefaultBrush}">
+            <StackPanel Orientation="Horizontal" Spacing="{StaticResource KasaneSpace3}" VerticalAlignment="Center">
+                <Border Width="20" Height="20" CornerRadius="{StaticResource KasaneCornerRadiusSm}" Background="{ThemeResource AccentFillColorDefaultBrush}">
                     <TextBlock Text="あ" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
                                Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
                 </Border>
