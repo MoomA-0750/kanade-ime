@@ -12,5 +12,4 @@ swiftc -O -swift-version 5 -target "$(uname -m)-apple-macos13.0" \
   Sources/*.swift -o "$APP/Contents/MacOS/Kanade"
 cp Info.plist "$APP/Contents/Info.plist"
 swift make-icon.swift "$APP/Contents/Resources/icon.tiff"
-# 開発者の署名がないので、ad-hoc で署名する（この Mac だけで使う）
-codesign --force --sign - "$APP"
+# 署名は mac/build.sh がまとめてする（中にエンジンを入れてから）

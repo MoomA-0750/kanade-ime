@@ -13,27 +13,9 @@ for a in "$@"; do
 done
 SUPPORT="$HOME/Library/Application Support/Kanade"
 DEST="$SUPPORT/engine"
-IM="$HOME/Library/Input Methods"
 
-# 動いているものを止める（新しい版を読み込ませる）
-pkill -f 'dev.mooma.kanade.desktop.MainKt serve' 2>/dev/null || true
-pkill -x Kanade 2>/dev/null || true
-
-mkdir -p "$DEST/data" "$IM"
-# 落とした音声のモデル（data の下のフォルダ）は残す
-for d in bin lib native runtime; do rm -rf "${DEST:?}/$d"; done
-cp -R engine/bin engine/lib engine/native engine/runtime "$DEST/"
-cp engine/data/* "$DEST/data/"
-# 前の Kanade.app はゴミ箱へ
-if [ -e "$IM/Kanade.app" ]; then
-  mkdir -p "$HOME/.Trash"
-  mv "$IM/Kanade.app" "$HOME/.Trash/Kanade-$(date +%Y%m%d%H%M%S).app"
-fi
-cp -R Kanade.app "$IM/"
-[ -d "Kanade Settings.app" ] && rm -rf "$HOME/Applications/Kanade Settings.app" && mkdir -p "$HOME/Applications" && cp -R "Kanade Settings.app" "$HOME/Applications/"
-cp MAC-USAGE.md "$SUPPORT/" 2>/dev/null || true
-# 入力ソースに登録して有効にする
-"$IM/Kanade.app/Contents/MacOS/Kanade" --install || true
+# Kanade.app が、中のエンジンと設定の画面を置き、自分を ~/Library/Input Methods へ写して登録する（開いたときと同じ）
+"./Kanade.app/Contents/MacOS/Kanade" --setup
 if [ "$VOICE" = 1 ]; then
   # 一覧は desktop/…/VoiceModels.kt・windows/settings/VoiceModels.cs と同じ版
   fetch() { # <置き場所> <URL>

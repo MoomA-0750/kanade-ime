@@ -3,7 +3,7 @@
 #   scripts/mac.sh bundle            エンジンの jar・辞書・ネイティブと mac/ のソースを .cache/mac-bundle.tgz にまとめる
 #   scripts/mac.sh build <host>      束を送って、相手で mac/build.sh を動かす（配布物は ~/kanade-build/dist）
 #   scripts/mac.sh install <host> [--voice]   相手で組み立てた配布物を入れる
-#   scripts/mac.sh fetch <host>      相手で作った配布物の tar.gz を dist/ へ持ってくる
+#   scripts/mac.sh fetch <host>      相手で作った配布物（dmg と tar.gz）を dist/ へ持ってくる
 #   scripts/mac.sh log <host>        エンジンの記録の末尾
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -69,13 +69,13 @@ case "${1:-}" in
     send_tools "$HOST" "$ARCH"
     ssh -o BatchMode=yes "$HOST" "mkdir -p ~/$REMOTE && cd ~/$REMOTE && rm -rf native third_party mac engine data docs"
     scp -q -o BatchMode=yes .cache/mac-bundle.tgz "$HOST:$REMOTE/bundle.tgz"
-    ssh -o BatchMode=yes "$HOST" "cd ~/$REMOTE && tar -xzf bundle.tgz && rm bundle.tgz && bash mac/build.sh" ;;
+    ssh -o BatchMode=yes "$HOST" "cd ~/$REMOTE && tar -xzf bundle.tgz && rm bundle.tgz && KANADE_SIGN_ID='${KANADE_SIGN_ID:-}' KANADE_NOTARY_PROFILE='${KANADE_NOTARY_PROFILE:-}' bash mac/build.sh" ;;
   install)
     HOST=$2; shift 2
     ssh -o BatchMode=yes "$HOST" "bash -c 'cd ~/$REMOTE/dist/Kanade-mac-*/ && ./install.sh $*'" ;;
   fetch)
     mkdir -p dist
-    scp -o BatchMode=yes "$2:$REMOTE/dist/Kanade-mac-*.tar.gz" dist/ ;;
+    scp -o BatchMode=yes "$2:$REMOTE/dist/Kanade-mac-*.tar.gz" "$2:$REMOTE/dist/Kanade-mac-*.dmg" dist/ ;;
   log)
     ssh -o BatchMode=yes "$2" "tail -n ${3:-40} ~/Library/Logs/Kanade/engine.log" ;;
   *)

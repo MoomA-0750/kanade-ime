@@ -6,12 +6,15 @@ Android 版・Windows 版・Linux 版と同じ入力（ライブ変換・zenz �
 
 要るもの: Xcode（組む Mac に。swiftc・codesign）。JDK・cmake は組み立てのときに手元から送る。Java は要らない（配布物に入っている）。sudo も要らない。
 
-- 組み立て: リポジトリの手元で `scripts/mac.sh build <ssh の相手>`。ネイティブ・入力ソース・設定の画面は相手の Mac の上でビルドする
-- 入れる: `scripts/mac.sh install <ssh の相手> --voice`（相手の Mac で配布物の `install.sh` を動かす）
+- 入れる: `Kanade-mac-<arch>.dmg` を開き、中の `Kanade.app` を開く。自分で入って「入れました」と出る（入力ソースへの登録まで済む）。そのあとディスクイメージは消してよい
+  - Developer ID の署名が無い版（ad-hoc）は、初めて開くときに macOS に止められる。システム設定 → プライバシーとセキュリティの「このまま開く」で開く
+  - 入れ直す（新しい版にする）ときも、新しい `Kanade.app` を開くだけ。前の `Kanade.app` はゴミ箱へ移り、落とした音声のモデル・設定・辞書・学習は残る
   - エンジン・辞書・音声のモデルは `~/Library/Application Support/Kanade/engine`、設定・ユーザー辞書・学習は `~/Library/Application Support/Kanade`、記録は `~/Library/Logs/Kanade/engine.log`・`ime.log`
-  - 入力ソースは `~/Library/Input Methods/Kanade.app`（入れると登録して有効にする）、設定の画面は `~/Applications/Kanade Settings.app`
-  - `--voice`: 音声入力のモデル（日本語の parakeet-ja 656MB・ReazonSpeech 73MB と、英語の parakeet-tdt v3 670MB）を落とす。入れ直しても残る
-- 外す: `~/kanade-build/dist/Kanade-mac-*/uninstall.sh`（設定・辞書・音声のモデルも消すときは `--all`。消したものはゴミ箱へ）
+  - 入力ソースは `~/Library/Input Methods/Kanade.app`、設定の画面は `~/Applications/Kanade Settings.app`
+  - 音声入力のモデルは、入力メニューの「設定…」→「音声入力」から落とす
+- 組み立て（開発用）: リポジトリの手元で `scripts/mac.sh build <ssh の相手>`。ネイティブ・入力ソース・設定の画面は相手の Mac の上でビルドし、`dist/` にディスクイメージと tar.gz を作る。相手の Mac に Developer ID Application の証明書があれば、それで署名する。公証も出すときは、相手の Mac で `xcrun notarytool store-credentials <名前>` をしておき、`KANADE_NOTARY_PROFILE=<名前>` を付けて組む
+  - `scripts/mac.sh install <ssh の相手> --voice` は、相手の Mac で tar.gz の `install.sh` を動かす（画面を出さずに同じように入れ、`--voice` で音声のモデル（日本語の parakeet-ja 656MB・ReazonSpeech 73MB と、英語の parakeet-tdt v3 670MB）も落とす）
+- 外す: tar.gz の `uninstall.sh`（設定・辞書・音声のモデルも消すときは `--all`。消したものはゴミ箱へ）。または `~/Library/Input Methods/Kanade.app` と `~/Applications/Kanade Settings.app` をゴミ箱へ入れ、システム設定の入力ソースから外す
 
 ## 使い始める
 

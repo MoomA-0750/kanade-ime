@@ -9,4 +9,4 @@ echo "設定の画面をビルドする"
 swiftc -O -parse-as-library -target "$(uname -m)-apple-macos14.0" -framework SwiftUI -framework AppKit \
   *.swift -o "$APP/Contents/MacOS/KanadeSettings"
 cp Info.plist "$APP/Contents/Info.plist"
-codesign --force --sign - "$APP"
+# 署名は mac/build.sh がまとめてする（中にエンジンを入れてから）

@@ -13,6 +13,6 @@ mkdir -p "$TRASH"
 if [ "${1:-}" = "--all" ]; then
   [ -e "$SUPPORT" ] && mv "$SUPPORT" "$TRASH/support"
 else
-  for d in bin lib native runtime; do [ -e "$SUPPORT/engine/$d" ] && mv "$SUPPORT/engine/$d" "$TRASH/"; done
+  for d in bin lib native runtime VERSION; do [ -e "$SUPPORT/engine/$d" ] && mv "$SUPPORT/engine/$d" "$TRASH/"; done
 fi
 echo "外しました（消したものは $TRASH）。入力ソースの一覧に残っていれば、システム設定のキーボードから外してください"

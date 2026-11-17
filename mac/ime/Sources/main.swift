@@ -1,5 +1,7 @@
 // Kanade の macOS の入力方式（InputMethodKit のアプリ）。~/Library/Input Methods/Kanade.app に置く。
-//   Kanade --install    入力ソースに登録して有効にする（install.sh が呼ぶ）
+//   ほかの場所（ダウンロードしたディスクイメージなど）で開くと、自分を入れて終わる（Setup.swift）
+//   Kanade --setup      同じことを、画面を出さずに行う（install.sh が呼ぶ）
+//   Kanade --install    入力ソースに登録して有効にする
 //   Kanade --uninstall  入力ソースを無効にする
 import AppKit
 import Carbon
@@ -22,12 +24,23 @@ if args.contains("--install") {
     }
     exit(0)
 }
+if args.contains("--setup") {
+    let error = Setup.install()
+    print(error ?? "installed")
+    exit(error == nil ? 0 : 1)
+}
 if args.contains("--uninstall") {
     for s in inputSources() {
         print("disable: \(TISDisableInputSource(s))")
     }
     exit(0)
 }
+
+if !Setup.isInstalledCopy && !args.contains("--serve-here") {
+    Setup.runInteractive()
+}
+// .app を入れ替えた（新しい版の中のエンジンが置いてあるものと違う）ときは、エンジンを写し直す
+do { try Setup.syncEngine() } catch { klog("engine を写せない: \(error)") }
 
 let connection = Bundle.main.infoDictionary?["InputMethodConnectionName"] as? String ?? "dev.mooma.inputmethod.Kanade_Connection"
 guard let server = IMKServer(name: connection, bundleIdentifier: bundleId) else {
