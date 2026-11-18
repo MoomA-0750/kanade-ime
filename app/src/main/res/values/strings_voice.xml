@@ -15,6 +15,8 @@
     <string name="voice_speaking_section_title">Speaking</string>
     <string name="voice_streaming_title">Show text while speaking</string>
     <string name="voice_streaming_summary">Shows text while you are still speaking (with Nemotron if downloaded, otherwise ReazonSpeech).</string>
+    <string name="voice_sounds_title">Sound when recording starts and stops</string>
+    <string name="voice_sounds_summary">Plays a short rising sound when recording starts and a falling one when it stops. Silent in vibrate and silent mode.</string>
     <string name="voice_spoken_punctuation_title">Speak punctuation</string>
     <string name="voice_spoken_punctuation_summary">Say words like くてん → 。, とうてん → 、, かいぎょう → new line, まる / てん at the end of a sentence. Edit the list under Settings → Spoken symbols.</string>
     <string name="voice_threads_label">Recognition threads</string>

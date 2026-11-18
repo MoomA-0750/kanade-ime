@@ -28,6 +28,7 @@ const QMap<QString, QString> &defaults()
         {"emoji_prefix", ":"},
         {"emoji_prefix_twice", "false"},
         {"spoken_punctuation", "true"},
+        {"voice_sounds", "true"},
         {"voice_final", "parakeet"},
         {"learning", "true"},
         {"ui_language", "auto"},
@@ -44,6 +45,7 @@ const QMap<QString, QString> &comments()
 {
     static const QMap<QString, QString> c{
         {"zenz_mode", "# zenz の使い方（CORRECT は1位を確かめて直す・軽い、RERANK は候補を全部並べ替える・打つたびに重い）"},
+        {"voice_sounds", "# 録音を始めた・終えたときに効果音を鳴らす"},
         {"key_style", "# 入力中の Ctrl のキー（PC は Ctrl+U/I/O/P/T でひらがな・カタカナ・半角カナ・全角英数・半角英数、MAC は macOS と同じ Ctrl+J/K/L/; でひらがな・カタカナ・全角英字・半角英字。F6〜F10 はどちらでも使える）"},
         {"emoji_prefix", "# 絵文字の名前の入り口の文字（: ; / @ ! など、記号1文字）"},
         {"emoji_prefix_twice", "# 入り口の文字を2回続けて打ったときだけ絵文字の名前にする（::rocket）"},

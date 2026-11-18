@@ -77,7 +77,7 @@ private fun build(data: File): Built {
     val reazon = ReazonPartial(File(data, "reazonspeech"), ::log)
     // 確定の文のモデルは設定の画面から落として選べるので、いま入っていなくても音声入力は用意しておく
     val voice = DesktopVoice(DesktopVoice.libraryFile(), data, ::log, reazon)
-    return Built(EngineHost(InputEngine(candidateSource = source), reranker, voice), source, voice, reranker)
+    return Built(EngineHost(InputEngine(candidateSource = source), reranker, voice, earcons = Earcons(::log)), source, voice, reranker)
 }
 
 

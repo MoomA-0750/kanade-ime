@@ -136,6 +136,11 @@ fun ColumnScope.VoiceScreen() {
             stringResource(R.string.voice_streaming_title), streaming, { streaming = it },
             stringResource(R.string.voice_streaming_summary),
         )
+        var sounds by rememberPref({ settings.voiceSounds }, { settings.voiceSounds = it })
+        SwitchRow(
+            stringResource(R.string.voice_sounds_title), sounds, { sounds = it },
+            stringResource(R.string.voice_sounds_summary),
+        )
         var spoken by rememberPref({ settings.spokenPunctuation }, { settings.spokenPunctuation = it })
         SwitchRow(
             stringResource(R.string.voice_spoken_punctuation_title), spoken, { spoken = it },

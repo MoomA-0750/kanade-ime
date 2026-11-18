@@ -142,6 +142,11 @@ class KanadeSettings(context: Context) {
 
     fun setFoldSplit(layout: String, value: FoldSplit) = prefs.edit().putString(KEY_FOLD_SPLIT + "_" + layout, value.name).apply()
 
+    /** 録音を始めた・終えたときに効果音を鳴らす */
+    var voiceSounds: Boolean
+        get() = prefs.getBoolean(KEY_VOICE_SOUNDS, true)
+        set(value) = prefs.edit().putBoolean(KEY_VOICE_SOUNDS, value).apply()
+
     /** 話して句読点を入れる（「くてん」→「。」など） */
     var spokenPunctuation: Boolean
         get() = prefs.getBoolean(KEY_SPOKEN_PUNCT, true)
@@ -349,6 +354,7 @@ class KanadeSettings(context: Context) {
         const val KEY_CLIP_OVERLAY_W = "clipboard_overlay_width"
         const val KEY_CLIP_OVERLAY_H = "clipboard_overlay_height"
         const val KEY_SPOKEN_PUNCT = "spoken_punctuation"
+        const val KEY_VOICE_SOUNDS = "voice_sounds"
         const val KEY_VOICE_AUTO_PUNCT = "voice_auto_punctuation"
         const val KEY_VOICE_FILLERS = "voice_fillers"
         const val KEY_VOICE_COMMANDS = "voice_commands"

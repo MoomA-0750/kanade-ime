@@ -61,6 +61,7 @@ class DesktopApp(
         host.keyStyle = s.keyStyle
         zenz?.correct = s.zenzMode == "CORRECT"
         voice?.spokenPunctuation = s.spokenPunctuation
+        host.earcons?.enabled = s.voiceSounds
         voice?.finalModel = VoiceFinal.of(s.voiceFinal)
         voice?.finalModelEn = VoiceFinal.english(s.voiceFinalEn)
         host.voiceKeys = s.voiceHoldKeys to s.voiceToggleKey

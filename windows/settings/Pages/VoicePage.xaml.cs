@@ -15,6 +15,7 @@ public sealed partial class VoicePage : Page
     {
         InitializeComponent();
         Spoken.IsOn = store.SpokenPunctuation;
+        Sounds.IsOn = store.VoiceSounds;
         BuildModels();
         loading = false;
     }
@@ -23,6 +24,7 @@ public sealed partial class VoicePage : Page
     {
         if (loading) return;
         store.SpokenPunctuation = Spoken.IsOn;
+        store.VoiceSounds = Sounds.IsOn;
         store.Save();
     }
 

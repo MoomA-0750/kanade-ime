@@ -15,6 +15,8 @@
     <string name="voice_speaking_section_title">話し方</string>
     <string name="voice_streaming_title">話しながら文字を出す</string>
     <string name="voice_streaming_summary">話している途中の文字を出します（Nemotron を落としてあればそれで、なければ ReazonSpeech で）。</string>
+    <string name="voice_sounds_title">録音の始めと終わりに音を鳴らす</string>
+    <string name="voice_sounds_summary">録音を始めたときに上がる短い音、終えたときに下がる短い音を鳴らします。マナーモードのときは鳴りません。</string>
     <string name="voice_spoken_punctuation_title">話して句読点を入れる</string>
     <string name="voice_spoken_punctuation_summary">「くてん」→「。」、「とうてん」→「、」、「かいぎょう」→ 改行、文の終わりの「まる」「てん」などを記号にします。言葉の一覧は設定の「話して入れる記号」で増やしたり減らしたりできます。</string>
     <string name="voice_threads_label">認識に使うスレッド数</string>

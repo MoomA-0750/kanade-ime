@@ -1,5 +1,6 @@
 package dev.mooma.kanade.desktop
 
+import dev.mooma.kanade.core.voice.VoiceEarcon
 import dev.mooma.kanade.core.ImeCommand
 import dev.mooma.kanade.core.InputEngine
 import dev.mooma.kanade.core.KeyInput
@@ -37,6 +38,8 @@ class EngineHost(
     private val voice: VoiceService? = null,
     /** 録音キー（押している間だけ録音）。Android 版と同じ F12 */
     private val voiceKey: Int = VK.F12,
+    /** 録音を始めた・終えたときの効果音（試験では null） */
+    val earcons: Earcons? = null,
 ) {
     private val lock = Any()
     private val mapper = WinKeyMapper()
@@ -225,6 +228,7 @@ class EngineHost(
         val commands = run(engine.commitAll())
         recordingEnglish = english
         recording = v.start(english) { partial -> synchronized(lock) { if (recording) indicate("🎤 $partial") } }
+        if (recording) earcons?.play(VoiceEarcon.Kind.START)
         indicate(
             if (recording) (if (english) "🎤 EN" else "🎤") else Ui.t("マイクを使えません", "Microphone unavailable"),
             if (recording) 0 else 2000,
@@ -237,6 +241,7 @@ class EngineHost(
         val v = voice ?: return
         if (!recording) return
         recording = false
+        earcons?.play(VoiceEarcon.Kind.STOP)
         val english = recordingEnglish
         indicate(Ui.t("🎤 認識中", "🎤 Recognizing"))
         v.stop { text ->
@@ -258,6 +263,7 @@ class EngineHost(
         if (!recording) return
         recording = false
         v.cancel()
+        if (!quiet) earcons?.play(VoiceEarcon.Kind.STOP)
         if (quiet) indicate(null) else indicate(Ui.t("🎤 取り消しました", "🎤 Canceled"), 1000)
     }
 

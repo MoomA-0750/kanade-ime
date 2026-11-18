@@ -31,6 +31,8 @@ public sealed class Store
     /// <summary>入力中の Ctrl のキー（PC は Ctrl+U/I/O/P/T、MAC は macOS と同じ Ctrl+J/K/L/;）</summary>
     public string KeyStyle { get; set; } = "PC";
     public bool SpokenPunctuation { get; set; } = true;
+    /// <summary>録音を始めた・終えたときに効果音を鳴らす</summary>
+    public bool VoiceSounds { get; set; } = true;
     public bool Learning { get; set; } = true;
     public bool LastJapanese { get; set; }
     public string VoiceFinal { get; set; } = VoiceModel.DefaultId;
@@ -63,6 +65,7 @@ public sealed class Store
                 case "key_style": if (value.ToUpperInvariant() is "PC" or "MAC") s.KeyStyle = value.ToUpperInvariant(); break;
                 case "toggle_triggers": s.Toggles = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToHashSet(); break;
                 case "spoken_punctuation": s.SpokenPunctuation = Bool(s.SpokenPunctuation); break;
+                case "voice_sounds": s.VoiceSounds = Bool(s.VoiceSounds); break;
                 case "learning": s.Learning = Bool(s.Learning); break;
                 case "last_japanese": s.LastJapanese = Bool(s.LastJapanese); break;
                 case "ui_language": if (value is "auto" or "ja" or "en") s.UiLanguage = value; break;
@@ -102,6 +105,8 @@ public sealed class Store
             .AppendLine($"key_style={KeyStyle}")
             .AppendLine("# 音声入力で「まる」「てん」などを句読点にする")
             .AppendLine($"spoken_punctuation={B(SpokenPunctuation)}")
+            .AppendLine("# 録音を始めた・終えたときに効果音を鳴らす")
+            .AppendLine($"voice_sounds={B(VoiceSounds)}")
             .AppendLine("# 音声入力の確定の文を作るモデル（parakeet・reazon・sensevoice・whisper-small・whisper-kotoba・whisper-turbo）")
             .AppendLine($"voice_final={VoiceFinal}")
             .AppendLine("# 選んだ変換を覚えて次から先に出す")

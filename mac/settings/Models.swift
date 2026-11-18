@@ -67,7 +67,8 @@ let voiceModels: [VoiceModel] = {
 final class Downloads {
     static let shared = Downloads()
     var progress: [String: Double] = [:]
-    var message: String?
+    /** 落とせなかったときの理由（モデルの行の下に出す。落とし終えた・消したは行の見た目が変わるので、知らせは出さない） */
+    var errors: [String: String] = [:]
     /** 状態が変わった（落とし終えた・消した）ら増える。画面はこれを見て「落としたか」を見直す */
     var revision = 0
     private var tasks: [String: Task<Void, Never>] = [:]
@@ -75,6 +76,7 @@ final class Downloads {
     func start(_ model: VoiceModel, then: @escaping @MainActor () -> Void) {
         guard tasks[model.id] == nil else { return }
         progress[model.id] = 0
+        errors[model.id] = nil
         tasks[model.id] = Task.detached {
             let result = await Self.download(model) { f in await MainActor.run { Downloads.shared.progress[model.id] = f } }
             await MainActor.run {
@@ -83,12 +85,11 @@ final class Downloads {
                 d.progress[model.id] = nil
                 d.revision += 1
                 switch result {
-                case .success(true):
-                    d.message = T("\(model.name) を落としました", "Downloaded \(model.name)")
-                    then()
+                case .success(true): then()
                 case .success(false): break
-                case .failure(let e): d.message = T("落とせませんでした: \(e.localizedDescription)", "Download failed: \(e.localizedDescription)")
+                case .failure(let e): d.errors[model.id] = T("落とせませんでした: \(e.localizedDescription)", "Download failed: \(e.localizedDescription)")
                 }
+                Attention.shared.refresh()
             }
         }
     }
@@ -98,8 +99,8 @@ final class Downloads {
     func delete(_ model: VoiceModel) {
         let url = dataDir.appendingPathComponent(model.path)
         try? FileManager.default.trashItem(at: url, resultingItemURL: nil)
-        message = T("\(model.name) をゴミ箱へ移しました", "Moved \(model.name) to the Trash")
         revision += 1
+        Attention.shared.refresh()
     }
 
     /** 途中まで落としたもの（.part）があれば続きから。止めたら false */

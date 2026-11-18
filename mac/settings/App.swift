@@ -4,10 +4,13 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 enum Page: String, CaseIterable, Identifiable {
-    case input, voice, dictionary, snippets, backup, usage
+    case input, voice, dictionary, snippets, backup, usage, attention
     var id: String { rawValue }
+    /** サイドバーにいつも並ぶページ（attention は確かめてほしいことがあるときだけ上に出る） */
+    static let main: [Page] = [.input, .voice, .dictionary, .snippets, .backup, .usage]
     var title: String {
         switch self {
+        case .attention: T("確かめてほしいこと", "Needs your attention")
         case .input: T("入力", "Input")
         case .voice: T("音声入力", "Voice input")
         case .dictionary: T("ユーザー辞書", "User dictionary")
@@ -24,6 +27,7 @@ enum Page: String, CaseIterable, Identifiable {
         case .snippets: "text.badge.plus"
         case .backup: "arrow.up.arrow.down"
         case .usage: "questionmark.circle"
+        case .attention: "exclamationmark.triangle.fill"
         }
     }
 }
@@ -99,12 +103,19 @@ struct KanadeSettingsApp: App {
 struct ContentView: View {
     @State private var settings = SettingsFile()
     @Bindable private var nav = Navigation.shared
-    @Bindable private var downloads = Downloads.shared
+    @Bindable private var attention = Attention.shared
 
     var body: some View {
         NavigationSplitView {
-            List(Page.allCases, selection: $nav.page) { p in
-                Label(p.title, systemImage: p.symbol).tag(p)
+            List(selection: $nav.page) {
+                if !attention.issues.isEmpty {
+                    Section { AttentionRow(issues: attention.issues).tag(Page.attention) }
+                }
+                Section {
+                    ForEach(Page.main) { p in
+                        Label(p.title, systemImage: p.symbol).tag(p)
+                    }
+                }
             }
             .navigationSplitViewColumnWidth(min: 200, ideal: 220)
         } detail: {
@@ -116,16 +127,18 @@ struct ContentView: View {
                 case .snippets: PairPage(snippets: true)
                 case .backup: BackupPage()
                 case .usage: UsagePage()
+                case .attention: AttentionPage()
                 }
             }
             .id((nav.page ?? .input).rawValue + (settings.values["ui_language"] ?? ""))
         }
         .id(settings.values["ui_language"] ?? "auto")
         .onChange(of: settings.values["ui_language"]) { _, value in ja = uiJapanese(value ?? "auto") }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in settings.load() }
-        .alert(downloads.message ?? "", isPresented: Binding(get: { downloads.message != nil }, set: { if !$0 { downloads.message = nil } })) {
-            Button("OK") { downloads.message = nil }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            settings.load()
+            attention.refresh(settings: settings.values)
         }
+        .onChange(of: settings.values) { _, values in attention.refresh(settings: values) }
     }
 }
 
@@ -260,6 +273,7 @@ struct InputPage: View {
 struct VoicePage: View {
     @Bindable var settings: SettingsFile
     @Bindable private var downloads = Downloads.shared
+    @Bindable private var attention = Attention.shared
     @State private var capture: Bool?
 
     private var holds: [String] { (settings.values["voice_hold_keys"] ?? "").split(separator: ",").map(String.init).filter { !$0.isEmpty } }
@@ -302,6 +316,11 @@ struct VoicePage: View {
                        "Work with any input source. With Kanade you get Japanese, with other input sources (such as ABC) you get English. Press Esc while recording to cancel. Needs Accessibility permission"))
             }
             Section(T("書き方", "Writing")) {
+                Toggle(isOn: settings.bool("voice_sounds")) {
+                    Text(T("録音の始めと終わりに音を鳴らす", "Sound when recording starts and stops"))
+                    Text(T("録音を始めたときに上がる短い音、終えたときに下がる短い音を鳴らします（システム設定の「ユーザインターフェイスのサウンドエフェクトを再生」を切っていると鳴りません）",
+                           "Plays a short rising sound when recording starts and a falling one when it stops (not played when “Play user interface sound effects” is off in System Settings)"))
+                }
                 Toggle(isOn: settings.bool("spoken_punctuation")) {
                     Text(T("話した句読点", "Spoken punctuation"))
                     Text(T("日本語で「まる」「てん」「かいぎょう」などを、句読点や改行にします",
@@ -316,15 +335,22 @@ struct VoicePage: View {
                          footer: T("Kanade 以外の入力ソースのときに使います", "Used when another input source is active"),
                          models: voiceModels.filter(\.english))
             Section {
-                LabeledContent(T("アクセシビリティ", "Accessibility")) {
+                let perms = attention.perms
+                LabeledContent {
                     Button(T("許可の設定を開く", "Open privacy settings")) {
                         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
                     }
+                } label: {
+                    Text(T("アクセシビリティ", "Accessibility"))
+                    PermissionState(value: perms["accessibility"].map { $0 == "true" ? "on" : "off" })
                 }
-                LabeledContent(T("マイク", "Microphone")) {
+                LabeledContent {
                     Button(T("許可の設定を開く", "Open privacy settings")) {
                         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!)
                     }
+                } label: {
+                    Text(T("マイク", "Microphone"))
+                    PermissionState(value: perms["microphone"].map { $0 == "authorized" ? "on" : $0 == "not_determined" ? "ask" : "off" })
                 }
             } header: {
                 Text(T("許可", "Permissions"))
@@ -344,6 +370,20 @@ struct VoicePage: View {
                     settings.set("voice_hold_keys", (holds + [name]).joined(separator: ","))
                 }
             }
+        }
+    }
+}
+
+/** 許可の様子（入力方式が書いたもの）。入力方式がまだ動いていなければ何も出さない */
+struct PermissionState: View {
+    let value: String?
+
+    var body: some View {
+        switch value {
+        case "on": Label(T("許可されています", "Allowed"), systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+        case "off": Label(T("許可されていません", "Not allowed"), systemImage: "xmark.circle.fill").foregroundStyle(.red)
+        case "ask": Label(T("初めて録音するときに尋ねられます", "You will be asked the first time you record"), systemImage: "questionmark.circle")
+        default: EmptyView()
         }
     }
 }
@@ -374,6 +414,9 @@ struct ModelSection: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("\(m.name)（\(m.size)）")
                         Text(T(m.ja, m.en)).font(.caption).foregroundStyle(.secondary)
+                        if let error = downloads.errors[m.id] {
+                            Label(error, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(.red)
+                        }
                     }
                     Spacer()
                     if let f = downloads.progress[m.id] {
@@ -681,14 +724,14 @@ struct UsagePage: View {
     var body: some View {
         Form {
             section(T("打つ", "Typing"), [
-                T("入力メニューで Kanade に切り替えると日本語。英字は ABC などに切り替えて打ちます",
-                  "Switch to Kanade in the input menu for Japanese; switch to ABC or similar for English"),
+                T("入力メニューの「Kanade ひらがな」で日本語、「Kanade 英字」で英字。Control+Space・地球儀キー・かな／英数キーでも切り替わります",
+                  "Kanade Hiragana in the input menu types Japanese, Kanade English types letters. Control+Space, the Globe key and the Kana/Eisu keys also switch"),
                 T("ローマ字で打つと、打つたびに変換した結果が出ます（ライブ変換）。Return で確定",
                   "Type in romaji and the converted text appears as you type (live conversion). Return commits"),
                 T("Space で変換し、候補の窓から Space・↑↓・数字・クリックで選びます。←→ で文節を移り、Shift+←→ で区切りを変えます",
                   "Space converts; choose with Space, ↑↓, numbers or a click. ←→ moves between phrases, Shift+←→ changes the boundaries"),
-                T("F6〜F10（Control+U/I/O/P/T）でひらがな・カタカナ・半角カナ・全角英数・半角英数",
-                  "F6–F10 (Control+U/I/O/P/T) convert to hiragana, katakana, half-width kana, full-width and half-width letters"),
+                T("Control+J・K・L・; でひらがな・カタカナ・全角英字・半角英字（macOS と同じ。「入力」で Control+U/I/O/P/T にも替えられます）。F6〜F10 でひらがな・カタカナ・半角カナ・全角英数・半角英数",
+                  "Control+J, K, L and ; convert to hiragana, katakana, full-width and half-width letters (as in macOS; you can switch to Control+U/I/O/P/T under Input). F6–F10 convert to hiragana, katakana, half-width kana, full-width and half-width letters"),
             ])
             section(T("音声入力", "Voice input"), [
                 T("録音キー（既定は右 Option と F12）を押している間だけ録音し、離すと句読点付きの文が入ります",

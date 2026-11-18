@@ -8,7 +8,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 echo "入力方式のアプリをビルドする"
 swiftc -O -swift-version 5 -target "$(uname -m)-apple-macos13.0" \
-  -framework AppKit -framework InputMethodKit -framework Carbon -framework ApplicationServices \
+  -framework AppKit -framework InputMethodKit -framework Carbon -framework ApplicationServices -framework AVFoundation \
   Sources/*.swift -o "$APP/Contents/MacOS/Kanade"
 cp Info.plist "$APP/Contents/Info.plist"
 swift make-icon.swift "$APP/Contents/Resources/icon.tiff"

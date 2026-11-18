@@ -27,12 +27,24 @@ final class SettingsFile {
     private var lines: [String] = []
     static let defaults: [String: String] = [
         "full_width_symbols": "true", "live_conversion": "true", "zenz_mode": "CORRECT", "punctuation": "、。", "pair_brackets": "true", "emoji_shortcodes": "true", "emoji_prefix": ":", "emoji_prefix_twice": "false",
-        "spoken_punctuation": "true", "voice_final": "parakeet", "learning": "true", "ui_language": "auto", "key_style": "MAC",
+        "spoken_punctuation": "true", "voice_sounds": "true", "voice_final": "parakeet", "learning": "true", "ui_language": "auto", "key_style": "MAC",
         "voice_final_en": "parakeet-en", "voice_hold_keys": "F12,Alt_R", "voice_toggle_key": "Control+Alt+space",
     ]
     var values: [String: String] = [:]
 
     init() { load() }
+
+    /** ファイルを読んで、無い項目は既定で埋めた値（画面を持たないところから見るとき） */
+    static func read() -> [String: String] {
+        var v = defaults
+        let text = (try? String(contentsOf: support.appendingPathComponent("settings.properties"), encoding: .utf8)) ?? ""
+        for l in text.components(separatedBy: "\n") where !l.hasPrefix("#") {
+            if let eq = l.firstIndex(of: "=") {
+                v[l[..<eq].trimmingCharacters(in: .whitespaces)] = l[l.index(after: eq)...].trimmingCharacters(in: .whitespaces)
+            }
+        }
+        return v
+    }
 
     func load() {
         lines = ((try? String(contentsOf: url, encoding: .utf8)) ?? "").components(separatedBy: "\n")

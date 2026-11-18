@@ -6,7 +6,7 @@ APP="$1/Kanade Settings.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 echo "設定の画面をビルドする"
-swiftc -O -parse-as-library -target "$(uname -m)-apple-macos14.0" -framework SwiftUI -framework AppKit \
+swiftc -O -parse-as-library -target "$(uname -m)-apple-macos14.0" -framework SwiftUI -framework AppKit -framework Carbon \
   *.swift -o "$APP/Contents/MacOS/KanadeSettings"
 cp Info.plist "$APP/Contents/Info.plist"
 # 署名は mac/build.sh がまとめてする（中にエンジンを入れてから）

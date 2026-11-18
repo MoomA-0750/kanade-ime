@@ -12,6 +12,11 @@
                 <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE720;" /></tk:SettingsCard.HeaderIcon>
                 <TextBlock Text="F12" Style="{StaticResource BodyStrongTextBlockStyle}" />
             </tk:SettingsCard>
+            <tk:SettingsCard Header="{local:L Ja='録音の始めと終わりに音を鳴らす', En='Sound when recording starts and stops'}"
+                             Description="{local:L Ja='録音を始めたときに上がる短い音、終えたときに下がる短い音を鳴らします', En='Plays a short rising sound when recording starts and a falling one when it stops'}">
+                <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE767;" /></tk:SettingsCard.HeaderIcon>
+                <ToggleSwitch x:Name="Sounds" Toggled="OnChanged" OnContent="{local:L Ja='オン', En='On'}" OffContent="{local:L Ja='オフ', En='Off'}" />
+            </tk:SettingsCard>
             <tk:SettingsCard Header="{local:L Ja='話した句読点', En='Spoken punctuation'}"
                              Description="{local:L Ja='「まる」「てん」「かいぎょう」などを、句読点や改行にします', En='Turns spoken words such as maru, ten and kaigyou into punctuation and line breaks'}">
                 <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8C1;" /></tk:SettingsCard.HeaderIcon>

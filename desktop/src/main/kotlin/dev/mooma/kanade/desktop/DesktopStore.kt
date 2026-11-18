@@ -24,6 +24,8 @@ data class DesktopSettings(
     /** 入力中の Ctrl のキーの割り当て（PC は Ctrl+U/I/O/P/T、MAC は Ctrl+J/K/L/;）。既定は macOS なら MAC */
     val keyStyle: KeyStyle = KeyStyle.DEFAULT,
     val spokenPunctuation: Boolean = true,
+    /** 録音を始めた・終えたときに効果音を鳴らす */
+    val voiceSounds: Boolean = true,
     val learning: Boolean = true,
     val lastJapanese: Boolean = false,
     /** 確定の文を作る音声認識のモデル（Android 版と同じ id。VoiceFinal） */
@@ -81,6 +83,7 @@ class DesktopStore(val dir: File = defaultDir()) {
                 ?: d.toggles,
             keyStyle = p.getProperty(KEY_KEY_STYLE)?.trim()?.uppercase()?.let { v -> KeyStyle.entries.find { it.name == v } } ?: d.keyStyle,
             spokenPunctuation = bool(KEY_SPOKEN_PUNCT, d.spokenPunctuation),
+            voiceSounds = bool(KEY_VOICE_SOUNDS, d.voiceSounds),
             learning = bool(KEY_LEARNING, d.learning),
             lastJapanese = bool(KEY_LAST_MODE, d.lastJapanese),
             voiceFinal = p.getProperty(KEY_VOICE_FINAL)?.trim()?.takeIf { id -> VoiceFinal.entries.any { it.id == id } } ?: d.voiceFinal,
@@ -116,6 +119,8 @@ class DesktopStore(val dir: File = defaultDir()) {
             appendLine("$KEY_KEY_STYLE=${s.keyStyle.name}")
             appendLine("# 音声入力で「まる」「てん」などを句読点にする")
             appendLine("$KEY_SPOKEN_PUNCT=${s.spokenPunctuation}")
+            appendLine("# 録音を始めた・終えたときに効果音を鳴らす")
+            appendLine("$KEY_VOICE_SOUNDS=${s.voiceSounds}")
             appendLine("# 音声入力の確定の文を作るモデル（parakeet・reazon・sensevoice・whisper-small・whisper-kotoba・whisper-turbo）")
             appendLine("$KEY_VOICE_FINAL=${s.voiceFinal}")
             appendLine("# 選んだ変換を覚えて次から先に出す")
@@ -182,6 +187,7 @@ class DesktopStore(val dir: File = defaultDir()) {
                 (v as? org.json.JSONArray)?.let { arr -> (0 until arr.length()).mapNotNull { i -> WinToggle.entries.find { it.name == arr.getString(i) } }.toSet() }
             }, now.toggles),
             spokenPunctuation = take(KEY_SPOKEN_PUNCT, { it as? Boolean }, now.spokenPunctuation),
+            voiceSounds = take(KEY_VOICE_SOUNDS, { it as? Boolean }, now.voiceSounds),
             learning = take(KEY_LEARNING, { it as? Boolean }, now.learning),
             voiceFinal = take(KEY_VOICE_FINAL, { v -> (v as? String)?.takeIf { id -> VoiceFinal.entries.any { it.id == id } } }, now.voiceFinal),
         ).let { base ->
@@ -227,6 +233,7 @@ class DesktopStore(val dir: File = defaultDir()) {
             .put(KEY_ZENZ_MODE, entry("string", s.zenzMode))
             .put(KEY_TRIGGERS, entry("stringSet", org.json.JSONArray(s.toggles.map { it.name }.sorted())))
             .put(KEY_SPOKEN_PUNCT, entry("boolean", s.spokenPunctuation))
+            .put(KEY_VOICE_SOUNDS, entry("boolean", s.voiceSounds))
             .put(KEY_LEARNING, entry("boolean", s.learning))
             .put(KEY_VOICE_FINAL, entry("string", s.voiceFinal))
         val files = JSONObject()
@@ -265,6 +272,7 @@ class DesktopStore(val dir: File = defaultDir()) {
         /** 入り口の文字として使える1文字なら、その文字 */
         fun emojiPrefixOrNull(s: String): String? = s.takeIf { it.length == 1 && EngineSettings.isEmojiPrefix(it[0]) }
         const val KEY_SPOKEN_PUNCT = "spoken_punctuation"
+        const val KEY_VOICE_SOUNDS = "voice_sounds"
         const val KEY_LEARNING = "learning"
         const val KEY_LAST_MODE = "last_japanese"
         const val KEY_VOICE_FINAL = "voice_final"

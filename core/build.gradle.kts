@@ -21,4 +21,6 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    // 効果音を WAV に書き出して測るとき: ./gradlew :core:test -Pkanade.earconDir=<フォルダ>
+    (project.findProperty("kanade.earconDir") as String?)?.let { systemProperty("kanade.earconDir", it) }
 }

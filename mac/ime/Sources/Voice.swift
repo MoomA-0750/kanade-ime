@@ -3,6 +3,7 @@
 // Kanade が選ばれていないときの確定は、ここ（[apply]）で前のアプリへ書く
 import AppKit
 import ApplicationServices
+import AVFoundation
 import Carbon.HIToolbox
 
 final class VoiceInput: CommandTarget {
@@ -26,6 +27,7 @@ final class VoiceInput: CommandTarget {
     func start() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         if !AXIsProcessTrustedWithOptions(options) { klog("accessibility is not allowed yet") }
+        Permissions.watch()
         if createTap() { return }
         retry = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] t in
             if self?.createTap() == true { t.invalidate() }
@@ -199,5 +201,37 @@ final class VoiceInput: CommandTarget {
         // アクセシビリティは左上が原点。主の画面の高さで反す
         let h = NSScreen.screens.first?.frame.height ?? 0
         return NSRect(x: rect.minX, y: h - rect.maxY, width: max(rect.width, 1), height: rect.height)
+    }
+}
+
+/**
+ * 許可の様子（アクセシビリティ・マイク）を ~/Library/Application Support/Kanade/permissions.properties に書く。
+ * 許可は Kanade.app に付くので、設定の画面（別のアプリ）からは調べられない。設定の画面はこれを読んで、足りない許可を知らせる。
+ * 3 秒ごとに調べ、変わったときだけ書く
+ */
+enum Permissions {
+    private static var last = ""
+    private static var timer: Timer?
+
+    static func watch() {
+        write()
+        timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in write() }
+    }
+
+    static func write() {
+        let mic: String
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized: mic = "authorized"
+        case .denied: mic = "denied"
+        case .restricted: mic = "restricted"
+        default: mic = "not_determined"
+        }
+        let text = "# Kanade の入力方式が書く許可の様子（設定の画面が読む）\naccessibility=\(AXIsProcessTrusted())\nmicrophone=\(mic)\n"
+        guard text != last else { return }
+        last = text
+        let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Kanade")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try? text.write(to: dir.appendingPathComponent("permissions.properties"), atomically: true, encoding: .utf8)
+        klog("permissions: accessibility=\(AXIsProcessTrusted()) microphone=\(mic)")
     }
 }

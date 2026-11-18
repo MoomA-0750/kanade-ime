@@ -24,6 +24,7 @@ import dev.mooma.kanade.core.voice.VoiceCommand
 import dev.mooma.kanade.core.voice.PauseSplitter
 import dev.mooma.kanade.core.voice.Fillers
 import dev.mooma.kanade.core.voice.VoiceEndpointer
+import dev.mooma.kanade.core.voice.VoiceEarcon
 import dev.mooma.kanade.whisper.WhisperModel
 import dev.mooma.kanade.zenz.ZenzModel
 import java.util.concurrent.Executors
@@ -1488,6 +1489,7 @@ class KanadeInputMethodService : InputMethodService() {
      * 録音を続け、話し終わり（無音）ごとに区切って文字にし、カーソルの位置に入れる。キーボードでの入力と並べて使える
      * （入力中の文字があれば、それが確定してから入れる）。もう一度押すか、1分話さなければ終わる
      */
+    private val earcons by lazy { Earcons(this) }
     private var continuous = false
     /** 聞き続けるモードで、これだけ話さなければ終える（ms。0 なら終えない） */
     private var continuousIdleMs = 60_000L
@@ -1580,6 +1582,7 @@ class KanadeInputMethodService : InputMethodService() {
     /** 聞き続けるモードを終える。話している途中の音声があれば文字にして入れる */
     private fun stopContinuous(message: String, keepSpeech: Boolean = true) {
         continuous = false
+        if (settings.voiceSounds) earcons.play(VoiceEarcon.Kind.STOP)
         keyboardView?.voiceActive = false
         flickView?.voiceActive = false
         main.removeCallbacks(continuousTick)
@@ -1623,6 +1626,7 @@ class KanadeInputMethodService : InputMethodService() {
         // 逐次認識のモデルは大きく、初めの読み込みに数秒かかるので、録音を始めたらすぐ読み始める
         if (partialStreaming) StreamingRecognizer.preload(this, settings.voiceThreads)
         partialText = null
+        if (settings.voiceSounds) earcons.play(VoiceEarcon.Kind.START)
         showIndicatorText("🎤", 0)
         if (voiceStreaming) main.postDelayed(partialTick, if (partialStreaming) STREAM_INTERVAL_MS else PARTIAL_INTERVAL_MS)
     }
@@ -1751,6 +1755,7 @@ class KanadeInputMethodService : InputMethodService() {
         }
         if (!VoiceInput.isRecording) return
         VoiceInput.cancel()
+        if (settings.voiceSounds) earcons.play(VoiceEarcon.Kind.STOP)
         main.removeCallbacks(partialTick)
         if (partialStreaming) StreamingRecognizer.finishStream()
         if (partialText != null || !previewInBar) {
@@ -1866,6 +1871,7 @@ class KanadeInputMethodService : InputMethodService() {
 
     private fun stopVoice() {
         val pcm = VoiceInput.stopRecording() ?: return
+        if (settings.voiceSounds) earcons.play(VoiceEarcon.Kind.STOP)
         main.removeCallbacks(partialTick)
         if (partialStreaming) StreamingRecognizer.finishStream()
         showIndicatorText("…", 0)

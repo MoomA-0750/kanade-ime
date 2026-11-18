@@ -62,6 +62,11 @@ PrefPage {
     PrefGroup {
         title: Pal.t("書き方", "Writing")
         SwitchRow {
+            key: "voice_sounds"
+            title: Pal.t("録音の始めと終わりに音を鳴らす", "Sound when recording starts and stops")
+            subtitle: Pal.t("録音を始めたときに上がる短い音、終えたときに下がる短い音を鳴らします", "Plays a short rising sound when recording starts and a falling one when it stops")
+        }
+        SwitchRow {
             key: "spoken_punctuation"
             title: Pal.t("話した句読点", "Spoken punctuation")
             subtitle: Pal.t("日本語で「まる」「てん」「かいぎょう」などを、句読点や改行にします",

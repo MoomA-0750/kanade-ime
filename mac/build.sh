@@ -2,7 +2,7 @@
 # macOS 版の配布物を、使う Mac（arm64 / x86_64）の上で組み立てる。scripts/mac.sh bundle で作った束を展開した中で動かす。
 # 要るもの: Xcode（swiftc・codesign）。JDK と cmake は scripts/mac.sh build が ~/.cache/kanade-build に置く
 # 出力: dist/Kanade-mac-<arch>.pkg（全員分に入れる配布物）と .version（版）、開発用の dist/Kanade-mac-<arch>/・.tar.gz（install.sh つき。本人のフォルダーに入れる）
-# 署名: Developer ID Application の証明書があれば .app をそれで、Developer ID Installer があれば pkg をそれで署名し、KANADE_NOTARY_PROFILE があれば pkg を公証に出す（なければ .app は ad-hoc、pkg は署名なし）
+# 署名: Developer ID Application の証明書があれば .app をそれで、Developer ID Installer があれば pkg をそれで署名し、KANADE_NOTARY_PROFILE があれば pkg を公証に出す（なければ .app はこの Mac の Kanade 専用の証明書か ad-hoc、pkg は署名なし）
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT=$PWD
@@ -69,15 +69,28 @@ SIGN_ID=${KANADE_SIGN_ID:-}
 if [ -z "$SIGN_ID" ]; then
   SIGN_ID=$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1)
 fi
+# Developer ID が無ければ、この Mac の Kanade 専用の証明書（~/.kanade-sign。自己署名、scripts/mac-local-sign.sh が作る）で署名する。
+# 配るには使えないが、組み直しても macOS が同じアプリと見なすので、アクセシビリティ・マイクの許可が消えない
+# （ad-hoc は中身の hash で見分けるので、組み直すたびに許可が効かなくなる）。専用のキーチェーンなのは、ssh からはログインのキーチェーンを開けないため
+LOCAL_ID=""
+LOCAL_KC="$HOME/.kanade-sign/kanade.keychain-db"
+if [ -z "$SIGN_ID" ] && [ -f "$LOCAL_KC" ]; then
+  security unlock-keychain -p "$(cat "$HOME/.kanade-sign/password")" "$LOCAL_KC"
+  LOCAL_ID=$(security find-identity -p codesigning "$LOCAL_KC" | sed -n 's/.*) \([0-9A-F]\{40\}\) "Kanade Local Signing".*/\1/p' | head -1)
+fi
 sign() { # <entitlements か ""> <path...>
   local ent=$1; shift
   if [ -n "$SIGN_ID" ]; then
     codesign --force --timestamp --options runtime ${ent:+--entitlements "$ent"} --sign "$SIGN_ID" "$@"
+  elif [ -n "$LOCAL_ID" ]; then
+    codesign --force ${ent:+--entitlements "$ent"} --keychain "$LOCAL_KC" --sign "$LOCAL_ID" "$@"
   else
     codesign --force --sign - "$@"
   fi
 }
-echo "署名する（${SIGN_ID:-ad-hoc}）"
+what=${SIGN_ID:-ad-hoc}
+[ -n "$LOCAL_ID" ] && what="Kanade Local Signing"
+echo "署名する（$what）"
 RES="$APP/Contents/Resources"
 # 公証は jar の中のネイティブ（sherpa-onnx の dylib）も署名を求めるので、取り出して署名し、jar に戻す
 if [ -n "$SIGN_ID" ]; then
