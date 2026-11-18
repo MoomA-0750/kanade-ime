@@ -8,6 +8,7 @@ Android 版と同じ入力（ライブ変換・zenz の並べ替え・音声入�
   - 本体は `C:\Program Files\Kanade`、辞書・モデルは `%LOCALAPPDATA%\Kanade\data`、設定・ユーザー辞書・学習は `%APPDATA%\Kanade`
   - 日本語のキーボードの一覧に「Kanade」が足される（MS-IME は残る。外すのは設定アプリの「言語と地域」→ 日本語 → キーボード）
   - エンジンはログオン時に起動する。止まっていても、最初のキーで起動する（1〜2秒は英字のまま出る）
+- 新しい版に入れ直したときは、動いているアプリは前の版のまま。新しく開いたアプリから新しい版になる。タスクバーの「あ」「A」の右クリックのメニューはタスクバー（Explorer）の中で動くので、サインインし直すまで前の版のまま
 - 外す: `powershell -ExecutionPolicy Bypass -File "C:\Program Files\Kanade\uninstall.ps1"`（設定・辞書も消すときは `-Purge`）
 
 ## 打つ

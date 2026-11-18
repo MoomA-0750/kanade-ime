@@ -8,6 +8,7 @@ Kanade brings the input of the Android app (live conversion, zenz reranking and 
   - The program goes to `C:\Program Files\Kanade`, dictionaries and models to `%LOCALAPPDATA%\Kanade\data`, and settings, the user dictionary and learning to `%APPDATA%\Kanade`
   - Kanade is added to the Japanese keyboards (Microsoft IME stays. To remove it, open Settings → Time & language → Language & region → Japanese → Keyboards)
   - The engine starts when you sign in. If it is not running, the first key starts it (letters stay unconverted for a second or two)
+- After installing a new version, apps that are already open keep the old one; apps you open afterwards use the new one. The right-click menu of あ/A on the taskbar runs inside the taskbar (Explorer), so it stays old until you sign in again
 - Uninstall: `powershell -ExecutionPolicy Bypass -File "C:\Program Files\Kanade\uninstall.ps1"` (add `-Purge` to delete settings and dictionaries too)
 
 ## Typing
