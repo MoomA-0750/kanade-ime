@@ -186,6 +186,23 @@ struct InputPage: View {
                 }
             }
             Section {
+                Picker(selection: settings.string("key_style")) {
+                    Text(T("macOS と同じ", "Same as macOS")).tag("MAC")
+                    Text(T("Windows 版・Android 版と同じ", "Same as Windows and Android")).tag("PC")
+                } label: {
+                    Text(T("入力中の Control のキー", "Control keys while typing"))
+                    Text(settings.values["key_style"] == "PC"
+                         ? T("Control+U・I・O・P・T で、ひらがな・カタカナ・半角カタカナ・全角英数・半角英数にします（MS-IME と同じ）",
+                             "Control+U, I, O, P and T change the text to hiragana, katakana, half-width katakana, full-width and half-width letters (as in Microsoft IME)")
+                         : T("Control+J・K・L・; で、ひらがな・カタカナ・全角英字・半角英字にします（Control+: も半角英字）",
+                             "Control+J, K, L and ; change the text to hiragana, katakana, full-width and half-width letters (Control+: also gives half-width letters)"))
+                }
+            } header: {
+                Text(T("キーの割り当て", "Key assignments"))
+            } footer: {
+                Text(T("F6〜F10 はどちらでも使えます", "F6 to F10 work either way"))
+            }
+            Section {
                 LabeledContent(T("切り替えのキーを変える", "Change the switching keys")) {
                     Button(T("キーボードの設定を開く", "Open Keyboard settings")) {
                         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
@@ -194,8 +211,8 @@ struct InputPage: View {
             } header: {
                 Text(T("日本語と英字の切り替え", "Switching between Japanese and English"))
             } footer: {
-                Text(T("macOS の入力ソースが受け持ちます（Control+Space・地球儀キー）。Kanade に切り替えると、いつも日本語から始まります。英字は ABC などで打ちます。JIS 配列のかなキーは日本語、英数キーは Kanade の中の直接入力です",
-                       "macOS input sources handle this (Control+Space, the Globe key). Switching to Kanade always starts in Japanese; type English with ABC or similar. On JIS keyboards, Kana is Japanese and Eisu is direct input in Kanade"))
+                Text(T("「Kanade ひらがな」と「Kanade 英字」は macOS の入力ソースのモードです。入力メニュー・Control+Space・地球儀キーで切り替えます。JIS 配列のかな・英数キー、F13 でも切り替わります",
+                       "Kanade Hiragana and Kanade English are input modes of the macOS input source. Switch with the input menu, Control+Space or the Globe key. The Kana and Eisu keys on JIS keyboards and F13 also switch"))
             }
             Section(T("学習", "Learning")) {
                 Toggle(isOn: settings.bool("learning")) {

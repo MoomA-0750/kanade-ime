@@ -15,7 +15,7 @@ class DesktopStoreTest {
         val s = store()
         s.ensureFiles()
         assertEquals(DesktopSettings(), s.loadSettings())
-        val changed = DesktopSettings(fullWidthSymbols = false, punctuation = "，．", toggles = setOf(WinToggle.CTRL_SPACE), lastJapanese = true, uiLanguage = "en")
+        val changed = DesktopSettings(fullWidthSymbols = false, punctuation = "，．", toggles = setOf(WinToggle.CTRL_SPACE), keyStyle = KeyStyle.MAC, lastJapanese = true, uiLanguage = "en")
         s.saveSettings(changed)
         assertEquals(changed, s.loadSettings())
         assertTrue(s.read(s.snippetsFile).contains("->"))

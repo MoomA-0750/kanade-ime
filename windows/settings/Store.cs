@@ -28,6 +28,8 @@ public sealed class Store
     /// <summary>入り口の文字を2回続けたときだけ始める（::rocket）</summary>
     public bool EmojiPrefixTwice { get; set; }
     public HashSet<string> Toggles { get; set; } = new() { "RIGHT_ALT_TAP", "CTRL_SPACE", "F13" };
+    /// <summary>入力中の Ctrl のキー（PC は Ctrl+U/I/O/P/T、MAC は macOS と同じ Ctrl+J/K/L/;）</summary>
+    public string KeyStyle { get; set; } = "PC";
     public bool SpokenPunctuation { get; set; } = true;
     public bool Learning { get; set; } = true;
     public bool LastJapanese { get; set; }
@@ -58,6 +60,7 @@ public sealed class Store
                 case "emoji_shortcodes": s.EmojiShortcodes = Bool(s.EmojiShortcodes); break;
                 case "emoji_prefix": if (value.Length == 1) s.EmojiPrefix = value; break;
                 case "emoji_prefix_twice": s.EmojiPrefixTwice = Bool(s.EmojiPrefixTwice); break;
+                case "key_style": if (value.ToUpperInvariant() is "PC" or "MAC") s.KeyStyle = value.ToUpperInvariant(); break;
                 case "toggle_triggers": s.Toggles = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToHashSet(); break;
                 case "spoken_punctuation": s.SpokenPunctuation = Bool(s.SpokenPunctuation); break;
                 case "learning": s.Learning = Bool(s.Learning); break;
@@ -95,6 +98,8 @@ public sealed class Store
             .AppendLine($"emoji_prefix_twice={B(EmojiPrefixTwice)}")
             .AppendLine("# 日本語のオン/オフに使うキー（RIGHT_ALT_TAP・CTRL_SPACE・F13 をカンマ区切りで。変換/無変換・半角/全角はいつでも使える）")
             .AppendLine($"toggle_triggers={string.Join(",", order.Where(Toggles.Contains))}")
+            .AppendLine("# 入力中の Ctrl のキー（PC は Ctrl+U/I/O/P/T でひらがな・カタカナ・半角カナ・全角英数・半角英数、MAC は macOS と同じ Ctrl+J/K/L/; でひらがな・カタカナ・全角英字・半角英字。F6〜F10 はどちらでも使える）")
+            .AppendLine($"key_style={KeyStyle}")
             .AppendLine("# 音声入力で「まる」「てん」などを句読点にする")
             .AppendLine($"spoken_punctuation={B(SpokenPunctuation)}")
             .AppendLine("# 音声入力の確定の文を作るモデル（parakeet・reazon・sensevoice・whisper-small・whisper-kotoba・whisper-turbo）")

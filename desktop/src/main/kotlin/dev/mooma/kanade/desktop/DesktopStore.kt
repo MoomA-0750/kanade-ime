@@ -21,6 +21,8 @@ data class DesktopSettings(
     /** zenz の使い方（Android 版と同じ）。CORRECT は1位を確かめて直す（軽い）、RERANK は候補を全部並べ替える（打つたびに重い） */
     val zenzMode: String = "CORRECT",
     val toggles: Set<WinToggle> = WinToggle.entries.toSet(),
+    /** 入力中の Ctrl のキーの割り当て（PC は Ctrl+U/I/O/P/T、MAC は Ctrl+J/K/L/;）。既定は macOS なら MAC */
+    val keyStyle: KeyStyle = KeyStyle.DEFAULT,
     val spokenPunctuation: Boolean = true,
     val learning: Boolean = true,
     val lastJapanese: Boolean = false,
@@ -77,6 +79,7 @@ class DesktopStore(val dir: File = defaultDir()) {
             zenzMode = p.getProperty(KEY_ZENZ_MODE)?.trim()?.uppercase()?.takeIf { it in ZENZ_MODES } ?: d.zenzMode,
             toggles = p.getProperty(KEY_TRIGGERS)?.split(',')?.mapNotNull { name -> WinToggle.entries.find { it.name == name.trim() } }?.toSet()
                 ?: d.toggles,
+            keyStyle = p.getProperty(KEY_KEY_STYLE)?.trim()?.uppercase()?.let { v -> KeyStyle.entries.find { it.name == v } } ?: d.keyStyle,
             spokenPunctuation = bool(KEY_SPOKEN_PUNCT, d.spokenPunctuation),
             learning = bool(KEY_LEARNING, d.learning),
             lastJapanese = bool(KEY_LAST_MODE, d.lastJapanese),
@@ -109,6 +112,8 @@ class DesktopStore(val dir: File = defaultDir()) {
             appendLine("$KEY_ZENZ_MODE=${s.zenzMode}")
             appendLine("# 日本語のオン/オフに使うキー（RIGHT_ALT_TAP・CTRL_SPACE・F13 をカンマ区切りで。変換/無変換・半角/全角はいつでも使える）")
             appendLine("$KEY_TRIGGERS=${s.toggles.joinToString(",") { it.name }}")
+            appendLine("# 入力中の Ctrl のキー（PC は Ctrl+U/I/O/P/T でひらがな・カタカナ・半角カナ・全角英数・半角英数、MAC は macOS と同じ Ctrl+J/K/L/; でひらがな・カタカナ・全角英字・半角英字。F6〜F10 はどちらでも使える）")
+            appendLine("$KEY_KEY_STYLE=${s.keyStyle.name}")
             appendLine("# 音声入力で「まる」「てん」などを句読点にする")
             appendLine("$KEY_SPOKEN_PUNCT=${s.spokenPunctuation}")
             appendLine("# 音声入力の確定の文を作るモデル（parakeet・reazon・sensevoice・whisper-small・whisper-kotoba・whisper-turbo）")
@@ -205,7 +210,8 @@ class DesktopStore(val dir: File = defaultDir()) {
     /**
      * Android 版の「設定の読み込み」で読める形（kanade-settings の JSON）で書き出す。項目名と型は Android 版と同じ。
      * Windows・Linux・macOS だけの項目（表示の言語・英語のモデル・録音キー）は "desktop" に入れ、ほかの PC 版で読み込める。
-     * 学習・前回の日本語のオン/オフは入れない（Android 版の書き出しと同じく、その端末での記録のため）
+     * 学習・前回の日本語のオン/オフは入れない（Android 版の書き出しと同じく、その端末での記録のため）。
+     * キーの割り当て（key_style）も入れない（Mac と Windows で既定が違い、機械ごとに選ぶもののため）
      */
     fun exportAndroid(json: File) {
         val s = loadSettings()
@@ -245,6 +251,7 @@ class DesktopStore(val dir: File = defaultDir()) {
 
     companion object {
         const val KEY_TRIGGERS = "toggle_triggers"
+        const val KEY_KEY_STYLE = "key_style"
         const val KEY_FULL_WIDTH = "full_width_symbols"
         const val KEY_LIVE = "live_conversion"
         const val KEY_PUNCTUATION = "punctuation"

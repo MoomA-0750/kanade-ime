@@ -58,6 +58,7 @@ object KeyScript {
         '-' -> 0xBD
         ',' -> 0xBC
         '.' -> 0xBE
+        ';', ':' -> VK.OEM_1
         else -> 0
     }
 

@@ -18,7 +18,7 @@ Kanade brings the input of the Android app (live conversion, zenz reranking and 
 - The input indicator on the taskbar (where Microsoft IME shows it) shows "あ" or "A". Left-click to switch, right-click for a menu with settings and more
 - Type in romaji and the converted text appears as you type (live conversion). Press Enter to commit
 - Press Space to convert, then pick from the candidate window with Space, ↑↓, number keys or a click. ←→ moves between segments and Shift+←→ changes where they split
-- F6–F10 (or Ctrl+U/I/O/P/T) convert to hiragana, katakana, half-width katakana, full-width letters and half-width letters
+- F6–F10 (or Ctrl+U/I/O/P/T) convert to hiragana, katakana, half-width katakana, full-width letters and half-width letters. Set "Ctrl keys while typing" to "Same as macOS" to use Ctrl+J, K, L and ; instead (hiragana, katakana, full-width and half-width letters)
 - Type `:` and an emoji's English name to pick a matching emoji (`:rocket` → 🚀). Enter, a number or the closing `:` inserts it; Esc turns it back into ordinary typing (see "Emoji by name" in `docs/USAGE.en.md`)
 - Hold F12 to record and release it to type the sentence with punctuation (choose the model in settings; the default is whisper small). Text appears near the cursor while you speak
 

@@ -19,6 +19,7 @@ public sealed partial class InputPage : Page
         EmojiNames.IsOn = store.EmojiShortcodes;
         EmojiPrefix.SelectedItem = EmojiPrefix.Items.Contains(store.EmojiPrefix) ? store.EmojiPrefix : ":";
         EmojiTwice.IsOn = store.EmojiPrefixTwice;
+        KeyStyle.SelectedItem = KeyStyle.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == store.KeyStyle) ?? KeyStyle.Items[0];
         RightAlt.IsOn = store.Toggles.Contains("RIGHT_ALT_TAP");
         CtrlSpace.IsOn = store.Toggles.Contains("CTRL_SPACE");
         F13.IsOn = store.Toggles.Contains("F13");
@@ -39,6 +40,7 @@ public sealed partial class InputPage : Page
         store.EmojiShortcodes = EmojiNames.IsOn;
         store.EmojiPrefix = EmojiPrefix.SelectedItem as string ?? ":";
         store.EmojiPrefixTwice = EmojiTwice.IsOn;
+        store.KeyStyle = (KeyStyle.SelectedItem as ComboBoxItem)?.Tag as string ?? "PC";
         store.Toggles = new HashSet<string>();
         if (RightAlt.IsOn) store.Toggles.Add("RIGHT_ALT_TAP");
         if (CtrlSpace.IsOn) store.Toggles.Add("CTRL_SPACE");

@@ -577,3 +577,12 @@ SPEC.md の未決事項に本人が答えた。
 - 名前: `Contents/Resources/{ja,en}.lproj/InfoPlist.strings` に、入力方式とモードの TISInputSourceID をキーにして「Kanade」「Kanade ひらがな」「Kanade 英字」を書いた（mozc と同じやり方）。メニューバーの印は「あ」「A」の TIFF（`make-icon.swift` で描く）。
 - 第三者の入力ソースの一覧（前の項）には英字のモードの項目も足す。モードを足した版を入れたあとも、ログインし直してから選べる。
 - 2026-11-18（続き）: Mac 版で「あ」「A」が二重に出た（本人が cramshell で見た）。モードを入力ソースのモードにしたため、切り替えると macOS 自身がカーソルの近くに「あ」「A」を出す。Kanade の表示（2-3）を Mac では出さないことにした。エンジンのキーで変えたときも `selectMode` で macOS が出す。
+
+## 2026-11-18 入力中の Ctrl のキーを macOS と同じ割り当てにも選べるようにした
+
+- 本人の要望。macOS の日本語入力では Control+J・K・L・; でひらがな・カタカナ・全角英字・半角英字になる（Apple の手引き「Macの日本語変換用のキーボードショートカット」）。Kanade の Mac 版は、ほかの版と同じ Ctrl+U/I/O/P/T だった。
+- 設定 `key_style`（PC・MAC）をエンジン（WinKeyMapper）に足し、Mac・Windows・Linux（Qt・GTK）の設定の画面に「入力中の Ctrl のキー」を置いた。既定は macOS で MAC、ほかは PC。
+- ; と : は配列で場所が違う（US は同じキー、JIS は別のキー）ので、Mac・Linux が送る文字で見る。Windows は文字を送らないことがあるので、仮想キー OEM_1・OEM_PLUS で見る。どちらも半角英字にする（macOS の既定の Control+; と Control+: はどちらも半角英字）。Mac の入力方式は、Control と一緒のときも修飾なしの文字を送るようにした。
+- F6〜F10 は割り当てを替えない。macOS では F8 も半角英字（半角カナは設定で選んだときだけ）だが、ほかの版と同じ F8＝半角カナのままにし、MAC でも半角カナを出せるキーを残した。
+- 書き出し（kanade-settings の JSON）には入れない。Mac と Windows で既定が違い、Windows の書き出しを Mac で読むと Mac の割り当てが PC に替わってしまうため。
+- 見送り: macOS の「英数キーを2回でかなを英字に」「かなキーを2回で英字をかなに」。1回目の英数で入力中の文字が確定してアプリへ渡るので、2回目で直すには確定した文字を取り戻す仕組みが要る。文節の伸び縮み（Shift+←→）・候補の前後（↑↓・Shift+Space）・Esc で読みに戻すは、もとから macOS と同じ。

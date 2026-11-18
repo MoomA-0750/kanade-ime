@@ -63,6 +63,16 @@
                 <ToggleSwitch x:Name="EmojiTwice" Toggled="OnChanged" OnContent="{local:L Ja='オン', En='On'}" OffContent="{local:L Ja='オフ', En='Off'}" />
             </tk:SettingsCard>
 
+            <TextBlock Text="{local:L Ja='キーの割り当て', En='Key assignments'}" Style="{StaticResource SectionHeader}" />
+            <tk:SettingsCard Header="{local:L Ja='入力中の Ctrl のキー', En='Ctrl keys while typing'}"
+                             Description="{local:L Ja='Windows 版・Android 版と同じなら Ctrl+U・I・O・P・T（MS-IME と同じ）、macOS と同じなら Ctrl+J・K・L・; で、ひらがな・カタカナなどにします。F6〜F10 はどちらでも使えます', En='Same as Windows and Android: Ctrl+U, I, O, P and T (as in Microsoft IME). Same as macOS: Ctrl+J, K, L and ;. They change the text to hiragana, katakana and so on. F6 to F10 work either way'}">
+                <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE92E;" /></tk:SettingsCard.HeaderIcon>
+                <ComboBox x:Name="KeyStyle" SelectionChanged="OnChanged" MinWidth="200">
+                    <ComboBoxItem Tag="PC" Content="{local:L Ja='Windows 版・Android 版と同じ', En='Same as Windows and Android'}" />
+                    <ComboBoxItem Tag="MAC" Content="{local:L Ja='macOS と同じ', En='Same as macOS'}" />
+                </ComboBox>
+            </tk:SettingsCard>
+
             <TextBlock Text="{local:L Ja='日本語と英字の切り替え', En='Switching between Japanese and English'}" Style="{StaticResource SectionHeader}" />
             <tk:SettingsExpander Header="{local:L Ja='切り替えに使うキー', En='Keys to switch'}"
                                  Description="{local:L Ja='変換（オン）・無変換（オフ）・半角/全角はいつでも使えます', En='Henkan (on), Muhenkan (off) and Hankaku/Zenkaku always work'}" IsExpanded="True">

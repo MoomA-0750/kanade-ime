@@ -18,10 +18,21 @@ data class WinKey(val down: Boolean, val vk: Int, val char: Int, val mods: Int, 
 enum class WinToggle { RIGHT_ALT_TAP, CTRL_SPACE, F13 }
 
 /**
+ * 入力中の Ctrl のキーの割り当て。
+ * PC は Android 版・MS-IME と同じ（Ctrl+U/I/O/P/T）、MAC は macOS の日本語入力と同じ（Ctrl+J/K/L/;/:）。F6〜F10 はどちらでも使える
+ */
+enum class KeyStyle { PC, MAC;
+    companion object {
+        /** macOS では MAC、ほかは PC */
+        val DEFAULT = if (System.getProperty("os.name").orEmpty().startsWith("Mac")) MAC else PC
+    }
+}
+
+/**
  * Windows の仮想キーを [KeyInput] へ写す（Android 版の KeyMapper と同じ割り当て）。
  * US 配列でも JIS 配列でも、右 Alt の単押し・Ctrl+Space・変換/無変換・半角/全角でオン/オフする。
  */
-class WinKeyMapper(var triggers: Set<WinToggle> = WinToggle.entries.toSet()) {
+class WinKeyMapper(var triggers: Set<WinToggle> = WinToggle.entries.toSet(), var keyStyle: KeyStyle = KeyStyle.PC) {
     /**
      * 右 Alt を押してから、Alt と一緒にほかのキーを押したか。右 Alt を離したとき、これが false なら単押し。
      * 「押した」を見て決めないのは、TSF に直接対応したアプリ（RichEdit など）では Alt を押したことが DLL に届かず、離したことだけが届くため
@@ -47,8 +58,10 @@ class WinKeyMapper(var triggers: Set<WinToggle> = WinToggle.entries.toSet()) {
 
         if (vk in MODIFIERS) return null
 
-        // Ctrl+U/I/O/P/T は F6〜F10 と同じ（MS-IME と同じ割り当て）。未確定がなければエンジンがアプリへ渡す
-        if (key.ctrl && !key.alt && !key.win && !key.shift) CTRL_WIDTH[vk]?.let { return KeyInput.ConvertWidth(it) }
+        // PC: Ctrl+U/I/O/P/T は F6〜F10 と同じ（MS-IME と同じ割り当て）。
+        // MAC: Ctrl+J/K/L/; は macOS の日本語入力と同じ（ひらがな・カタカナ・全角英字・半角英字）。Ctrl+: も半角英字（US 配列では Ctrl+Shift+;）。
+        // どちらも未確定がなければエンジンがアプリへ渡す
+        if (key.ctrl && !key.alt && !key.win) widthKey(key)?.let { return KeyInput.ConvertWidth(it) }
 
         // Ctrl・Alt・Win と一緒に押されたキーはショートカットとしてアプリへ渡す
         if (key.ctrl || key.alt || key.win) return KeyInput.Other
@@ -74,6 +87,17 @@ class WinKeyMapper(var triggers: Set<WinToggle> = WinToggle.entries.toSet()) {
         }
     }
 
+    private fun widthKey(key: WinKey): WidthTarget? = when (keyStyle) {
+        KeyStyle.PC -> if (key.shift) null else CTRL_WIDTH[key.vk]
+        KeyStyle.MAC -> when {
+            // ; と : は配列で場所が違うので、文字（Mac・Linux が送る）で見る。文字が無ければ（Windows）仮想キーで見る（US の ; と JIS の : は OEM_1、JIS の ; は OEM_PLUS）
+            key.char == ';'.code || key.char == ':'.code -> WidthTarget.HALF_ALNUM
+            key.char == 0 && (key.vk == VK.OEM_1 || key.vk == VK.OEM_PLUS) -> WidthTarget.HALF_ALNUM
+            key.shift -> null
+            else -> CTRL_WIDTH_MAC[key.vk]
+        }
+    }
+
     /** OnTestKeyUp 用: [onKeyUp] で切り替えになるか（状態は変えない） */
     fun onKeyUpWouldToggle(key: WinKey) = key.vk == VK.RMENU && !altCombo && WinToggle.RIGHT_ALT_TAP in triggers
 
@@ -96,6 +120,11 @@ class WinKeyMapper(var triggers: Set<WinToggle> = WinToggle.entries.toSet()) {
             'O'.code to WidthTarget.HALF_KATAKANA,
             'P'.code to WidthTarget.FULL_ALNUM,
             'T'.code to WidthTarget.HALF_ALNUM,
+        )
+        val CTRL_WIDTH_MAC = mapOf(
+            'J'.code to WidthTarget.HIRAGANA,
+            'K'.code to WidthTarget.KATAKANA,
+            'L'.code to WidthTarget.FULL_ALNUM,
         )
     }
 }
@@ -137,6 +166,10 @@ object VK {
     const val F10 = 0x79
     const val F12 = 0x7B
     const val F13 = 0x7C
+    /** US: ; と :、JIS: : と * */
+    const val OEM_1 = 0xBA
+    /** US: = と +、JIS: ; と + */
+    const val OEM_PLUS = 0xBB
     const val NUMLOCK = 0x90
     const val SCROLL = 0x91
     const val LSHIFT = 0xA0

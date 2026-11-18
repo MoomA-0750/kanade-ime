@@ -58,6 +58,7 @@ class DesktopApp(
             if (first && s.lastJapanese) host.engine.handle(KeyInput.SetJapanese(true))
         }
         host.toggles = s.toggles
+        host.keyStyle = s.keyStyle
         zenz?.correct = s.zenzMode == "CORRECT"
         voice?.spokenPunctuation = s.spokenPunctuation
         voice?.finalModel = VoiceFinal.of(s.voiceFinal)

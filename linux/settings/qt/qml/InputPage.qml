@@ -64,6 +64,17 @@ PrefPage {
     }
 
     PrefGroup {
+        title: Pal.t("キーの割り当て", "Key assignments")
+        ComboRow {
+            key: "key_style"
+            title: Pal.t("入力中の Ctrl のキー", "Ctrl keys while typing")
+            subtitle: Pal.t("「Windows 版・Android 版と同じ」は Ctrl+U・I・O・P・T（MS-IME と同じ）、「macOS と同じ」は Ctrl+J・K・L・; で、ひらがな・カタカナなどにします。F6〜F10 はどちらでも使えます",
+                            "Same as Windows and Android: Ctrl+U, I, O, P and T (as in Microsoft IME). Same as macOS: Ctrl+J, K, L and ;. They change the text to hiragana, katakana and so on. F6 to F10 work either way")
+            choices: [["PC", Pal.t("Windows 版・Android 版と同じ", "Same as Windows and Android")], ["MAC", Pal.t("macOS と同じ", "Same as macOS")]]
+        }
+    }
+
+    PrefGroup {
         title: Pal.t("日本語と英字の切り替え", "Switching between Japanese and English")
         description: Pal.t("fcitx5 が受け持ちます。Kanade に切り替えると、いつも日本語から始まります。英字は fcitx5 の keyboard-us などで打ちます",
                            "fcitx5 handles this. Switching to Kanade always starts in Japanese; type English with fcitx5's keyboard-us or similar")

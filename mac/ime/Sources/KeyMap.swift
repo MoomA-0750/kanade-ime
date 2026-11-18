@@ -52,8 +52,8 @@ enum KeyMap {
         if let c = event.characters?.unicodeScalars.first, k.mods & (2 | 4 | 8) == 0 {
             let v = Int(c.value)
             if v >= 0x20 && v != 0x7F && !(0xF700...0xF8FF).contains(v) { k.ch = v }
-        } else if k.mods & 4 != 0, k.mods & (2 | 8) == 0, let c = event.charactersIgnoringModifiers?.unicodeScalars.first {
-            // Option と一緒（エンジンはショートカットとしてアプリへ渡す）
+        } else if k.mods & (2 | 4) != 0, k.mods & 8 == 0, let c = event.charactersIgnoringModifiers?.unicodeScalars.first {
+            // Option か Control と一緒（エンジンはショートカットとしてアプリへ渡す。Control+; と Control+: は文字で見て半角英字にする）
             let v = Int(c.value)
             if v >= 0x20 && v != 0x7F && !(0xF700...0xF8FF).contains(v) { k.ch = v }
         }

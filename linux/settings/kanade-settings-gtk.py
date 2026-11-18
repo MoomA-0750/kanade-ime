@@ -56,6 +56,7 @@ DEFAULTS = {
     "voice_final": "parakeet",
     "learning": "true",
     "ui_language": "auto",
+    "key_style": "PC",
     "voice_final_en": "parakeet-en",
     "voice_hold_keys": "F12,Alt_R",
     "voice_toggle_key": "Control+Alt+space",
@@ -64,6 +65,7 @@ DEFAULTS = {
 # ファイルにないときに足す説明（エンジンが書くものと同じ）
 COMMENTS = {
     "zenz_mode": "# zenz の使い方（CORRECT は1位を確かめて直す・軽い、RERANK は候補を全部並べ替える・打つたびに重い）",
+    "key_style": "# 入力中の Ctrl のキー（PC は Ctrl+U/I/O/P/T でひらがな・カタカナ・半角カナ・全角英数・半角英数、MAC は macOS と同じ Ctrl+J/K/L/; でひらがな・カタカナ・全角英字・半角英字。F6〜F10 はどちらでも使える）",
     "emoji_prefix": "# 絵文字の名前の入り口の文字（: ; / @ ! など、記号1文字）",
     "emoji_prefix_twice": "# 入り口の文字を2回続けて打ったときだけ絵文字の名前にする（::rocket）",
     "emoji_shortcodes": "# : に続けて絵文字の名前を打つと絵文字を候補に出す（:rocket → 🚀）",
@@ -438,6 +440,13 @@ class SettingsWindow(Adw.ApplicationWindow):
         g.add(switch_row(T("2回続けて打ったときだけ始める", "Start only when typed twice"),
                          T("入り口の文字を1回打つとふつうの文字になり、2回続けて打つと絵文字の名前を打てます（::rocket → 🚀）",
                            "Typing the start character once types it as usual; typing it twice in a row starts an emoji name (::rocket → 🚀)"), "emoji_prefix_twice"))
+        page.add(g)
+
+        g = group(T("キーの割り当て", "Key assignments"))
+        g.add(combo_row(T("入力中の Ctrl のキー", "Ctrl keys while typing"),
+                        T("「Windows 版・Android 版と同じ」は Ctrl+U・I・O・P・T（MS-IME と同じ）、「macOS と同じ」は Ctrl+J・K・L・; で、ひらがな・カタカナなどにします。F6〜F10 はどちらでも使えます",
+                          "Same as Windows and Android: Ctrl+U, I, O, P and T (as in Microsoft IME). Same as macOS: Ctrl+J, K, L and ;. They change the text to hiragana, katakana and so on. F6 to F10 work either way"),
+                        "key_style", [("PC", T("Windows 版・Android 版と同じ", "Same as Windows and Android")), ("MAC", T("macOS と同じ", "Same as macOS"))]))
         page.add(g)
 
         g = group(T("日本語と英字の切り替え", "Switching between Japanese and English"),

@@ -39,6 +39,40 @@ class EngineHostTest {
     }
 
     @Test
+    fun pcStyleCtrlKeysConvertWidth() {
+        val d = dll()
+        d.type("{Ctrl+Space}kana{Ctrl+I}")
+        assertEquals("[カナ]", d.toString())
+        d.type("{Ctrl+T}")
+        assertEquals("[kana]", d.toString())
+        // PC の割り当てでは Ctrl+K は変換に使わず、確定してアプリへ渡す
+        d.type("{Ctrl+K}")
+        assertEquals("kana", d.toString())
+    }
+
+    @Test
+    fun macStyleCtrlKeysConvertWidth() {
+        val d = dll(EngineHost(InputEngine()).apply { keyStyle = KeyStyle.MAC })
+        d.type("{Ctrl+Space}kana{Ctrl+K}")
+        assertEquals("[カナ]", d.toString())
+        d.type("{Ctrl+L}")
+        assertEquals("[ｋａｎａ]", d.toString())
+        d.type("{Ctrl+J}")
+        assertEquals("[かな]", d.toString())
+        d.type("{Ctrl+;}")
+        assertEquals("[kana]", d.toString())
+        d.type("{Ctrl+J}{Ctrl+Shift+:}")
+        assertEquals("[kana]", d.toString())
+        // Mac・Linux は ; を文字で送る（JIS 配列で仮想キーが違っても文字で決まる）
+        d.type("{Ctrl+J}")
+        d.key(WinKey(true, VK.OEM_PLUS, ';'.code, Mods.CTRL)); d.key(WinKey(false, VK.OEM_PLUS, 0, Mods.CTRL))
+        assertEquals("[kana]", d.toString())
+        // macOS の割り当てでは Ctrl+I は変換に使わない
+        d.type("{Ctrl+I}")
+        assertEquals("kana", d.toString())
+    }
+
+    @Test
     fun toggleKeys() {
         val d = dll()
         d.type("{RAlt}")

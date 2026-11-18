@@ -54,6 +54,11 @@ class EngineHost(
     var toggles: Set<WinToggle>
         get() = mapper.triggers
         set(value) = synchronized(lock) { mapper.triggers = value }
+
+    /** 入力中の Ctrl のキーの割り当て（PC か macOS か） */
+    var keyStyle: KeyStyle
+        get() = mapper.keyStyle
+        set(value) = synchronized(lock) { mapper.keyStyle = value }
     private var active: Client? = null
     private val rerankExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "rerank").apply { isDaemon = true } }
     private val latestRerank = AtomicInteger()
