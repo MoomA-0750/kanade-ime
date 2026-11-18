@@ -426,7 +426,7 @@ class SettingsWindow(Adw.ApplicationWindow):
                            "Types numbers, symbols and capital letters in full width while typing Japanese (Space stays half width)"),
                          "full_width_symbols"))
         g.add(combo_row(T("句読点", "Punctuation"), T("「,」と「.」で入る句読点です", "The marks typed with the comma and period keys"),
-                        "punctuation", [(p, p) for p in ["、。", "，．", "、．", "，。"]]))
+                        "punctuation", [(p, "".join(f"「{c}」" for c in p)) for p in ["、。", "，．", "、．", "，。"]]))
         g.add(switch_row(T("括弧を対で入れる", "Insert brackets in pairs"),
                          T("開き括弧を打つと閉じ括弧も入れ、カーソルを中に置きます。空の括弧で Space を押すと括弧の種類が替わります",
                            "Typing an opening bracket also inserts the closing one and puts the cursor between them. "
@@ -620,7 +620,7 @@ class SettingsWindow(Adw.ApplicationWindow):
                     tag = Gtk.Label(label=T("使用中", "In use"), valign=Gtk.Align.CENTER)
                     tag.add_css_class("dim-label")
                     row.add_suffix(tag)
-                delete = Gtk.Button(icon_name="user-trash-symbolic", valign=Gtk.Align.CENTER, tooltip_text=T("消す（ゴミ箱へ）", "Delete (to trash)"))
+                delete = Gtk.Button(icon_name="user-trash-symbolic", valign=Gtk.Align.CENTER, tooltip_text=T("消す（ゴミ箱へ）", "Delete (to Trash)"))
                 delete.add_css_class("flat")
                 delete.connect("clicked", lambda _b, model=m: self.delete_model(model))
                 row.add_suffix(delete)

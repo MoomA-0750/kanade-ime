@@ -337,9 +337,8 @@ void IndicatorWindow::Paint(ID2D1RenderTarget* rt) {
     D2D1_SIZE_F size = rt->GetSize();
     auto l = Layout(message_, 16, DWRITE_FONT_WEIGHT_SEMI_BOLD);
     DWRITE_TEXT_METRICS m;
-    // 「あ」「A」はアクセントの色、音声入力の様子はふつうの文字の色
-    bool mode = message_ == L"あ" || message_ == L"A";
-    if (l && SUCCEEDED(l->GetMetrics(&m))) DrawLayout(rt, l.Get(), (size.width - m.width) / 2, (size.height - m.height) / 2, mode ? accent_ : text_);
+    // 「あ」「A」も音声入力の様子も、ふつうの文字の色（ダークは白、ライトは黒に近い色）。アクセントの色は使わない
+    if (l && SUCCEEDED(l->GetMetrics(&m))) DrawLayout(rt, l.Get(), (size.width - m.width) / 2, (size.height - m.height) / 2, text_);
 }
 
 }  // namespace kanade

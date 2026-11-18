@@ -35,7 +35,7 @@ PrefPage {
             key: "punctuation"
             title: Pal.t("句読点", "Punctuation")
             subtitle: Pal.t("「,」と「.」で入る句読点です", "The marks typed with the comma and period keys")
-            choices: ["、。", "，．", "、．", "，。"].map(p => [p, p])
+            choices: ["、。", "，．", "、．", "，。"].map(p => [p, p.split("").map(c => "「" + c + "」").join("")])
         }
         SwitchRow {
             key: "pair_brackets"

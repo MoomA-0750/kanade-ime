@@ -39,7 +39,7 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItemSeparator />
-                <NavigationViewItem Content="{local:L Ja='読み込み・書き出し', En='Import and export'}" Tag="backup">
+                <NavigationViewItem Content="{local:L Ja='設定の保存と読み込み', En='Backup and restore'}" Tag="backup">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE8B5;" />
                     </NavigationViewItem.Icon>

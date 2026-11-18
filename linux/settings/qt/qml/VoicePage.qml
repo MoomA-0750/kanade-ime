@@ -165,7 +165,7 @@ PrefPage {
                 IconButton {
                     visible: !row.modelData.downloading && row.modelData.ready
                     iconName: "delete"
-                    tip: Pal.t("消す（ゴミ箱へ）", "Delete (to trash)")
+                    tip: Pal.t("消す（ゴミ箱へ）", "Delete (to Trash)")
                     onClicked: Models.remove(row.id_)
                 }
                 // まだない

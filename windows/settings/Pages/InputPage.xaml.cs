@@ -14,7 +14,7 @@ public sealed partial class InputPage : Page
         Live.IsOn = store.LiveConversion;
         ZenzMode.SelectedItem = ZenzMode.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == store.ZenzMode) ?? ZenzMode.Items[0];
         FullWidth.IsOn = store.FullWidthSymbols;
-        Punctuation.SelectedItem = Punctuation.Items.Contains(store.Punctuation) ? store.Punctuation : "、。";
+        Punctuation.SelectedItem = Punctuation.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == store.Punctuation) ?? Punctuation.Items[0];
         Brackets.IsOn = store.PairBrackets;
         EmojiNames.IsOn = store.EmojiShortcodes;
         EmojiPrefix.SelectedItem = EmojiPrefix.Items.Contains(store.EmojiPrefix) ? store.EmojiPrefix : ":";
@@ -34,7 +34,7 @@ public sealed partial class InputPage : Page
         store.LiveConversion = Live.IsOn;
         store.ZenzMode = (ZenzMode.SelectedItem as ComboBoxItem)?.Tag as string ?? "CORRECT";
         store.FullWidthSymbols = FullWidth.IsOn;
-        store.Punctuation = Punctuation.SelectedItem as string ?? "、。";
+        store.Punctuation = (Punctuation.SelectedItem as ComboBoxItem)?.Tag as string ?? "、。";
         store.PairBrackets = Brackets.IsOn;
         store.EmojiShortcodes = EmojiNames.IsOn;
         store.EmojiPrefix = EmojiPrefix.SelectedItem as string ?? ":";
@@ -60,7 +60,7 @@ public sealed partial class InputPage : Page
         var dialog = new ContentDialog
         {
             XamlRoot = XamlRoot,
-            Title = Lang.T("覚えたものを消しますか？", "Clear learned conversions?"),
+            Title = Lang.T("覚えたものを消しますか？", "Clear what Kanade has learned?"),
             Content = Lang.T("学習した変換をすべて消します。元に戻せません。", "Everything learned will be deleted. This cannot be undone."),
             PrimaryButtonText = Lang.T("消す", "Clear"),
             CloseButtonText = Lang.T("やめる", "Cancel"),

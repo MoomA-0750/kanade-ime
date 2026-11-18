@@ -6,7 +6,7 @@
     xmlns:tk="using:CommunityToolkit.WinUI.Controls">
     <ScrollViewer>
         <StackPanel Margin="36,24,36,36" MaxWidth="1000" Spacing="{StaticResource SettingsCardSpacing}">
-            <TextBlock Text="{local:L Ja='読み込み・書き出し', En='Import and export'}" Style="{StaticResource TitleTextBlockStyle}" Margin="0,0,0,12" />
+            <TextBlock Text="{local:L Ja='設定の保存と読み込み', En='Backup and restore'}" Style="{StaticResource TitleTextBlockStyle}" Margin="0,0,0,12" />
             <tk:SettingsCard Header="{local:L Ja='Android 版の設定を読み込む', En='Import settings from Android'}"
                              Description="{local:L Ja='Android 版の設定画面の「設定の書き出し」で作ったファイル（kanade-settings-*.json）から、設定・ユーザー辞書・スニペットを読み込みます。今のユーザー辞書・スニペットは .bak に残します', En='Imports settings, the user dictionary and snippets from a file made with Export settings in the Android app (kanade-settings-*.json). The current dictionary and snippets are kept as .bak'}">
                 <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8B5;" /></tk:SettingsCard.HeaderIcon>
