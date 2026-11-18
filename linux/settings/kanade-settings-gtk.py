@@ -418,8 +418,8 @@ class SettingsWindow(Adw.ApplicationWindow):
                          T("打つたびに変換した結果を出します。切ると Space を押すまでかなのままです",
                            "Shows the converted text as you type. When off, text stays in kana until you press Space"), "live_conversion"))
         g.add(combo_row(T("zenz の使い方", "zenz mode"),
-                        T("zenz で変換の候補を直す方法です。「確かめて直す」は1位だけを確かめて軽く、「並べ替え」は打つたびに候補を全部並べ替えるので CPU を多く使います",
-                          "How zenz improves the candidates. Verify checks only the top one and stays light; Rerank reorders every candidate on each keystroke and uses much more CPU"),
+                        T("「確かめて直す」は軽く、「並べ替え」は打つたびに CPU を多く使います",
+                          "Verify is light; Rerank uses much more CPU on each keystroke"),
                         "zenz_mode", [("CORRECT", T("確かめて直す", "Verify")), ("RERANK", T("並べ替え", "Rerank"))]))
         g.add(switch_row(T("数字・記号を全角にする", "Full-width numbers and symbols"),
                          T("日本語入力中の数字・記号・大文字を全角で入れます（Space は半角のまま）",

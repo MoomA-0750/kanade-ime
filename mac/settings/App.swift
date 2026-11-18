@@ -149,8 +149,8 @@ struct InputPage: View {
                     Text(T("並べ替え", "Rerank")).tag("RERANK")
                 } label: {
                     Text(T("zenz の使い方", "zenz mode"))
-                    Text(T("zenz で変換の候補を直す方法です。「確かめて直す」は1位だけを確かめて軽く、「並べ替え」は打つたびに候補を全部並べ替えるので CPU を多く使います",
-                           "How zenz improves the candidates. Verify checks only the top one and stays light; Rerank reorders every candidate on each keystroke and uses much more CPU"))
+                    Text(T("「確かめて直す」は軽く、「並べ替え」は打つたびに CPU を多く使います",
+                           "Verify is light; Rerank uses much more CPU on each keystroke"))
                 }
                 Toggle(isOn: settings.bool("full_width_symbols")) {
                     Text(T("数字・記号を全角にする", "Full-width numbers and symbols"))

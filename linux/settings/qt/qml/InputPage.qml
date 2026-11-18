@@ -20,8 +20,8 @@ PrefPage {
         ComboRow {
             key: "zenz_mode"
             title: Pal.t("zenz の使い方", "zenz mode")
-            subtitle: Pal.t("zenz で変換の候補を直す方法です。「確かめて直す」は1位だけを確かめて軽く、「並べ替え」は打つたびに候補を全部並べ替えるので CPU を多く使います",
-                            "How zenz improves the candidates. Verify checks only the top one and stays light; Rerank reorders every candidate on each keystroke and uses much more CPU")
+            subtitle: Pal.t("「確かめて直す」は軽く、「並べ替え」は打つたびに CPU を多く使います",
+                            "Verify is light; Rerank uses much more CPU on each keystroke")
             choices: [["CORRECT", Pal.t("確かめて直す", "Verify")], ["RERANK", Pal.t("並べ替え", "Rerank")]]
         }
         SwitchRow {
