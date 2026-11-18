@@ -38,7 +38,7 @@ PrefPage {
         PrefRow {
             clickable: true
             centered: true
-            title: Pal.t("押している間だけ録音するキーを足す", "Add a hold-to-record key")
+            title: Pal.t("押している間だけ録音するキーを足す…", "Add a hold-to-record key…")
             prefix: Icon { name: "add"; color: Pal.fg }
             onClicked: capture.ask(false, k => page.setHolds(page.holds.includes(k) ? page.holds : page.holds.concat([k])))
         }
@@ -47,7 +47,7 @@ PrefPage {
             subtitle: page.toggle ? KeyGrab.label(page.toggle, Store.english) : Pal.t("使わない", "Not used")
             prefix: Icon { name: "record"; color: Pal.fg }
             KButton {
-                text: Pal.t("変える", "Change")
+                text: Pal.t("変える…", "Change…")
                 onClicked: capture.ask(true, k => Store.set("voice_toggle_key", k))
             }
             KButton {

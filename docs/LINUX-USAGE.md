@@ -35,7 +35,7 @@ Android 版・Windows 版と同じ入力（ライブ変換・zenz の並べ替�
 
 ## 設定
 
-設定の画面は、アプリの一覧の「Kanade の設定」か、fcitx5 のトレイのメニュー（Kanade を使っているとき）の「Kanade: 設定」「音声入力」「ユーザー辞書」「スニペット」で開く（`~/.local/share/kanade/bin/kanade-settings [input|voice|dictionary|snippets|backup|usage]`）。中身は入力・音声入力（録音キー・モデルを落とす）・ユーザー辞書・スニペット・Android 版の設定の読み込みと書き出し・使い方。変えると、エンジンが 2 秒ほどで読み直す。
+設定の画面は、アプリの一覧の「Kanade の設定」か、fcitx5 のトレイのメニュー（Kanade を使っているとき）の「Kanade: 設定…」「音声入力…」「ユーザー辞書…」「スニペット…」で開く（`~/.local/share/kanade/bin/kanade-settings [input|voice|dictionary|snippets|backup|usage]`）。中身は入力・音声入力（録音キー・モデルを落とす）・ユーザー辞書・スニペット・Android 版の設定の読み込みと書き出し・使い方。変えると、エンジンが 2 秒ほどで読み直す。
 
 画面は2つあり、中身は同じ:
 

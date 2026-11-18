@@ -3,6 +3,7 @@
 #include <olectl.h>
 #include <shlobj.h>
 
+#include <algorithm>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -24,7 +25,7 @@ enum MenuId : UINT {
     kMenuSettings,
     kMenuUserDictionary,
     kMenuSnippets,
-    kMenuImportAndroid,
+    kMenuVoice,
     kMenuLog,
 };
 
@@ -182,11 +183,11 @@ STDMETHODIMP LangBarButton::GetIcon(HICON* icon) {
     return *icon ? S_OK : E_FAIL;
 }
 
-STDMETHODIMP LangBarButton::OnClick(TfLBIClick click, POINT pt, const RECT*) {
+STDMETHODIMP LangBarButton::OnClick(TfLBIClick click, POINT pt, const RECT* area) {
     Log("OnClick %d", static_cast<int>(click));
     try {
         if (click == TF_LBI_CLK_LEFT && onToggle_) onToggle_();
-        if (click == TF_LBI_CLK_RIGHT) ShowMenu(pt);
+        if (click == TF_LBI_CLK_RIGHT) ShowMenu(pt, area);
     } catch (...) {
         Log("exception in OnClick");
     }
@@ -199,15 +200,16 @@ void LangBarButton::AddItems(const std::function<void(UINT, bool, bool, const wc
     add(kMenuJapanese, false, japanese_, en ? L"Hiragana (あ)" : L"ひらがな（あ）");
     add(kMenuDirect, false, !japanese_, en ? L"Alphanumeric (A)" : L"半角英数（A）");
     add(0, true, false, nullptr);
-    add(kMenuSettings, false, false, en ? L"Settings" : L"設定");
-    add(kMenuUserDictionary, false, false, en ? L"User dictionary" : L"ユーザー辞書");
-    add(kMenuSnippets, false, false, en ? L"Snippets" : L"スニペット");
-    add(kMenuImportAndroid, false, false, en ? L"Import Android settings" : L"Android 版の設定を読み込む");
+    // 項目と言い方は Mac・Linux の入力メニューと同じ（設定の画面を開くものは「…」）
+    add(kMenuSettings, false, false, en ? L"Settings…" : L"設定…");
+    add(kMenuVoice, false, false, en ? L"Voice input…" : L"音声入力…");
+    add(kMenuUserDictionary, false, false, en ? L"User dictionary…" : L"ユーザー辞書…");
+    add(kMenuSnippets, false, false, en ? L"Snippets…" : L"スニペット…");
     add(0, true, false, nullptr);
-    add(kMenuLog, false, false, en ? L"Open log" : L"記録を開く");
+    add(kMenuLog, false, false, en ? L"Log" : L"記録");
 }
 
-void LangBarButton::ShowMenu(POINT pt) {
+void LangBarButton::ShowMenu(POINT pt, const RECT* area) {
     // タスクバーの入力の表示（BTN_BUTTON）では、右クリックでもシステムは InitMenu を呼ばず OnClick だけが来る。
     // そこで自分でメニューを出す。メニューの持ち主にする見えない窓を前面にしないと、外をクリックしても閉じない
     HMENU menu = CreatePopupMenu();
@@ -227,9 +229,21 @@ void LangBarButton::ShowMenu(POINT pt) {
     });
     HWND owner = CreateWindowExW(WS_EX_TOOLWINDOW, L"STATIC", L"", WS_POPUP, pt.x, pt.y, 0, 0, nullptr, nullptr, g_module, nullptr);
     if (owner) SetForegroundWindow(owner);
-    UINT flags = TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON | TPM_BOTTOMALIGN |
-                 (GetSystemMetrics(SM_MENUDROPALIGNMENT) ? TPM_RIGHTALIGN : TPM_LEFTALIGN);
-    UINT id = static_cast<UINT>(TrackPopupMenuEx(menu, flags, pt.x, pt.y, owner ? owner : GetForegroundWindow(), nullptr));
+    // Windows 11 のタスクバーのメニューと同じく、タスクバーに重ねず上に出し、ボタンの真ん中にそろえる。
+    // 下の端は、ボタンの上の端と、画面の作業領域（タスクバーを除いた範囲）の下の端の、上にある方
+    POINT at = pt;
+    UINT align = GetSystemMetrics(SM_MENUDROPALIGNMENT) ? TPM_RIGHTALIGN : TPM_LEFTALIGN;
+    if (area && area->right > area->left) {
+        at.x = (area->left + area->right) / 2;
+        at.y = area->top;
+        align = TPM_CENTERALIGN;
+    }
+    MONITORINFO mi = {sizeof(mi)};
+    if (GetMonitorInfoW(MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST), &mi) && mi.rcWork.bottom < mi.rcMonitor.bottom) {
+        at.y = std::min(at.y, mi.rcWork.bottom);
+    }
+    UINT flags = TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON | TPM_BOTTOMALIGN | align;
+    UINT id = static_cast<UINT>(TrackPopupMenuEx(menu, flags, at.x, at.y, owner ? owner : GetForegroundWindow(), nullptr));
     if (owner) {
         PostMessageW(owner, WM_NULL, 0, 0);
         DestroyWindow(owner);
@@ -259,7 +273,7 @@ STDMETHODIMP LangBarButton::OnMenuSelect(UINT id) {
         case kMenuSettings: action = "settings"; break;
         case kMenuUserDictionary: action = "user-dictionary"; break;
         case kMenuSnippets: action = "snippets"; break;
-        case kMenuImportAndroid: action = "import-android"; break;
+        case kMenuVoice: action = "voice"; break;
         case kMenuLog: action = "log"; break;
         default: break;
     }

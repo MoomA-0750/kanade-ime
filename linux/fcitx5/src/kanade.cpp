@@ -83,8 +83,9 @@ public:
         // 表示の言語はエンジンの既定（ui_language=auto）と同じく、LANG が日本語なら日本語、ほかは英語
         bool ja = env("LC_ALL", env("LC_MESSAGES", env("LANG", ""))).rfind("ja", 0) == 0;
         const std::tuple<const char *, const char *, const char *> items[] = {
-            {"settings", "設定", "Settings"}, {"voice", "音声入力", "Voice input"}, {"user-dictionary", "ユーザー辞書", "User dictionary"},
-            {"snippets", "スニペット", "Snippets"}, {"log", "記録", "Log"}};
+            // 項目と言い方は Mac の入力メニュー・Windows のタスクバーのメニューと同じ（設定の画面を開くものは「…」）
+            {"settings", "設定…", "Settings…"}, {"voice", "音声入力…", "Voice input…"}, {"user-dictionary", "ユーザー辞書…", "User dictionary…"},
+            {"snippets", "スニペット…", "Snippets…"}, {"log", "記録", "Log"}};
         for (const auto &[id, labelJa, labelEn] : items) {
             auto action = std::make_unique<fcitx::SimpleAction>();
             action->setShortText(std::string("Kanade: ") + (ja ? labelJa : labelEn));

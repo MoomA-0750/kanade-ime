@@ -509,14 +509,14 @@ class SettingsWindow(Adw.ApplicationWindow):
             remove.connect("clicked", lambda _b, k=key: self.set_hold_keys([h for h in holds if h != k]))
             row.add_suffix(remove)
             g.add(row)
-        add = Adw.ButtonRow(title=T("押している間だけ録音するキーを足す", "Add a hold-to-record key"), start_icon_name="list-add-symbolic")
+        add = Adw.ButtonRow(title=T("押している間だけ録音するキーを足す…", "Add a hold-to-record key…"), start_icon_name="list-add-symbolic")
         add.connect("activated", lambda _r: self.capture_key(False, lambda k: self.set_hold_keys(holds + [k] if k not in holds else holds)))
         g.add(add)
         toggle = s.get("voice_toggle_key", "")
         row = Adw.ActionRow(title=T("押すたびに始める・終える", "Press to start and stop"),
                             subtitle=key_label(toggle) if toggle else T("使わない", "Not used"))
         row.add_prefix(Gtk.Image.new_from_icon_name("media-record-symbolic"))
-        change = Gtk.Button(label=T("変える", "Change"), valign=Gtk.Align.CENTER)
+        change = Gtk.Button(label=T("変える…", "Change…"), valign=Gtk.Align.CENTER)
         change.connect("clicked", lambda _b: self.capture_key(True, lambda k: self.save_and_refresh("voice_toggle_key", k)))
         row.add_suffix(change)
         if toggle:
@@ -811,18 +811,18 @@ class SettingsWindow(Adw.ApplicationWindow):
 
     def backup_page(self):
         page = Adw.PreferencesPage()
-        g = group(T("Android 版との行き来", "Moving to and from Android"),
-                  T("設定・ユーザー辞書・スニペットを1つのファイルにします。Android 版の「設定の書き出し」「設定の読み込み」と同じ形です",
-                    "Settings, the user dictionary and snippets in one file, the same format as Export and Import settings in the Android app"))
+        g = group(T("ほかの Kanade との行き来", "Moving between devices"),
+                  T("設定・ユーザー辞書・スニペットを1つのファイルにします。Android 版の「設定の書き出し」「設定の読み込み」と同じ形です。録音キーや英語のモデルなど PC の版だけの項目は、Windows・Linux・Mac のあいだで引き継ぎ、Android 版は読み飛ばします",
+                    "Settings, the user dictionary and snippets in one file, the same format as Export and Import settings in the Android app. Desktop-only items such as record keys and the English model carry over between Windows, Linux and Mac; the Android app skips them"))
         row = Adw.ActionRow(title=T("読み込む", "Import"),
-                            subtitle=T("Android 版で書き出したファイル（kanade-settings-….json）を読みます。今のユーザー辞書・スニペットは .bak に残します",
-                                       "Reads a file exported from the Android app (kanade-settings-….json). The current dictionary and snippets are kept as .bak"))
-        button = Gtk.Button(label=T("ファイルを選ぶ", "Choose file"), valign=Gtk.Align.CENTER)
+                            subtitle=T("ほかの Kanade（Android・Windows・Linux・Mac）で書き出したファイル（kanade-settings-….json）を読みます。今のユーザー辞書・スニペットは .bak に残します",
+                                       "Reads a file exported from another Kanade (Android, Windows, Linux or Mac), kanade-settings-….json. The current dictionary and snippets are kept as .bak"))
+        button = Gtk.Button(label=T("ファイルを選ぶ…", "Choose file…"), valign=Gtk.Align.CENTER)
         button.connect("clicked", lambda _b: self.import_android())
         row.add_suffix(button)
         g.add(row)
-        row = Adw.ActionRow(title=T("書き出す", "Export"), subtitle=T("Android 版で読み込める形で書き出します", "Writes a file the Android app can import"))
-        button = Gtk.Button(label=T("保存先を選ぶ", "Choose where"), valign=Gtk.Align.CENTER)
+        row = Adw.ActionRow(title=T("書き出す", "Export"), subtitle=T("Android・Windows・Linux・Mac の Kanade で読み込める形で書き出します", "Writes a file that Kanade on Android, Windows, Linux and Mac can import"))
+        button = Gtk.Button(label=T("保存先を選ぶ…", "Choose where…"), valign=Gtk.Align.CENTER)
         button.connect("clicked", lambda _b: self.export_android())
         row.add_suffix(button)
         g.add(row)

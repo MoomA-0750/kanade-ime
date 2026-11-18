@@ -34,7 +34,7 @@ public static class Engine
         }
         catch (SocketException)
         {
-            return (false, Lang.T("Kanade のエンジンが動いていません（文字を1つ打つと起動します）", "The Kanade engine is not running (typing one character starts it)"));
+            return (false, Lang.T("Kanade のエンジンが動いていません（Kanade で文字を1つ打つと起動します）", "The Kanade engine is not running (typing one character with Kanade starts it)"));
         }
     }
 

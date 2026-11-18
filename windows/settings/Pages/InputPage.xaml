@@ -63,7 +63,7 @@
                 <ToggleSwitch x:Name="EmojiTwice" Toggled="OnChanged" OnContent="{local:L Ja='オン', En='On'}" OffContent="{local:L Ja='オフ', En='Off'}" />
             </tk:SettingsCard>
 
-            <TextBlock Text="{local:L Ja='日本語のオン/オフ', En='Turning Japanese on and off'}" Style="{StaticResource SectionHeader}" />
+            <TextBlock Text="{local:L Ja='日本語と英字の切り替え', En='Switching between Japanese and English'}" Style="{StaticResource SectionHeader}" />
             <tk:SettingsExpander Header="{local:L Ja='切り替えに使うキー', En='Keys to switch'}"
                                  Description="{local:L Ja='変換（オン）・無変換（オフ）・半角/全角はいつでも使えます', En='Henkan (on), Muhenkan (off) and Hankaku/Zenkaku always work'}" IsExpanded="True">
                 <tk:SettingsExpander.HeaderIcon><FontIcon Glyph="&#xE765;" /></tk:SettingsExpander.HeaderIcon>

@@ -7,19 +7,19 @@ PrefPage {
     id: page
 
     PrefGroup {
-        title: Pal.t("Android 版との行き来", "Moving to and from Android")
-        description: Pal.t("設定・ユーザー辞書・スニペットを1つのファイルにします。Android 版の「設定の書き出し」「設定の読み込み」と同じ形です",
-                           "Settings, the user dictionary and snippets in one file, the same format as Export and Import settings in the Android app")
+        title: Pal.t("ほかの Kanade との行き来", "Moving between devices")
+        description: Pal.t("設定・ユーザー辞書・スニペットを1つのファイルにします。Android 版の「設定の書き出し」「設定の読み込み」と同じ形です。録音キーや英語のモデルなど PC の版だけの項目は、Windows・Linux・Mac のあいだで引き継ぎ、Android 版は読み飛ばします",
+                           "Settings, the user dictionary and snippets in one file, the same format as Export and Import settings in the Android app. Desktop-only items such as record keys and the English model carry over between Windows, Linux and Mac; the Android app skips them")
         PrefRow {
             title: Pal.t("読み込む", "Import")
-            subtitle: Pal.t("Android 版で書き出したファイル（kanade-settings-….json）を読みます。今のユーザー辞書・スニペットは .bak に残します",
-                            "Reads a file exported from the Android app (kanade-settings-….json). The current dictionary and snippets are kept as .bak")
-            KButton { text: Pal.t("ファイルを選ぶ", "Choose file"); onClicked: importDialog.open() }
+            subtitle: Pal.t("ほかの Kanade（Android・Windows・Linux・Mac）で書き出したファイル（kanade-settings-….json）を読みます。今のユーザー辞書・スニペットは .bak に残します",
+                            "Reads a file exported from another Kanade (Android, Windows, Linux or Mac), kanade-settings-….json. The current dictionary and snippets are kept as .bak")
+            KButton { text: Pal.t("ファイルを選ぶ…", "Choose file…"); onClicked: importDialog.open() }
         }
         PrefRow {
             title: Pal.t("書き出す", "Export")
-            subtitle: Pal.t("Android 版で読み込める形で書き出します", "Writes a file the Android app can import")
-            KButton { text: Pal.t("保存先を選ぶ", "Choose where"); onClicked: exportDialog.open() }
+            subtitle: Pal.t("Android・Windows・Linux・Mac の Kanade で読み込める形で書き出します", "Writes a file that Kanade on Android, Windows, Linux and Mac can import")
+            KButton { text: Pal.t("保存先を選ぶ…", "Choose where…"); onClicked: exportDialog.open() }
         }
     }
 

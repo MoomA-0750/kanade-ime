@@ -28,7 +28,7 @@ Open them from the right-click menu of the taskbar input indicator or from "Kana
 - Input: live conversion, zenz mode, full width, punctuation, bracket pairs, emoji by name, keys to switch, learning (and clearing it), display language
 - Voice input: spoken punctuation, the model for the final text (parakeet, ReazonSpeech, SenseVoice, whisper small/kotoba/turbo: download, delete, use), microphone settings
 - User dictionary and snippets: add, edit and delete in a list, or edit everything as text
-- Backup and restore: import Android settings (the JSON from Export settings), export a file the Android app can read, open the settings folder and the log
+- Backup and restore: import a file exported from another Kanade (Android, Windows, Linux or Mac), export a file any Kanade can import, open the settings folder and the log
 - Display language: Same as Windows, 日本語 or English. It changes this window, the taskbar menu and the messages near the cursor
 - Changes take effect right away
 

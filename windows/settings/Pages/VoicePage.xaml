@@ -19,7 +19,7 @@
             </tk:SettingsCard>
 
             <TextBlock Text="{local:L Ja='確定の文を作るモデル', En='Model for the final text'}" Style="{StaticResource SectionHeader}" />
-            <TextBlock Text="{local:L Ja='録音キーを離したときに、句読点付きの文を作るモデルです。使うには落としておきます（途中で止めても、続きから落とせます）。ReazonSpeech は話している途中の文字にも使います', En='The model that writes the sentence with punctuation when you release the record key. Download it to use it (a stopped download resumes where it left off). ReazonSpeech is also used for the text shown while you speak'}"
+            <TextBlock Text="{local:L Ja='録音キーを離したときに、句読点付きの文を作るモデルです。使うには落としておきます（途中で止めても続きから落とせます）。ReazonSpeech は話している途中の文字にも使います', En='The model that writes the sentence with punctuation when you release the record key. Download it to use it (a stopped download resumes). ReazonSpeech is also used for the text shown while you speak'}"
                        TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="1,0,0,8" />
             <StackPanel x:Name="Models" Spacing="{StaticResource SettingsCardSpacing}" />
 

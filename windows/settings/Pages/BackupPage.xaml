@@ -7,23 +7,25 @@
     <ScrollViewer>
         <StackPanel Margin="36,24,36,36" MaxWidth="1000" Spacing="{StaticResource SettingsCardSpacing}">
             <TextBlock Text="{local:L Ja='設定の保存と読み込み', En='Backup and restore'}" Style="{StaticResource TitleTextBlockStyle}" Margin="0,0,0,12" />
-            <tk:SettingsCard Header="{local:L Ja='Android 版の設定を読み込む', En='Import settings from Android'}"
-                             Description="{local:L Ja='Android 版の設定画面の「設定の書き出し」で作ったファイル（kanade-settings-*.json）から、設定・ユーザー辞書・スニペットを読み込みます。今のユーザー辞書・スニペットは .bak に残します', En='Imports settings, the user dictionary and snippets from a file made with Export settings in the Android app (kanade-settings-*.json). The current dictionary and snippets are kept as .bak'}">
+            <TextBlock Text="{local:L Ja='ほかの Kanade との行き来', En='Moving between devices'}" Style="{StaticResource SectionHeader}" />
+            <TextBlock Text="{local:L Ja='設定・ユーザー辞書・スニペットを1つのファイルにします。Android 版の「設定の書き出し」「設定の読み込み」と同じ形です。録音キーや英語のモデルなど PC の版だけの項目は、Windows・Linux・Mac のあいだで引き継ぎ、Android 版は読み飛ばします', En='Settings, the user dictionary and snippets in one file, the same format as Export and Import settings in the Android app. Desktop-only items such as record keys and the English model carry over between Windows, Linux and Mac; the Android app skips them'}" TextWrapping="Wrap" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+            <tk:SettingsCard Header="{local:L Ja='読み込む', En='Import'}"
+                             Description="{local:L Ja='ほかの Kanade（Android・Windows・Linux・Mac）で書き出したファイル（kanade-settings-….json）を読みます。今のユーザー辞書・スニペットは .bak に残します', En='Reads a file exported from another Kanade (Android, Windows, Linux or Mac), kanade-settings-….json. The current dictionary and snippets are kept as .bak'}">
                 <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8B5;" /></tk:SettingsCard.HeaderIcon>
-                <Button Content="{local:L Ja='ファイルを選ぶ', En='Choose file'}" Click="OnImport" />
+                <Button Content="{local:L Ja='ファイルを選ぶ…', En='Choose file…'}" Click="OnImport" />
             </tk:SettingsCard>
-            <tk:SettingsCard Header="{local:L Ja='Android 版で読める形で書き出す', En='Export for Android'}"
-                             Description="{local:L Ja='設定・ユーザー辞書・スニペットを、Android 版の「設定の読み込み」で読める1つのファイルにします（学習は入れません）', En='Saves settings, the user dictionary and snippets as one file that Import settings in the Android app can read (learning is not included)'}">
+            <tk:SettingsCard Header="{local:L Ja='書き出す', En='Export'}"
+                             Description="{local:L Ja='Android・Windows・Linux・Mac の Kanade で読み込める形で書き出します', En='Writes a file that Kanade on Android, Windows, Linux and Mac can import'}">
                 <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xEDE1;" /></tk:SettingsCard.HeaderIcon>
-                <Button Content="{local:L Ja='書き出す', En='Export'}" Click="OnExport" />
+                <Button Content="{local:L Ja='保存先を選ぶ…', En='Choose where…'}" Click="OnExport" />
             </tk:SettingsCard>
-            <tk:SettingsCard Header="{local:L Ja='設定のフォルダ', En='Settings folder'}"
-                             Description="{local:L Ja='設定・ユーザー辞書・スニペット・学習を置いているところです', En='Where settings, the user dictionary, snippets and learning are stored'}">
+
+            <TextBlock Text="{local:L Ja='ファイル', En='Files'}" Style="{StaticResource SectionHeader}" />
+            <tk:SettingsCard Header="{local:L Ja='設定のフォルダーを開く', En='Open the settings folder'}">
                 <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8B7;" /></tk:SettingsCard.HeaderIcon>
                 <Button Content="{local:L Ja='開く', En='Open'}" Click="OnOpenFolder" />
             </tk:SettingsCard>
-            <tk:SettingsCard Header="{local:L Ja='記録', En='Log'}"
-                             Description="{local:L Ja='うまく動かないときの手がかり（エンジンの記録）です', En='The engine log, useful when something does not work'}">
+            <tk:SettingsCard Header="{local:L Ja='記録を開く', En='Open the log'}">
                 <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE9F9;" /></tk:SettingsCard.HeaderIcon>
                 <Button Content="{local:L Ja='開く', En='Open'}" Click="OnOpenLog" />
             </tk:SettingsCard>

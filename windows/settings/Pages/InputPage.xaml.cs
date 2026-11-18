@@ -61,7 +61,7 @@ public sealed partial class InputPage : Page
         {
             XamlRoot = XamlRoot,
             Title = Lang.T("覚えたものを消しますか？", "Clear what Kanade has learned?"),
-            Content = Lang.T("学習した変換をすべて消します。元に戻せません。", "Everything learned will be deleted. This cannot be undone."),
+            Content = Lang.T("元に戻せません。ユーザー辞書は残ります", "This cannot be undone. Your user dictionary is kept"),
             PrimaryButtonText = Lang.T("消す", "Clear"),
             CloseButtonText = Lang.T("やめる", "Cancel"),
             DefaultButton = ContentDialogButton.Close,

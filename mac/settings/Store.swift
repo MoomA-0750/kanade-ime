@@ -101,7 +101,7 @@ func engineRequest(_ command: String, _ argument: String) -> (Bool, String) {
             if f.count >= 4 { return (f[2] == "1", f[3].replacingOccurrences(of: "\\n", with: "\n")) }
         }
     }
-    return (false, T("返事がありません", "No answer"))
+    return (false, T("エンジンから返事がありません", "The engine did not respond"))
 }
 
 
