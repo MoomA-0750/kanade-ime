@@ -116,10 +116,8 @@ final class KanadeInputController: IMKInputController, CommandTarget {
                 composing = false
             case "mode" where c.count >= 2:
                 let on = c[1] == "1"
-                if on != japanese {
-                    japanese = on
-                    Panels.indicator.show(on ? "あ" : "A", ms: 800, caret: caretRect(client))
-                }
+                // 「あ」「A」は自分では出さない。モードを選び直すと macOS がカーソルの近くに出すので、出すと二重になる
+                japanese = on
                 // エンジンのキー（かな・英数・F13・右 Option など）で変わったときは、メニューバーのモードも合わせる
                 if on != Modes.currentIsJapanese() { client.selectMode(on ? Modes.japanese : Modes.roman) }
             case "cands" where c.count >= 3:
