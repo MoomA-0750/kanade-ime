@@ -1,0 +1,5 @@
+#!/bin/bash
+# pkg を入れる前（root で動く）: 動いている前の版の入力方式とエンジンを止める（入れ替えたあと、新しい版で起き直す）
+/usr/bin/pkill -x Kanade 2>/dev/null
+/usr/bin/pkill -f 'dev.mooma.kanade.desktop.MainKt serve' 2>/dev/null
+exit 0

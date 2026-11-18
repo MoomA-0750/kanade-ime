@@ -538,6 +538,8 @@ struct PairEditor: View {
 struct BackupPage: View {
     @State private var message: String?
     @State private var busy = false
+    @State private var confirmRemove = false
+    @State private var removed = false
 
     var body: some View {
         Form {
@@ -575,12 +577,52 @@ struct BackupPage: View {
                     Text(logFile.path)
                 }
             }
+            Section(T("取り除く", "Remove")) {
+                LabeledContent {
+                    Button(T("取り除く…", "Remove…"), role: .destructive) { confirmRemove = true }
+                } label: {
+                    Text(T("Kanade を取り除く", "Remove Kanade"))
+                    Text(T("入力方式・この画面・エンジンをゴミ箱へ移します。Mac のパスワードを求めます",
+                           "Moves the input method, this window and the engine to the Trash. Asks for your Mac password"))
+                }
+            }
         }
         .formStyle(.grouped)
         .disabled(busy)
         .navigationTitle(Page.backup.title)
+        .confirmationDialog(T("Kanade を取り除きますか？", "Remove Kanade?"), isPresented: $confirmRemove) {
+            Button(T("取り除く（設定と辞書は残す）", "Remove (keep settings and dictionary)"), role: .destructive) { remove(removeData: false) }
+            Button(T("設定・辞書・音声のモデルも取り除く", "Also remove settings, dictionary and voice models"), role: .destructive) { remove(removeData: true) }
+        } message: {
+            Text(T("ゴミ箱へ移すので、空にするまでは戻せます。設定・ユーザー辞書・スニペット・学習・落とした音声のモデルは、残すと入れ直したときにそのまま使えます",
+                   "Everything goes to the Trash, so you can restore it until you empty it. If you keep settings, the user dictionary, snippets, learning and downloaded voice models, a reinstall picks them up"))
+        }
         .alert(message ?? "", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
-            Button("OK") { message = nil }
+            Button("OK") {
+                message = nil
+                if removed { NSApp.terminate(nil) }
+            }
+        }
+    }
+
+    private func remove(removeData: Bool) {
+        busy = true
+        // NSAppleScript（パスワードを求める）は main thread で動かす
+        Task { @MainActor in
+            let outcome = Uninstaller.run(removeData: removeData)
+            do {
+                busy = false
+                switch outcome {
+                case .removed:
+                    removed = true
+                    message = T("Kanade を取り除きました。入力メニューに残っていれば、ログアウトすると消えます",
+                                "Kanade has been removed. If it still shows in the input menu, it goes away when you log out")
+                case .cancelled:
+                    break
+                case .failed(let text):
+                    message = T("取り除けませんでした: ", "Could not remove Kanade: ") + text
+                }
+            }
         }
     }
 

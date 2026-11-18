@@ -1,8 +1,8 @@
 #!/bin/bash
 # macOS 版の配布物を、使う Mac（arm64 / x86_64）の上で組み立てる。scripts/mac.sh bundle で作った束を展開した中で動かす。
 # 要るもの: Xcode（swiftc・codesign）。JDK と cmake は scripts/mac.sh build が ~/.cache/kanade-build に置く
-# 出力: dist/Kanade-mac-<arch>.dmg（Kanade.app を開くだけで入る）と、開発用の dist/Kanade-mac-<arch>/・.tar.gz（install.sh つき）
-# 署名: Developer ID Application の証明書があればそれで署名し、KANADE_NOTARY_PROFILE があれば公証も出す（なければ ad-hoc）
+# 出力: dist/Kanade-mac-<arch>.pkg（全員分に入れる配布物）と .version（版）、開発用の dist/Kanade-mac-<arch>/・.tar.gz（install.sh つき。本人のフォルダーに入れる）
+# 署名: Developer ID Application の証明書があれば .app をそれで、Developer ID Installer があれば pkg をそれで署名し、KANADE_NOTARY_PROFILE があれば pkg を公証に出す（なければ .app は ad-hoc、pkg は署名なし）
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT=$PWD
@@ -108,22 +108,37 @@ cp mac/install.sh mac/uninstall.sh docs/THIRD-PARTY.md "$D/" 2>/dev/null || true
 chmod +x "$D"/*.sh 2>/dev/null || true
 tar -C "$ROOT/dist" -czf "$ROOT/dist/$NAME.tar.gz" "$NAME"
 
-# ディスクイメージ（開いて Kanade.app を開くだけで入る）
-echo "ディスクイメージを作る"
-DMG_SRC=$(mktemp -d)
-cp -R "$APP" "$DMG_SRC/"
-cp docs/THIRD-PARTY.md "$DMG_SRC/" 2>/dev/null || true
-[ -f docs/MAC-USAGE.md ] && cp docs/MAC-USAGE.md "$DMG_SRC/"
-rm -f "$ROOT/dist/$NAME.dmg"
-hdiutil create -quiet -volname Kanade -srcfolder "$DMG_SRC" -fs HFS+ -format UDZO "$ROOT/dist/$NAME.dmg"
-rm -rf "$DMG_SRC"
-if [ -n "$SIGN_ID" ]; then
-  codesign --force --timestamp --sign "$SIGN_ID" "$ROOT/dist/$NAME.dmg"
-fi
-# 公証: KANADE_NOTARY_PROFILE（xcrun notarytool store-credentials で作った名前）があり、Developer ID で署名したときだけ
-if [ -n "${KANADE_NOTARY_PROFILE:-}" ] && [ -n "$SIGN_ID" ]; then
+# pkg（全員分に入れる。入れるときに Mac のパスワードを1回求める）
+#   /Library/Input Methods/Kanade.app と /Applications/Kanade Settings.app を置き、postinstall がログインしている人として登録する
+#   版はエンジンの VERSION（年月日時分秒）から 年.月.日.時分 にする（Homebrew の cask の version と同じ）
+STAMP=$(cat "$RES/engine/VERSION")
+PKG_VERSION="${STAMP:0:4}.${STAMP:4:2}.${STAMP:6:2}.${STAMP:8:4}"
+echo "pkg を作る（$PKG_VERSION）"
+PKG_TMP=$(mktemp -d)
+mkdir -p "$PKG_TMP/root/Library/Input Methods" "$PKG_TMP/root/Applications"
+ditto "$APP" "$PKG_TMP/root/Library/Input Methods/Kanade.app"
+ditto "$RES/Kanade Settings.app" "$PKG_TMP/root/Applications/Kanade Settings.app"
+# 組んだ Mac が付ける拡張属性（com.apple.provenance）は、pkgbuild が ._ のファイルにして入れてしまうので外す（署名は中に埋まっているので影響しない）
+xattr -cr "$PKG_TMP/root"
+# 同じ bundle id の .app がほかの場所（前に入れた ~/Library/Input Methods など）にあっても、そちらへ動かさない
+pkgbuild --analyze --root "$PKG_TMP/root" "$PKG_TMP/component.plist" >/dev/null
+i=0
+while plutil -replace "$i.BundleIsRelocatable" -bool NO "$PKG_TMP/component.plist" 2>/dev/null; do i=$((i + 1)); done
+pkgbuild --quiet --root "$PKG_TMP/root" --component-plist "$PKG_TMP/component.plist" --scripts mac/pkg/scripts \
+  --identifier dev.mooma.pkg.Kanade --version "$PKG_VERSION" --install-location / "$PKG_TMP/Kanade-component.pkg"
+case "$ARCH" in aarch64) HOST_ARCH=arm64 ;; *) HOST_ARCH=x86_64 ;; esac
+sed -e "s/@ARCH@/$HOST_ARCH/" -e "s/@VERSION@/$PKG_VERSION/" mac/pkg/distribution.xml > "$PKG_TMP/distribution.xml"
+# 署名: Developer ID Installer の証明書があればそれで（無ければ署名なし。開くときに止められる）
+INSTALLER_ID=${KANADE_INSTALLER_ID:-$(security find-identity -v 2>/dev/null | sed -n 's/.*"\(Developer ID Installer: [^"]*\)".*/\1/p' | head -1)}
+rm -f "$ROOT/dist/$NAME.pkg" "$ROOT/dist/$NAME.dmg"
+productbuild --quiet --distribution "$PKG_TMP/distribution.xml" --package-path "$PKG_TMP" \
+  ${INSTALLER_ID:+--sign "$INSTALLER_ID" --timestamp} "$ROOT/dist/$NAME.pkg"
+rm -rf "$PKG_TMP"
+echo "$PKG_VERSION" > "$ROOT/dist/$NAME.version"
+# 公証: KANADE_NOTARY_PROFILE（xcrun notarytool store-credentials で作った名前）があり、Developer ID Installer で署名したときだけ
+if [ -n "${KANADE_NOTARY_PROFILE:-}" ] && [ -n "$INSTALLER_ID" ]; then
   echo "公証に出す（$KANADE_NOTARY_PROFILE）"
-  xcrun notarytool submit "$ROOT/dist/$NAME.dmg" --keychain-profile "$KANADE_NOTARY_PROFILE" --wait
-  xcrun stapler staple "$ROOT/dist/$NAME.dmg"
+  xcrun notarytool submit "$ROOT/dist/$NAME.pkg" --keychain-profile "$KANADE_NOTARY_PROFILE" --wait
+  xcrun stapler staple "$ROOT/dist/$NAME.pkg"
 fi
-du -sh "$D" "$ROOT/dist/$NAME.tar.gz" "$ROOT/dist/$NAME.dmg"
+du -sh "$D" "$ROOT/dist/$NAME.tar.gz" "$ROOT/dist/$NAME.pkg"

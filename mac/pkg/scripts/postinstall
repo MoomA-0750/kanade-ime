@@ -1,0 +1,25 @@
+#!/bin/bash
+# pkg を入れたあと（root で動く）。ログインしている人のユーザーとして:
+#   1. 前に本人のフォルダーへ入れた版（~/Library/Input Methods/Kanade.app・~/Applications/Kanade Settings.app）をゴミ箱へ移す（同じ入力方式が2つ並ばないように）
+#   2. 中のエンジンを ~/Library/Application Support/Kanade/engine へ置き、入力ソースに登録して有効にする（Kanade --install）
+# ほかのユーザーは、システム設定 → キーボード → 入力ソースの「編集…」で Kanade を足す（エンジンは初めて使うときに置かれる）
+APP="/Library/Input Methods/Kanade.app"
+LOG=/tmp/kanade-postinstall.log
+exec >>"$LOG" 2>&1
+echo "---- $(date) postinstall"
+USER_NAME=$(/usr/bin/stat -f %Su /dev/console)
+case "$USER_NAME" in ""|root|loginwindow|_mbsetupuser) echo "ログインしている人がいない（$USER_NAME）"; exit 0 ;; esac
+USER_ID=$(/usr/bin/id -u "$USER_NAME") || exit 0
+USER_HOME=$(/usr/bin/dscl . -read "/Users/$USER_NAME" NFSHomeDirectory | /usr/bin/awk '{print $2}')
+as_user() { /bin/launchctl asuser "$USER_ID" /usr/bin/sudo -u "$USER_NAME" "$@"; }
+
+TRASH="$USER_HOME/.Trash/Kanade-$(/bin/date +%Y%m%d%H%M%S)"
+for old in "$USER_HOME/Library/Input Methods/Kanade.app" "$USER_HOME/Applications/Kanade Settings.app"; do
+  if [ -e "$old" ]; then
+    as_user /bin/mkdir -p "$TRASH"
+    as_user /bin/mv "$old" "$TRASH/" && echo "ゴミ箱へ: $old"
+  fi
+done
+as_user "$APP/Contents/MacOS/Kanade" --install
+as_user /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "/Applications/Kanade Settings.app"
+exit 0

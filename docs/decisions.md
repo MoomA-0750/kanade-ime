@@ -538,3 +538,15 @@ SPEC.md の未決事項に本人が答えた。
   - 「設定の保存と読み込み」のページは、Windows・Linux（GTK・QML）も Mac と同じ組み立てと文言（「ほかの Kanade との行き来」の読み込む・書き出す、「ファイル」の設定のフォルダーを開く・記録を開く）にした。前は「Android 版との行き来」で、PC の版どうしでも行き来できることが書かれていなかった。
   - ボタンで別の窓や選ぶ画面が出るもの（ファイルを選ぶ…・保存先を選ぶ…・変える…・キーを足す…）は「…」をそろえた。エンジンについての知らせ、学習を消す確認の本文、ダウンロードの説明の句読点、Windows の見出し「日本語と英字の切り替え」も Mac に合わせた。
   - OS で呼び名が違うもの（Ctrl と Control、Alt と Option、Enter と Return、入力方式と入力ソース、システムに合わせると Windows に合わせる）はそのまま。「消す」の英語は、学習を消すのが Clear、項目を消すのが Delete で、どの版も同じなのでそのまま。
+
+## 2026-11-18 Mac 版の配り方を pkg にし、Homebrew の cask でも配る
+
+- 本人の決定。dmg に背景と Applications へのショートカットを付ける案は、作りかけで取りやめた。「開けば入る」作りでも、本人は dmg を開いてどうすればよいか迷った。pkg なら、インストーラーの案内どおりに進めるだけで入る。作りかけの差分は `.trash/2026-11-18-dmg-background-stash.patch`。
+- 入れる先は全員分（`/Library/Input Methods/Kanade.app`・`/Applications/Kanade Settings.app`）。入れるときに Mac のパスワードを1回求める。pkg の postinstall は root で走るので、入力ソースへの登録（TIS は人ごと）とエンジンの配置は、ログインしている人として `launchctl asuser <uid> sudo -u <人>` で `Kanade --install` を呼ぶ。`--install` は前は登録だけだったが、エンジンを置く（syncEngine）ことも足した。
+- エンジンは、これまでどおり人ごとに `~/Library/Application Support/Kanade/engine` へ写して動かす。落とした音声のモデルを engine/data に置く作りを変えずに済み、pkg の中身（root のもの）を書き換えずに済む。
+- 前に本人のフォルダーへ入れた版（`~/Library/Input Methods/Kanade.app`）は、postinstall がゴミ箱へ移す。同じ bundle id の入力方式が2つあると、どちらが動くか分からなくなる。同じ理由で、pkg の BundleIsRelocatable を切る（切らないと Installer が、ほかの場所の同じ bundle id の .app を探して、そこへ入れてしまう）。
+- dmg はやめ、配布物は pkg 1つにした（pkg は1つのファイルでそのまま配れ、Release・appshelf・Homebrew のどれでも同じものを使える）。開発用の tar.gz（install.sh で本人のフォルダーへ入れる。sudo が要らない）は残す。
+- pkg は Xcode の pkgbuild・productbuild だけで作れる（dmgbuild や Finder の操作は要らない）。組む Mac が付ける拡張属性 com.apple.provenance は pkgbuild が `._` のファイルにして入れてしまうので、入れる前に `xattr -cr` で外す（署名は Mach-O に埋まっているので崩れない。codesign --verify で確かめた）。ssh から pkgbuild を動かすと「write: Permission denied」が4行出るが、空に近い pkg でも出るもので、中身には影響しない。
+- 取り除くのは設定の画面の「設定の保存と読み込み」→「Kanade を取り除く」。全員分のものは NSAppleScript の `do shell script … with administrator privileges`（パスワードを求める。Apple Events の許可は要らない）でゴミ箱へ移し、`pkgutil --forget` で受領記録も消す。消さずにゴミ箱なので、空にするまで戻せる。設定・辞書・音声のモデルを残すか選べる（残すと入れ直したときにそのまま使える）。
+- Homebrew は自分用の tap（`MoomA-0750/homebrew-tap`、cask `kanade`）。kanade-ime は公開のリポジトリなので、pkg は Release（タグ `mac-v<版>`）に付け、cask はそこを指す。版は 年.月.日.時分（エンジンの VERSION から）。`brew uninstall` は入力ソースを無効にしてから pkgutil の記録で外し、`--zap` で設定と記録も消す。
+- 署名なしの pkg: ダウンロードしたもの（隔離の印つき）は、開くと Gatekeeper に止められ（`spctl -t install` が「no usable signature」で rejected）、システム設定 → プライバシーとセキュリティの「このまま開く」が要る。Homebrew 5 から `--no-quarantine` が無くなり、7 はどの tap のダウンロードにも隔離の印を付けると報告されている。pkg を `installer` に渡すときに止められるかは、Homebrew の入った Mac で確かめていない。どちらも Developer ID Installer の署名と公証で解ける。

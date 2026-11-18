@@ -1,7 +1,7 @@
-// Kanade の macOS の入力方式（InputMethodKit のアプリ）。~/Library/Input Methods/Kanade.app に置く。
-//   ほかの場所（ダウンロードしたディスクイメージなど）で開くと、自分を入れて終わる（Setup.swift）
+// Kanade の macOS の入力方式（InputMethodKit のアプリ）。pkg が /Library/Input Methods/Kanade.app に置く（開発用の install.sh は ~/Library/Input Methods）。
+//   ほかの場所で開くと、自分を ~/Library/Input Methods へ入れて終わる（Setup.swift。開発用）
 //   Kanade --setup      同じことを、画面を出さずに行う（install.sh が呼ぶ）
-//   Kanade --install    入力ソースに登録して有効にする
+//   Kanade --install    中のエンジンを置き、入力ソースに登録して有効にする（pkg の postinstall がログインしている人として呼ぶ）
 //   Kanade --uninstall  入力ソースを無効にする
 import AppKit
 import Carbon
@@ -16,6 +16,7 @@ func inputSources() -> [TISInputSource] {
 }
 
 if args.contains("--install") {
+    do { try Setup.syncEngine() } catch { print("engine を写せない: \(error)") }
     let status = TISRegisterInputSource(Bundle.main.bundleURL as CFURL)
     print("register: \(status)")
     for s in inputSources() {

@@ -14,9 +14,13 @@ enum Setup {
     static var bundledEngine: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/engine") }
     static var bundledSettings: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/Kanade Settings.app") }
 
-    /** この Kanade.app が入れた場所（~/Library/Input Methods/Kanade.app）で動いているか */
+    /** pkg が入れる場所（全員分） */
+    static let systemApp = URL(fileURLWithPath: "/Library/Input Methods/Kanade.app")
+
+    /** この Kanade.app が入れた場所（pkg の /Library/Input Methods/Kanade.app か、開発用の ~/Library/Input Methods/Kanade.app）で動いているか */
     static var isInstalledCopy: Bool {
-        Bundle.main.bundleURL.resolvingSymlinksInPath().standardizedFileURL.path == installedApp.resolvingSymlinksInPath().standardizedFileURL.path
+        let me = Bundle.main.bundleURL.resolvingSymlinksInPath().standardizedFileURL.path
+        return [installedApp, systemApp].contains { $0.resolvingSymlinksInPath().standardizedFileURL.path == me }
     }
 
     static func version(_ engine: URL) -> String? {

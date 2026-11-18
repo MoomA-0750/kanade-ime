@@ -1,20 +1,21 @@
 # Kanade（macOS 版）の使い方
 
-Android 版・Windows 版・Linux 版と同じ入力（ライブ変換・zenz の並べ替え・音声入力）を、macOS の入力ソースとして使う。中身は Windows 版・Linux 版と同じエンジンで、入力ソースのアプリ（InputMethodKit）が Windows の TSF の DLL の代わりをする。macOS 13 以上（設定の画面は 14 以上）、Apple シリコンと Intel。
+Android 版・Windows 版・Linux 版と同じ入力（ライブ変換・zenz の並べ替え・音声入力）を、macOS の入力ソースとして使う。中身は Windows 版・Linux 版と同じエンジンで、入力ソースのアプリ（InputMethodKit）が Windows の TSF の DLL の代わりをする。macOS 14 以上、Apple シリコン（pkg は Apple シリコン向けだけ組んでいる。Intel は同じ手順で Intel の Mac の上で組む）。
 
 ## 入れる・外す
 
-要るもの: Xcode（組む Mac に。swiftc・codesign）。JDK・cmake は組み立てのときに手元から送る。Java は要らない（配布物に入っている）。sudo も要らない。
-
-- 入れる: `Kanade-mac-<arch>.dmg` を開き、中の `Kanade.app` を開く。自分で入って「入れました」と出る（入力ソースへの登録まで済む）。そのあとディスクイメージは消してよい
-  - Developer ID の署名が無い版（ad-hoc）は、初めて開くときに macOS に止められる。システム設定 → プライバシーとセキュリティの「このまま開く」で開く
-  - 入れ直す（新しい版にする）ときも、新しい `Kanade.app` を開くだけ。前の `Kanade.app` はゴミ箱へ移り、落とした音声のモデル・設定・辞書・学習は残る
-  - エンジン・辞書・音声のモデルは `~/Library/Application Support/Kanade/engine`、設定・ユーザー辞書・学習は `~/Library/Application Support/Kanade`、記録は `~/Library/Logs/Kanade/engine.log`・`ime.log`
-  - 入力ソースは `~/Library/Input Methods/Kanade.app`、設定の画面は `~/Applications/Kanade Settings.app`
+- 入れる: `Kanade-mac-<arch>.pkg` を開き、インストーラーの案内どおりに進める（Mac のパスワードを1回求める）。全員分に入り、入れた人の入力ソースへの登録まで済む
+  - Homebrew なら `brew install --cask MoomA-0750/tap/kanade`（同じ pkg を GitHub の Release から入れる）
+  - Developer ID の署名が無い版は、ダウンロードした pkg を開くときに macOS に止められる。システム設定 → プライバシーとセキュリティの「このまま開く」で開く
+  - 入れ直す（新しい版にする）ときも、新しい pkg を入れるだけ（`brew upgrade --cask kanade`）。落とした音声のモデル・設定・辞書・学習は残る。前に本人のフォルダー（`~/Library/Input Methods`）へ入れた版はゴミ箱へ移る
+  - 入力ソースは `/Library/Input Methods/Kanade.app`、設定の画面は `/Applications/Kanade Settings.app`
+  - エンジン・辞書・音声のモデルは `~/Library/Application Support/Kanade/engine`、設定・ユーザー辞書・学習は `~/Library/Application Support/Kanade`、記録は `~/Library/Logs/Kanade/engine.log`・`ime.log`（入れたときの記録は `/tmp/kanade-postinstall.log`）
+  - Mac のほかのユーザーは、システム設定 → キーボード → 入力ソースの「編集…」で「日本語」の Kanade を足す
   - 音声入力のモデルは、入力メニューの「設定…」→「音声入力」から落とす
-- 組み立て（開発用）: リポジトリの手元で `scripts/mac.sh build <ssh の相手>`。ネイティブ・入力ソース・設定の画面は相手の Mac の上でビルドし、`dist/` にディスクイメージと tar.gz を作る。相手の Mac に Developer ID Application の証明書があれば、それで署名する。公証も出すときは、相手の Mac で `xcrun notarytool store-credentials <名前>` をしておき、`KANADE_NOTARY_PROFILE=<名前>` を付けて組む
-  - `scripts/mac.sh install <ssh の相手> --voice` は、相手の Mac で tar.gz の `install.sh` を動かす（画面を出さずに同じように入れ、`--voice` で音声のモデル（日本語の parakeet-ja 656MB・ReazonSpeech 73MB と、英語の parakeet-tdt v3 670MB）も落とす）
-- 外す: tar.gz の `uninstall.sh`（設定・辞書・音声のモデルも消すときは `--all`。消したものはゴミ箱へ）。または `~/Library/Input Methods/Kanade.app` と `~/Applications/Kanade Settings.app` をゴミ箱へ入れ、システム設定の入力ソースから外す
+- 外す: 設定の画面の「設定の保存と読み込み」→「Kanade を取り除く」。Mac のパスワードを求め、入力方式・設定の画面・エンジンをゴミ箱へ移す。設定・辞書・音声のモデルも取り除くかを選べる。Homebrew で入れたなら `brew uninstall --cask kanade`（設定と記録も消すなら `--zap`）
+- 組み立て（開発用）: リポジトリの手元で `scripts/mac.sh build <ssh の相手>`。要るのは組む Mac の Xcode（swiftc・codesign・pkgbuild）だけで、JDK・cmake は手元から送る。ネイティブ・入力ソース・設定の画面は相手の Mac の上でビルドし、`dist/` に pkg・版・tar.gz を作る（`scripts/mac.sh fetch <ssh の相手>` で持ってくる）。相手の Mac に Developer ID Application の証明書があれば .app を、Developer ID Installer があれば pkg を署名する。公証も出すときは、相手の Mac で `xcrun notarytool store-credentials <名前>` をしておき、`KANADE_NOTARY_PROFILE=<名前>` を付けて組む
+  - Release と Homebrew の tap を新しい版にするのは `scripts/mac-release.sh`
+  - `scripts/mac.sh install <ssh の相手> --voice` は、相手の Mac で tar.gz の `install.sh` を動かし、本人のフォルダー（`~/Library/Input Methods`）へ入れる（sudo は要らない。`--voice` で音声のモデル（日本語の parakeet-ja 656MB・ReazonSpeech 73MB と、英語の parakeet-tdt v3 670MB）も落とす）。外すのは tar.gz の `uninstall.sh`（設定・辞書・音声のモデルも消すときは `--all`。消したものはゴミ箱へ）
 
 ## 使い始める
 
