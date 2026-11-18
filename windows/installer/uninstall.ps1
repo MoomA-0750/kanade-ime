@@ -21,7 +21,8 @@ Get-ChildItem (Join-Path $dest 'tsf\x86') -Filter 'kanade_tsf-*.dll' -ErrorActio
 Get-ChildItem (Join-Path $dest 'tsf') -Filter 'kanade_tsf-*.dll' -ErrorAction SilentlyContinue | ForEach-Object {
     Start-Process regsvr32 -ArgumentList '/s', '/u', "`"$($_.FullName)`"" -Wait
 }
-Get-Process java, javaw -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*dev.mooma.kanade.desktop.MainKt*' } | Stop-Process -Force
+# Windows PowerShell 5 の Get-Process は CommandLine を持たないので、CIM でコマンドラインを見る
+Get-CimInstance Win32_Process -Filter "name='java.exe' or name='javaw.exe'" | Where-Object { $_.CommandLine -like '*dev.mooma.kanade.desktop.MainKt*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 Remove-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' Kanade -ErrorAction SilentlyContinue
 Get-Process Kanade.Settings -ErrorAction SilentlyContinue | Stop-Process -Force
 $programs = [Environment]::GetFolderPath('CommonPrograms')

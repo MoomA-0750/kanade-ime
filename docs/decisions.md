@@ -531,3 +531,4 @@ SPEC.md の未決事項に本人が答えた。
 - Windows の入力の画面の選ぶ欄の幅を 200 にそろえた（句読点・絵文字の入り口が 120 で、左端がそろっていなかった）。
 - Windows のページ名「読み込み・書き出し」を Mac・Linux と同じ「設定の保存と読み込み」（Backup and restore）に。英語の文言のずれ（全角の説明・学習を消す確認・Delete (to Trash)）も Mac に合わせた。Windows の録音キーは1つなので「Record key」のまま。
 - Windows の「あ」「A」はアクセントの色をやめ、音声入力の様子と同じふつうの文字の色（ダークは白、ライトは #1A1A1A）。アクセントの色は候補の窓の選んでいる行の印だけに残す。
+- 同日: Windows のインストーラー（install.ps1・uninstall.ps1）が、入れ直すときに動いているエンジンを止められず、`jvm.dll` を置き換えられずに失敗していた。`Get-Process` の `CommandLine` は PowerShell 7 にしかなく、install.ps1 を動かす Windows PowerShell 5 では空だったため。`Get-CimInstance Win32_Process` でコマンドラインを見るように直し、to-fu で上書きして入れ直せることを確かめた。

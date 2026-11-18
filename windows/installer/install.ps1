@@ -15,7 +15,8 @@ function T($ja, $english) { if ($en) { $english } else { $ja } }
 Write-Host (T "Kanade を $dest に入れます" "Installing Kanade to $dest")
 
 # 動いているエンジンを止める（ネイティブの DLL を置き換えられるように）
-Get-Process java, javaw -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*dev.mooma.kanade.desktop.MainKt*' } | Stop-Process -Force
+# Windows PowerShell 5 の Get-Process は CommandLine を持たないので、CIM でコマンドラインを見る
+Get-CimInstance Win32_Process -Filter "name='java.exe' or name='javaw.exe'" | Where-Object { $_.CommandLine -like '*dev.mooma.kanade.desktop.MainKt*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 Start-Sleep -Milliseconds 500
 
 New-Item -ItemType Directory -Force $dest | Out-Null
