@@ -4,8 +4,8 @@ Android 版・Windows 版・Linux 版と同じ入力（ライブ変換・zenz �
 
 ## 入れる・外す
 
-- 入れる: `Kanade-mac-<arch>.pkg` を開き、インストーラーの案内どおりに進める（Mac のパスワードを1回求める）。全員分に入り、入れた人の入力ソースへの登録まで済む
-  - Homebrew なら `brew install --cask MoomA-0750/tap/kanade`（同じ pkg を GitHub の Release から入れる）
+- 入れる: `Kanade-mac-<arch>.pkg` を開き、インストーラーの案内どおりに進める（Mac のパスワードを1回求める）。全員分に入り、入れた人の入力ソースへの登録まで済む。入れ終えたらインストーラーがログアウトを求めるので、ログインし直してから入力メニューで「Kanade」を選ぶ（入力ソースの一覧はログインのときに読まれ、ログインし直すまでは選んでも文字が入らない）
+  - Homebrew なら `brew install --cask MoomA-0750/tap/kanade`（同じ pkg を GitHub の Release から入れる。終わったらログアウトしてログインし直す）
   - Developer ID の署名が無い版は、ダウンロードした pkg を開くときに macOS に止められる。システム設定 → プライバシーとセキュリティの「このまま開く」で開く
   - 入れ直す（新しい版にする）ときも、新しい pkg を入れるだけ（`brew upgrade --cask kanade`）。落とした音声のモデル・設定・辞書・学習は残る。前に本人のフォルダー（`~/Library/Input Methods`）へ入れた版はゴミ箱へ移る
   - 入力ソースは `/Library/Input Methods/Kanade.app`、設定の画面は `/Applications/Kanade Settings.app`

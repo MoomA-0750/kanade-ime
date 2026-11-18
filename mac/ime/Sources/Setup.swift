@@ -78,6 +78,32 @@ enum Setup {
         for s in (TISCreateInputSourceList(filter, true)?.takeRetainedValue() as? [TISInputSource]) ?? [] {
             TISEnableInputSource(s)
         }
+        setThirdPartyEntries(true)
+    }
+
+    // 第三者の入力ソースを有効にした一覧（com.apple.inputsources の AppleEnabledThirdPartyInputSources）。
+    // TISEnableInputSource はここへ書かないので、書かないと入力メニューで選べない（TISSelectInputSource が -50）。
+    // システム設定で足すと書かれるのと同じ2項目（入力モードと入力方式）。読まれるのはログインのときなので、書いたらログインし直す
+    static let thirdPartyDomain = "com.apple.inputsources" as CFString
+    static let thirdPartyKey = "AppleEnabledThirdPartyInputSources" as CFString
+    static var thirdPartyEntries: [[String: String]] {
+        [["Bundle ID": bundleId, "Input Mode": "\(bundleId).Japanese", "InputSourceKind": "Input Mode"],
+         ["Bundle ID": bundleId, "InputSourceKind": "Keyboard Input Method"]]
+    }
+
+    /** 一覧に Kanade の2項目を足す（on）か外す（off）。変えたら true */
+    @discardableResult
+    static func setThirdPartyEntries(_ on: Bool) -> Bool {
+        let current = (CFPreferencesCopyAppValue(thirdPartyKey, thirdPartyDomain) as? [[String: Any]]) ?? []
+        var next = current.filter { ($0["Bundle ID"] as? String) != bundleId }
+        if on { next += thirdPartyEntries.map { $0 as [String: Any] } }
+        let changed = !(next as NSArray).isEqual(to: current)
+        if changed {
+            CFPreferencesSetAppValue(thirdPartyKey, next as CFArray, thirdPartyDomain)
+            CFPreferencesAppSynchronize(thirdPartyDomain)
+        }
+        klog("入力ソースの一覧（\(thirdPartyKey)）: \(on ? "足す" : "外す") \(changed ? "変えた" : "そのまま")")
+        return changed
     }
 
     /** 入れる。前の Kanade.app はゴミ箱へ。戻り値は失敗の説明（成功なら nil） */
@@ -124,8 +150,8 @@ enum Setup {
         } else {
             alert.messageText = L.t("Kanade を入れました", "Kanade is installed")
             alert.informativeText = L.t(
-                "メニューバーの入力メニューで「Kanade」を選ぶと使えます。一覧に無ければ、システム設定 → キーボード → 入力ソースの「編集…」で「日本語」の Kanade を足してください。\n\n音声入力には、はじめて使うときにマイクとアクセシビリティの許可が要ります。音声のモデルは、入力メニューの「設定…」の「音声入力」から落とせます。\n\nこの .app（とディスクイメージ）は、もう消してかまいません。",
-                "Choose \"Kanade\" in the input menu in the menu bar. If it is not listed, add Kanade (Japanese) in System Settings → Keyboard → Input Sources → Edit….\n\nVoice input asks for microphone and Accessibility permission the first time. Download voice models from Settings… → Voice input in the input menu.\n\nYou can delete this app (and the disk image) now.")
+                "一度ログアウトしてログインし直すと、メニューバーの入力メニューで「Kanade」を選べます（入力ソースの一覧はログインのときに読まれます）。一覧に無ければ、システム設定 → キーボード → 入力ソースの「編集…」で「日本語」の Kanade を足してください。\n\n音声入力には、はじめて使うときにマイクとアクセシビリティの許可が要ります。音声のモデルは、入力メニューの「設定…」の「音声入力」から落とせます。\n\nこの .app（とディスクイメージ）は、もう消してかまいません。",
+                "Log out and log back in, then choose \"Kanade\" in the input menu in the menu bar (the list of input sources is read at login). If it is not listed, add Kanade (Japanese) in System Settings → Keyboard → Input Sources → Edit….\n\nVoice input asks for microphone and Accessibility permission the first time. Download voice models from Settings… → Voice input in the input menu.\n\nYou can delete this app (and the disk image) now.")
         }
         alert.runModal()
         exit(error == nil ? 0 : 1)

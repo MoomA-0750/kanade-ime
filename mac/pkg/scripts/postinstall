@@ -1,7 +1,8 @@
 #!/bin/bash
 # pkg を入れたあと（root で動く）。ログインしている人のユーザーとして:
 #   1. 前に本人のフォルダーへ入れた版（~/Library/Input Methods/Kanade.app・~/Applications/Kanade Settings.app）をゴミ箱へ移す（同じ入力方式が2つ並ばないように）
-#   2. 中のエンジンを ~/Library/Application Support/Kanade/engine へ置き、入力ソースに登録して有効にする（Kanade --install）
+#   2. 中のエンジンを ~/Library/Application Support/Kanade/engine へ置き、入力ソースに登録して有効にし、第三者の入力ソースの一覧（com.apple.inputsources）に足す（Kanade --install）
+#   入力メニューで選べるのはログインし直してから（Distribution の onConclusion=RequireLogout でインストーラーがログアウトを求める）
 # ほかのユーザーは、システム設定 → キーボード → 入力ソースの「編集…」で Kanade を足す（エンジンは初めて使うときに置かれる）
 APP="/Library/Input Methods/Kanade.app"
 LOG=/tmp/kanade-postinstall.log

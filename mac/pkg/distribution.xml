@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Kanade の pkg の作り（mac/build.sh が CPU と版を埋めて productbuild に渡す）。全員分（/Library）にだけ入れる -->
+<!-- Kanade の pkg の作り（mac/build.sh が CPU と版を埋めて productbuild に渡す）。全員分（/Library）にだけ入れる。
+     入れ終えたらログアウトを求める（第三者の入力ソースの一覧はログインのときに読まれ、ログインし直すまで入力メニューで選んでも起動しない） -->
 <installer-gui-script minSpecVersion="2">
     <title>Kanade</title>
     <options customize="never" require-scripts="false" hostArchitectures="@ARCH@" rootVolumeOnly="true"/>
@@ -12,5 +13,5 @@
     </choices-outline>
     <choice id="default"/>
     <choice id="dev.mooma.pkg.Kanade" visible="false"><pkg-ref id="dev.mooma.pkg.Kanade"/></choice>
-    <pkg-ref id="dev.mooma.pkg.Kanade" version="@VERSION@" onConclusion="none">Kanade-component.pkg</pkg-ref>
+    <pkg-ref id="dev.mooma.pkg.Kanade" version="@VERSION@" onConclusion="RequireLogout">Kanade-component.pkg</pkg-ref>
 </installer-gui-script>

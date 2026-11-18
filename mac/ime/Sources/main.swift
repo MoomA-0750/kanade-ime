@@ -1,8 +1,8 @@
 // Kanade の macOS の入力方式（InputMethodKit のアプリ）。pkg が /Library/Input Methods/Kanade.app に置く（開発用の install.sh は ~/Library/Input Methods）。
 //   ほかの場所で開くと、自分を ~/Library/Input Methods へ入れて終わる（Setup.swift。開発用）
 //   Kanade --setup      同じことを、画面を出さずに行う（install.sh が呼ぶ）
-//   Kanade --install    中のエンジンを置き、入力ソースに登録して有効にする（pkg の postinstall がログインしている人として呼ぶ）
-//   Kanade --uninstall  入力ソースを無効にする
+//   Kanade --install    中のエンジンを置き、入力ソースに登録して有効にし、第三者の入力ソースの一覧に足す（pkg の postinstall がログインしている人として呼ぶ。効くのはログインし直してから）
+//   Kanade --uninstall  入力ソースを無効にし、一覧から外す
 import AppKit
 import Carbon
 import InputMethodKit
@@ -23,6 +23,7 @@ if args.contains("--install") {
         let id = Unmanaged<CFString>.fromOpaque(TISGetInputSourceProperty(s, kTISPropertyInputSourceID)).takeUnretainedValue()
         print("enable \(id): \(TISEnableInputSource(s))")
     }
+    print("一覧に足す: \(Setup.setThirdPartyEntries(true) ? "書いた" : "もうある")")
     exit(0)
 }
 if args.contains("--setup") {
@@ -34,6 +35,7 @@ if args.contains("--uninstall") {
     for s in inputSources() {
         print("disable: \(TISDisableInputSource(s))")
     }
+    print("一覧から外す: \(Setup.setThirdPartyEntries(false) ? "外した" : "無かった")")
     exit(0)
 }
 

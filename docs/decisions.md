@@ -550,3 +550,17 @@ SPEC.md の未決事項に本人が答えた。
 - 取り除くのは設定の画面の「設定の保存と読み込み」→「Kanade を取り除く」。全員分のものは NSAppleScript の `do shell script … with administrator privileges`（パスワードを求める。Apple Events の許可は要らない）でゴミ箱へ移し、`pkgutil --forget` で受領記録も消す。消さずにゴミ箱なので、空にするまで戻せる。設定・辞書・音声のモデルを残すか選べる（残すと入れ直したときにそのまま使える）。
 - Homebrew は自分用の tap（`MoomA-0750/homebrew-tap`、cask `kanade`）。kanade-ime は公開のリポジトリなので、pkg は Release（タグ `mac-v<版>`）に付け、cask はそこを指す。版は 年.月.日.時分（エンジンの VERSION から）。`brew uninstall` は入力ソースを無効にしてから pkgutil の記録で外し、`--zap` で設定と記録も消す。
 - 署名なしの pkg: ダウンロードしたもの（隔離の印つき）は、開くと Gatekeeper に止められ（`spctl -t install` が「no usable signature」で rejected）、システム設定 → プライバシーとセキュリティの「このまま開く」が要る。Homebrew 5 から `--no-quarantine` が無くなり、7 はどの tap のダウンロードにも隔離の印を付けると報告されている。pkg を `installer` に渡すときに止められるかは、Homebrew の入った Mac で確かめていない。どちらも Developer ID Installer の署名と公証で解ける。
+
+## 2026-11-18 Mac 版: 入れたら第三者の入力ソースの一覧に足し、ログインし直してもらう
+
+- 起きたこと: cramshell（macOS 27.0.1）で本人が 2026.11.18.1621 の pkg を入れると、入力ソースの一覧で Kanade を選べなかった（消して足し直すと選べた）。選べても文字が一切入らず、Ctrl+Space の切り替えもかなり遅れた。ime.log に入れたあとの「started」が無く、入力方式は一度も起動していなかった。システムのログでは imklaunchagent が `LaunchInputMethod() Error, status=-50` と `NO Endpoint` を出していた（アプリが入力方式を待って遅れる）。
+- Reiyas-Air（macOS 27）で同じことが起きた。本人のフォルダーへ入れても、前に動いていた版（11-18 00:06）に戻しても同じ。置き場所や版のせいではない。
+  - `TISEnableInputSource` は 0 を返すのに、入力方式（`dev.mooma.inputmethod.Kanade`）は無効のままで、`com.apple.inputsources` の `AppleEnabledThirdPartyInputSources` に何も書かれない。`TISSelectInputSource` は -50。ことえりは同じ道具で選べる。
+  - 一覧に2項目（入力モード・入力方式。システム設定で足したときと同じ形）を書くと、選べるようになった（-50 → 0）。それでも入力方式は起動せず、`LaunchInputMethod() -50` のままで、TextEdit に打っても何も入らない（cramshell の不具合2と同じ）。
+  - 試して効かなかったこと: imklaunchagent・TextInputMenuAgent を立ち上げ直す、Launch Services の古い登録（ゴミ箱・ディスクイメージ・組み立ての出力先の十数件）を外す、TextEdit を開き直す、入力方式を手で起動しておく。
+- 同じ症状の報告（青简 qingjian の issue #209、Meltype の issue #21）: 一覧に書いたうえでログアウトしてログインし直すと直り、入力方式は launchd から起動した。ログインのときに作られる一覧があり、立ち上げ直しでは足りない、とある。Apple の文書は見つからなかった。
+- 決めたこと:
+  - `Kanade --install`（と開発用の `--setup`）で一覧に Kanade の2項目を足す。`--uninstall`（「Kanade を取り除く」と brew uninstall が呼ぶ）で外す。
+  - pkg は `onConclusion="RequireLogout"` にし、インストーラーが最後にログアウトを求める。Homebrew は cask の caveats で知らせる。開発用の知らせの文にも書いた。
+- `TISDisableInputSource` は一覧から外す（書くのはしない）。Reiyas-Air で新しい版の `--install` が2項目を足し、2回目は「もうある」、`--uninstall` で一覧が空になることを見た。
+- まだ確かめていないこと: ログインし直したら打てるか（Reiyas-Air はほかのユーザーもログインしているので試していない）。本人に cramshell で確かめてもらう。直らなければ、ほかの原因を探し直す。
