@@ -564,3 +564,15 @@ SPEC.md の未決事項に本人が答えた。
   - pkg は `onConclusion="RequireLogout"` にし、インストーラーが最後にログアウトを求める。Homebrew は cask の caveats で知らせる。開発用の知らせの文にも書いた。
 - `TISDisableInputSource` は一覧から外す（書くのはしない）。Reiyas-Air で新しい版の `--install` が2項目を足し、2回目は「もうある」、`--uninstall` で一覧が空になることを見た。
 - まだ確かめていないこと: ログインし直したら打てるか（Reiyas-Air はほかのユーザーもログインしているので試していない）。本人に cramshell で確かめてもらう。直らなければ、ほかの原因を探し直す。
+
+## 2026-11-18 Mac 版: Kanade の中に英字のモードを持たせる・入力ソースの名前を出す
+
+- 本人の依頼: 英字を打つのに ABC へ切り替えたくない。Google 日本語入力のように入力メニューに「あ」「A」を出し、Kanade の中で切り替えたい。また、システム設定の入力ソースの一覧で Kanade が「dev.mooma.inputmet…」と bundle id で出ていた。
+- 決めたこと: 入力モードを「ひらがな」（`dev.mooma.inputmethod.Kanade.Japanese`、smJapanese）と「英字」（`…Kanade.Roman`、smRoman）の2つにした。英字はエンジンの直接入力。`.Japanese` は前からある名前なので変えない（一覧の項目と、本人が足した入力ソースがそのまま使える）。
+- 切り替えのキー:
+  - システムがモードを切り替えるキー（入力メニュー、Control+Space、地球儀キー）は何もしなくても効く。Control+Space は Windows 版・Android 版の US 配列の切り替えキーと同じなので、そろう。
+  - エンジンのキー（JIS 配列のかな・英数、右 Option の単押し、F13）も残した。これらで変わったときは、入力方式が `selectMode` でメニューバーのモードを選び直す。システムでモードを選んだとき（`setValue:forTag:` の `kTextServiceInputModePropertyTag`）は、エンジンへ `mode` を送る。
+  - ⌘ の単押しで英数・かな（⌘英かな の形）も考えたが、やめた。IMK には ⌘+C などのショートカットのキーが届かないことがあり、単押しと見分けられない。見分けるには録音キーと同じイベントタップ（アクセシビリティの許可）が要る。
+- 入力欄に入ったときはいつも日本語にする決まり（前の 12-2）はやめ、選んでいるモードにエンジンを合わせる。モードの選択はシステムが覚えている（書類ごとに覚えるかどうかは macOS の設定）。
+- 名前: `Contents/Resources/{ja,en}.lproj/InfoPlist.strings` に、入力方式とモードの TISInputSourceID をキーにして「Kanade」「Kanade ひらがな」「Kanade 英字」を書いた（mozc と同じやり方）。メニューバーの印は「あ」「A」の TIFF（`make-icon.swift` で描く）。
+- 第三者の入力ソースの一覧（前の項）には英字のモードの項目も足す。モードを足した版を入れたあとも、ログインし直してから選べる。

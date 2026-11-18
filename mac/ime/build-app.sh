@@ -12,4 +12,8 @@ swiftc -O -swift-version 5 -target "$(uname -m)-apple-macos13.0" \
   Sources/*.swift -o "$APP/Contents/MacOS/Kanade"
 cp Info.plist "$APP/Contents/Info.plist"
 swift make-icon.swift "$APP/Contents/Resources/icon.tiff"
+swift make-icon.swift "$APP/Contents/Resources/hiragana.tiff" あ
+swift make-icon.swift "$APP/Contents/Resources/roman.tiff" A
+# 入力ソースの一覧・入力メニューに出す名前（無いと bundle id がそのまま出る）
+for l in ja en; do mkdir -p "$APP/Contents/Resources/$l.lproj"; cp "Resources/$l.lproj/InfoPlist.strings" "$APP/Contents/Resources/$l.lproj/"; done
 # 署名は mac/build.sh がまとめてする（中にエンジンを入れてから）

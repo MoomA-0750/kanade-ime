@@ -83,15 +83,16 @@ enum Setup {
 
     // 第三者の入力ソースを有効にした一覧（com.apple.inputsources の AppleEnabledThirdPartyInputSources）。
     // TISEnableInputSource はここへ書かないので、書かないと入力メニューで選べない（TISSelectInputSource が -50）。
-    // システム設定で足すと書かれるのと同じ2項目（入力モードと入力方式）。読まれるのはログインのときなので、書いたらログインし直す
+    // システム設定で足すと書かれるのと同じ形の項目（入力モードのひらがな・英字と、入力方式）。読まれるのはログインのときなので、書いたらログインし直す
     static let thirdPartyDomain = "com.apple.inputsources" as CFString
     static let thirdPartyKey = "AppleEnabledThirdPartyInputSources" as CFString
     static var thirdPartyEntries: [[String: String]] {
         [["Bundle ID": bundleId, "Input Mode": "\(bundleId).Japanese", "InputSourceKind": "Input Mode"],
+         ["Bundle ID": bundleId, "Input Mode": "\(bundleId).Roman", "InputSourceKind": "Input Mode"],
          ["Bundle ID": bundleId, "InputSourceKind": "Keyboard Input Method"]]
     }
 
-    /** 一覧に Kanade の2項目を足す（on）か外す（off）。変えたら true */
+    /** 一覧に Kanade の項目を足す（on）か外す（off）。変えたら true */
     @discardableResult
     static func setThirdPartyEntries(_ on: Bool) -> Bool {
         let current = (CFPreferencesCopyAppValue(thirdPartyKey, thirdPartyDomain) as? [[String: Any]]) ?? []

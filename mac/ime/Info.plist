@@ -34,13 +34,29 @@
 				<key>tsInputModePrimaryInScriptKey</key><true/>
 				<key>tsInputModeIsVisibleKey</key><true/>
 				<key>tsInputModeDefaultStateKey</key><true/>
-				<key>tsInputModeMenuIconFileKey</key><string>icon.tiff</string>
-				<key>tsInputModeAlternateMenuIconFileKey</key><string>icon.tiff</string>
-				<key>tsInputModePaletteIconFileKey</key><string>icon.tiff</string>
+				<key>tsInputModeJISKeyboardShortcutKey</key><integer>1</integer>
+				<key>tsInputModeMenuIconFileKey</key><string>hiragana.tiff</string>
+				<key>tsInputModeAlternateMenuIconFileKey</key><string>hiragana.tiff</string>
+				<key>tsInputModePaletteIconFileKey</key><string>hiragana.tiff</string>
 				<key>tsInputModeCharacterRepertoireKey</key><array><string>Hira</string><string>Kana</string><string>Latn</string></array>
 			</dict>
+			<key>dev.mooma.inputmethod.Kanade.Roman</key>
+			<dict>
+				<key>TISInputSourceID</key><string>dev.mooma.inputmethod.Kanade.Roman</string>
+				<key>TISIntendedLanguage</key><string>en</string>
+				<key>TISIconIsTemplate</key><true/>
+				<key>tsInputModeScriptKey</key><string>smRoman</string>
+				<key>tsInputModePrimaryInScriptKey</key><true/>
+				<key>tsInputModeIsVisibleKey</key><true/>
+				<key>tsInputModeDefaultStateKey</key><true/>
+				<key>tsInputModeJISKeyboardShortcutKey</key><integer>3</integer>
+				<key>tsInputModeMenuIconFileKey</key><string>roman.tiff</string>
+				<key>tsInputModeAlternateMenuIconFileKey</key><string>roman.tiff</string>
+				<key>tsInputModePaletteIconFileKey</key><string>roman.tiff</string>
+				<key>tsInputModeCharacterRepertoireKey</key><array><string>Latn</string></array>
+			</dict>
 		</dict>
-		<key>tsVisibleInputModeOrderedArrayKey</key><array><string>dev.mooma.inputmethod.Kanade.Japanese</string></array>
+		<key>tsVisibleInputModeOrderedArrayKey</key><array><string>dev.mooma.inputmethod.Kanade.Japanese</string><string>dev.mooma.inputmethod.Kanade.Roman</string></array>
 	</dict>
 </dict>
 </plist>

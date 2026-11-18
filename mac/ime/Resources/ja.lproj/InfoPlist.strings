@@ -1,0 +1,6 @@
+/* 入力ソースの一覧と入力メニューに出す名前。キーは TISInputSourceID（入力方式と、モードごと） */
+"CFBundleName" = "Kanade";
+"CFBundleDisplayName" = "Kanade";
+"dev.mooma.inputmethod.Kanade" = "Kanade";
+"dev.mooma.inputmethod.Kanade.Japanese" = "Kanade ひらがな";
+"dev.mooma.inputmethod.Kanade.Roman" = "Kanade 英字";

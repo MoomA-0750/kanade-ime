@@ -1,0 +1,6 @@
+/* Names in the list of input sources and the input menu. Keys are TISInputSourceIDs (the input method and each mode) */
+"CFBundleName" = "Kanade";
+"CFBundleDisplayName" = "Kanade";
+"dev.mooma.inputmethod.Kanade" = "Kanade";
+"dev.mooma.inputmethod.Kanade.Japanese" = "Kanade Hiragana";
+"dev.mooma.inputmethod.Kanade.Roman" = "Kanade English";
