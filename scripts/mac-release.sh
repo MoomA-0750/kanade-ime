@@ -14,7 +14,7 @@ test -f "$PKG"
 SHA=$(sha256sum "$PKG" | cut -d' ' -f1)
 echo "版 $VERSION / $TAG / sha256 $SHA"
 gh release create "$TAG" "$PKG" --title "Kanade for Mac $VERSION" --target "$(git rev-parse HEAD)" \
-  --notes "Mac 版の pkg（Apple Silicon・macOS 14 以上）。開くと全員分（/Library/Input Methods）に入り、入力ソースへの登録まで済みます。Homebrew: \`brew install --cask MoomA-0750/tap/kanade\`"
+  --notes "Mac 版の pkg（Apple Silicon・macOS 14 以上）。開くと全員分（/Library/Input Methods）に入り、入力ソースへの登録まで済みます。入れたあとはログアウトしてログインし直してください（macOS はログインのときに入力ソースの一覧を読みます）。Homebrew: \`brew install --cask MoomA-0750/tap/kanade\`"
 sed -i -E "s/^  version \".*\"/  version \"$VERSION\"/; s/^  sha256 \".*\"/  sha256 \"$SHA\"/" "$TAP/Casks/kanade.rb"
 git -C "$TAP" add Casks/kanade.rb
 git -C "$TAP" commit -q -m "kanade $VERSION"
