@@ -16,7 +16,7 @@
             </tk:SettingsCard>
             <tk:SettingsCard Header="{local:L Ja='zenz の使い方', En='zenz mode'}"
                              Description="{local:L Ja='「確かめて直す」は軽く、「並べ替え」は打つたびに CPU を多く使います', En='Verify is light; Rerank uses much more CPU on each keystroke'}">
-                <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE945;" /></tk:SettingsCard.HeaderIcon>
+                <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE99A;" /></tk:SettingsCard.HeaderIcon>
                 <ComboBox x:Name="ZenzMode" SelectionChanged="OnChanged" MinWidth="200">
                     <ComboBoxItem Tag="CORRECT" Content="{local:L Ja='確かめて直す', En='Verify'}" />
                     <ComboBoxItem Tag="RERANK" Content="{local:L Ja='並べ替え', En='Rerank'}" />
