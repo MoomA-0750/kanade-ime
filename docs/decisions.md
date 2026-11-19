@@ -609,3 +609,10 @@ SPEC.md の未決事項に本人が答えた。
 - 鳴らす所: 録音を始めたとき、押して離して終えたとき、聞き続けるモードを終えたとき、Esc などで取り消したとき。押し間違い（短すぎる押し）で捨てたときは鳴らさない。
 - PC の版はエンジン（Java）が javax.sound の Clip で鳴らす（Windows・Linux・macOS で同じ）。macOS では「ユーザインターフェイスのサウンドエフェクトを再生」（`defaults read -g com.apple.sound.uiaudio.enabled`、無ければ入）を 10 秒ごとに見て、切っていれば鳴らさない。Android は AudioTrack（USAGE_ASSISTANCE_SONIFICATION）で、マナーモード・サイレントでは鳴らさず、オーディオフォーカスを取らない。
 - 始めの音はマイクにも入る。0.115 秒と短く、話し始めより前に鳴り終わることが多いので、録った音から削ってはいない。認識に「ん」などが混ざるようなら、始めの 0.12 秒を捨てる。
+
+## 2026-11-19 Mac 版: Developer ID の証明書と公証の資格情報を、Kanade 専用のキーチェーンに置く
+
+- 本人が「証明書と公証の資格情報ができた」と知らせてくれたが、組む Mac（Reiya’s MacBook Air）のどのキーチェーンにも、Xcode の「Manage Certificates…」にも、cramshell にも Developer ID Application・Installer は無かった（Apple Development の1枚だけ）。公証の資格情報は本人が ssh から `store-credentials` で作った。ssh からはログインのキーチェーンが開けない（`notarytool history` が keychainLocked）ので、資格情報があるかも確かめられない。
+- 組み立ては ssh から走らせるので、ログインのキーチェーンにある鍵は使えない。codesign は errSecInternalComponent、notarytool は keychainLocked で失敗する。そこで、自己署名の証明書用に作ってある専用のキーチェーン（`~/.kanade-sign`、パスワードはファイル）に Developer ID も入れる。build.sh は専用のキーチェーンを先に探し、codesign・productbuild・notarytool に `--keychain` を渡す。ログインのキーチェーンにあれば、それも使う（画面から組むとき）。
+- 鍵は Xcode では作らない。Xcode で作るとログインのキーチェーンに入り、ssh からは書き出せないため。`scripts/mac-devid.sh csr` が組む Mac で鍵と CSR を作り、本人が developer.apple.com で CSR を上げて .cer を落とす（iPhone の Safari からでもできる）。`import` で専用のキーチェーンへ入れ、鍵のファイルは消す。
+- Mac の bash は 3.2 で、`set -u` の下で空の配列を `"${a[@]}"` と展開すると unbound variable で止まる。そのため `${a[@]+"${a[@]}"}` と書く。

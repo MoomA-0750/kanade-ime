@@ -13,7 +13,7 @@ Android 版・Windows 版・Linux 版と同じ入力（ライブ変換・zenz �
   - Mac のほかのユーザーは、システム設定 → キーボード → 入力ソースの「編集…」で「日本語」の Kanade を足す
   - 音声入力のモデルは、入力メニューの「設定…」→「音声入力」から落とす
 - 外す: 設定の画面の「設定の保存と読み込み」→「Kanade を取り除く」。Mac のパスワードを求め、入力方式・設定の画面・エンジンをゴミ箱へ移す。設定・辞書・音声のモデルも取り除くかを選べる。Homebrew で入れたなら `brew uninstall --cask kanade`（設定と記録も消すなら `--zap`）
-- 組み立て（開発用）: リポジトリの手元で `scripts/mac.sh build <ssh の相手>`。要るのは組む Mac の Xcode（swiftc・codesign・pkgbuild）だけで、JDK・cmake は手元から送る。ネイティブ・入力ソース・設定の画面は相手の Mac の上でビルドし、`dist/` に pkg・版・tar.gz を作る（`scripts/mac.sh fetch <ssh の相手>` で持ってくる）。相手の Mac に Developer ID Application の証明書があれば .app を、Developer ID Installer があれば pkg を署名する。公証も出すときは、相手の Mac で `xcrun notarytool store-credentials <名前>` をしておき、`KANADE_NOTARY_PROFILE=<名前>` を付けて組む
+- 組み立て（開発用）: リポジトリの手元で `scripts/mac.sh build <ssh の相手>`。要るのは組む Mac の Xcode（swiftc・codesign・pkgbuild）だけで、JDK・cmake は手元から送る。ネイティブ・入力ソース・設定の画面は相手の Mac の上でビルドし、`dist/` に pkg・版・tar.gz を作る（`scripts/mac.sh fetch <ssh の相手>` で持ってくる）。相手の Mac に Developer ID Application の証明書があれば .app を、Developer ID Installer があれば pkg を署名する。ssh から組むのでログインのキーチェーンは使えず、証明書は Kanade 専用のキーチェーン（`~/.kanade-sign`）に `scripts/mac-devid.sh` で入れる（`csr` で鍵と CSR を作り、developer.apple.com で作った .cer を置いて `import`）。公証も出すときは、相手の Mac で `xcrun notarytool store-credentials <名前> --keychain ~/.kanade-sign/kanade.keychain-db` をしておき、`KANADE_NOTARY_PROFILE=<名前>` を付けて組む
   - Release と Homebrew の tap を新しい版にするのは `scripts/mac-release.sh`
   - `scripts/mac.sh install <ssh の相手> --voice` は、相手の Mac で tar.gz の `install.sh` を動かし、本人のフォルダー（`~/Library/Input Methods`）へ入れる（sudo は要らない。`--voice` で音声のモデル（日本語の parakeet-ja 656MB・ReazonSpeech 73MB と、英語の parakeet-tdt v3 670MB）も落とす）。外すのは tar.gz の `uninstall.sh`（設定・辞書・音声のモデルも消すときは `--all`。消したものはゴミ箱へ）
 

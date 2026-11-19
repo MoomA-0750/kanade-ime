@@ -64,24 +64,35 @@ APP="$D/Kanade.app"
 mv "$E" "$APP/Contents/Resources/engine"
 mv "$D/Kanade Settings.app" "$APP/Contents/Resources/"
 
-# 署名: KANADE_SIGN_ID に Developer ID Application の名前があればそれで（Hardened Runtime・時刻印つき）、なければ ad-hoc（この Mac だけで使う）
+# 署名の証明書と公証の資格情報は、組む Mac の Kanade 専用のキーチェーン（~/.kanade-sign、scripts/mac-local-sign.sh が作る）に置く。
+# ssh からはログインのキーチェーンを開けない（codesign が errSecInternalComponent、notarytool が keychainLocked）ため
+LOCAL_KC="$HOME/.kanade-sign/kanade.keychain-db"
+KC_ARGS=()
+if [ -f "$LOCAL_KC" ]; then
+  security unlock-keychain -p "$(cat "$HOME/.kanade-sign/password")" "$LOCAL_KC"
+  KC_ARGS=(--keychain "$LOCAL_KC")
+fi
+# KANADE_SIGN_ID が無ければ、専用のキーチェーン、ログインのキーチェーンの順に Developer ID Application を探す（あれば Hardened Runtime・時刻印つき）
 SIGN_ID=${KANADE_SIGN_ID:-}
+SIGN_KC=()
+if [ -z "$SIGN_ID" ] && [ -f "$LOCAL_KC" ]; then
+  SIGN_ID=$(security find-identity -v -p codesigning "$LOCAL_KC" 2>/dev/null | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1)
+  [ -n "$SIGN_ID" ] && SIGN_KC=(--keychain "$LOCAL_KC")
+fi
 if [ -z "$SIGN_ID" ]; then
   SIGN_ID=$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1)
 fi
-# Developer ID が無ければ、この Mac の Kanade 専用の証明書（~/.kanade-sign。自己署名、scripts/mac-local-sign.sh が作る）で署名する。
+# Developer ID が無ければ、専用のキーチェーンの自己署名の証明書（Kanade Local Signing）で署名する。
 # 配るには使えないが、組み直しても macOS が同じアプリと見なすので、アクセシビリティ・マイクの許可が消えない
-# （ad-hoc は中身の hash で見分けるので、組み直すたびに許可が効かなくなる）。専用のキーチェーンなのは、ssh からはログインのキーチェーンを開けないため
+# （ad-hoc は中身の hash で見分けるので、組み直すたびに許可が効かなくなる）
 LOCAL_ID=""
-LOCAL_KC="$HOME/.kanade-sign/kanade.keychain-db"
 if [ -z "$SIGN_ID" ] && [ -f "$LOCAL_KC" ]; then
-  security unlock-keychain -p "$(cat "$HOME/.kanade-sign/password")" "$LOCAL_KC"
   LOCAL_ID=$(security find-identity -p codesigning "$LOCAL_KC" | sed -n 's/.*) \([0-9A-F]\{40\}\) "Kanade Local Signing".*/\1/p' | head -1)
 fi
 sign() { # <entitlements か ""> <path...>
   local ent=$1; shift
   if [ -n "$SIGN_ID" ]; then
-    codesign --force --timestamp --options runtime ${ent:+--entitlements "$ent"} --sign "$SIGN_ID" "$@"
+    codesign --force --timestamp --options runtime ${ent:+--entitlements "$ent"} ${SIGN_KC[@]+"${SIGN_KC[@]}"} --sign "$SIGN_ID" "$@"
   elif [ -n "$LOCAL_ID" ]; then
     codesign --force ${ent:+--entitlements "$ent"} --keychain "$LOCAL_KC" --sign "$LOCAL_ID" "$@"
   else
@@ -142,16 +153,26 @@ pkgbuild --quiet --root "$PKG_TMP/root" --component-plist "$PKG_TMP/component.pl
 case "$ARCH" in aarch64) HOST_ARCH=arm64 ;; *) HOST_ARCH=x86_64 ;; esac
 sed -e "s/@ARCH@/$HOST_ARCH/" -e "s/@VERSION@/$PKG_VERSION/" mac/pkg/distribution.xml > "$PKG_TMP/distribution.xml"
 # 署名: Developer ID Installer の証明書があればそれで（無ければ署名なし。開くときに止められる）
-INSTALLER_ID=${KANADE_INSTALLER_ID:-$(security find-identity -v 2>/dev/null | sed -n 's/.*"\(Developer ID Installer: [^"]*\)".*/\1/p' | head -1)}
+#   専用のキーチェーン、ログインのキーチェーンの順に探す
+INSTALLER_ID=${KANADE_INSTALLER_ID:-}
+INSTALLER_KC=()
+if [ -z "$INSTALLER_ID" ] && [ -f "$LOCAL_KC" ]; then
+  INSTALLER_ID=$(security find-identity -v "$LOCAL_KC" 2>/dev/null | sed -n 's/.*"\(Developer ID Installer: [^"]*\)".*/\1/p' | head -1)
+  [ -n "$INSTALLER_ID" ] && INSTALLER_KC=(--keychain "$LOCAL_KC")
+fi
+[ -z "$INSTALLER_ID" ] && INSTALLER_ID=$(security find-identity -v 2>/dev/null | sed -n 's/.*"\(Developer ID Installer: [^"]*\)".*/\1/p' | head -1)
+PB_SIGN=()
+[ -n "$INSTALLER_ID" ] && PB_SIGN=(--sign "$INSTALLER_ID" --timestamp ${INSTALLER_KC[@]+"${INSTALLER_KC[@]}"})
 rm -f "$ROOT/dist/$NAME.pkg" "$ROOT/dist/$NAME.dmg"
 productbuild --quiet --distribution "$PKG_TMP/distribution.xml" --package-path "$PKG_TMP" \
-  ${INSTALLER_ID:+--sign "$INSTALLER_ID" --timestamp} "$ROOT/dist/$NAME.pkg"
+  ${PB_SIGN[@]+"${PB_SIGN[@]}"} "$ROOT/dist/$NAME.pkg"
 rm -rf "$PKG_TMP"
 echo "$PKG_VERSION" > "$ROOT/dist/$NAME.version"
-# 公証: KANADE_NOTARY_PROFILE（xcrun notarytool store-credentials で作った名前）があり、Developer ID Installer で署名したときだけ
+# 公証: KANADE_NOTARY_PROFILE（xcrun notarytool store-credentials で作った名前）があり、Developer ID Installer で署名したときだけ。
+#   資格情報は専用のキーチェーンにあればそこから（store-credentials に --keychain ~/.kanade-sign/kanade.keychain-db を付けて作る）
 if [ -n "${KANADE_NOTARY_PROFILE:-}" ] && [ -n "$INSTALLER_ID" ]; then
   echo "公証に出す（$KANADE_NOTARY_PROFILE）"
-  xcrun notarytool submit "$ROOT/dist/$NAME.pkg" --keychain-profile "$KANADE_NOTARY_PROFILE" --wait
+  xcrun notarytool submit "$ROOT/dist/$NAME.pkg" --keychain-profile "$KANADE_NOTARY_PROFILE" ${KC_ARGS[@]+"${KC_ARGS[@]}"} --wait
   xcrun stapler staple "$ROOT/dist/$NAME.pkg"
 fi
 du -sh "$D" "$ROOT/dist/$NAME.tar.gz" "$ROOT/dist/$NAME.pkg"
