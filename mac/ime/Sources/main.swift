@@ -53,6 +53,7 @@ guard let server = IMKServer(name: connection, bundleIdentifier: bundleId) else 
 klog("started (\(connection))")
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
+StatusMenu.shared.start()
 let voice = VoiceInput()
 EngineLink.shared.fallback = voice
 EngineLink.shared.onVoiceKeys = { hold, toggle in voice.setKeys(hold: hold, toggle: toggle) }

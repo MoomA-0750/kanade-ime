@@ -21,6 +21,7 @@ final class KanadeInputController: IMKInputController, CommandTarget {
     override func activateServer(_ sender: Any!) {
         super.activateServer(sender)
         EngineLink.shared.target = self
+        StatusMenu.shared.refresh()
         guard EngineLink.shared.ensureConnected() else { return }
         sendFocus()
     }
@@ -29,6 +30,7 @@ final class KanadeInputController: IMKInputController, CommandTarget {
         commitAll()
         if EngineLink.shared.connected { EngineLink.shared.send(["focus", "0"]) }
         if EngineLink.shared.target === self { EngineLink.shared.target = nil }
+        StatusMenu.shared.refresh()
         Panels.hideAll()
         super.deactivateServer(sender)
     }
@@ -211,11 +213,7 @@ final class KanadeInputController: IMKInputController, CommandTarget {
 
     override func menu() -> NSMenu! {
         let menu = NSMenu()
-        let items: [(String, String, String)] = [
-            ("settings", "設定…", "Settings…"), ("voice", "音声入力…", "Voice input…"), ("user-dictionary", "ユーザー辞書…", "User dictionary…"),
-            ("snippets", "スニペット…", "Snippets…"), ("log", "記録", "Log"),
-        ]
-        for (id, ja, en) in items {
+        for (id, ja, en) in MenuEntries.all {
             let item = NSMenuItem(title: L.t(ja, en), action: #selector(menuAction(_:)), keyEquivalent: "")
             item.representedObject = id
             item.target = self

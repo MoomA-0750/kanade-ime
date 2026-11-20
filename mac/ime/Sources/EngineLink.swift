@@ -26,7 +26,9 @@ final class EngineLink {
     /** Kanade が選ばれていないとき（ほかの入力方式で音声入力を使ったとき）の書き先 */
     var fallback: CommandTarget?
     /** エンジンの今のモード（日本語か）。分かるまで nil */
-    var japanese: Bool?
+    var japanese: Bool? { didSet { if let j = japanese { onModeChange?(j) } } }
+    /** モードが変わった（メニューバーの項目を映す） */
+    var onModeChange: ((Bool) -> Void)?
     /** 録音キーの設定が届いた（つないだときと、設定を変えたとき） */
     var onVoiceKeys: ((String, String) -> Void)?
     /** つながった・切れた */
@@ -201,7 +203,13 @@ final class EngineLink {
             let mine = id == waiting
             let wasLate = late.remove(id) != nil
             if id == 0 || mine || wasLate {
-                if let t = target { t.apply(commands) } else { fallback?.apply(commands) }
+                if let t = target {
+                    t.apply(commands)
+                } else {
+                    // Kanade が選ばれていないときも、メニューバーの項目のためにモードは覚える
+                    for c in commands where c.count >= 2 && c[0] == "mode" { japanese = c[1] == "1" }
+                    fallback?.apply(commands)
+                }
             }
             if mine { answered = f[2] == "1" }
         }
