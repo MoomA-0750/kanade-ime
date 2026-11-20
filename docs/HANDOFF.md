@@ -8,6 +8,8 @@ Kanade（日本語 IME、Android・Windows・Linux・macOS）。Mac 版は署名
 - bb6fb13: 録音キーの一回押し（もう一度押すまで録音）・長押し（押している間）の両対応（Mac）と、マリンバの効果音4種（始め2・終わり2。終わりは認識の結果で選ぶ）。Android にも同じ音を入れた。pkg 2026.11.20.2339 を cramshell へ置いた。本人の確認はまだ（SPEC 8-15、decisions 2026-11-20）
 - ee36eb2: メニューバーに Kanade 自身の項目（「あ」「A」とメニュー）を出す（StatusItem.swift）。pkg は組んでいる最中（`.../scratchpad/build3.log` の末尾が done なら終わり）。cramshell への送り方は下の「注意」
 
+- 92d10f8・次の commit: 設定 `start_mode`（入力欄に入ったときの始めのモード。全部の版）と `mac_switch_keys`（Mac。Control+Space・🌐 を Kanade が取るか macOS に任せるか）。SPEC 2-4・12-2、decisions 2026-11-21。Mac の pkg を組んで cramshell へ置く（版は ~/Downloads の新しいもの）。Linux Qt・Windows C# は未ビルド
+
 ## 残り（次の仕事）
 - **聞き続けるモードを PC の版に入れる**（本人の要望「全てのプラットフォームで機能をなるべく揃えたい」）。Android の実装は `app/.../KanadeInputMethodService.kt` の `continuous*`・`continuousTick`・`startContinuous`・`stopContinuous`・`recognizeUtterance(continuousMode = true)`・`runVoiceCommand`（約 1480〜1830 行）。部品は core にある（`VoiceEndpointer`・`PauseSplitter`・`VoiceCommand`）。PC には無い: 録音の途中の音を取り出す・無音の判定をする・区切りごとに認識して入れる・もう一度押す／無音 N 秒／別の入力欄で終える・声のコマンド（送って・次へ・全部消して・止めて・取り消して）・設定 `continuous_idle_seconds`。PC 側の入口は `desktop/.../EngineHost.kt` の startVoice/stopVoice/cancelVoice と Voice*.kt（録音は `VoiceInput` 相当）。Mac の録音キー処理は `mac/ime/Sources/Voice.swift`（今は短押し→「押すたびに始める・終える」。ここを聞き続けるモードへつなぐ）。Windows の DLL・Linux の fcitx5 アドオンは録音キーを持つので、その押し方（短押し・長押し）も揃える
 - 設計は先に `design-planner` に回すのがよい（録音の API、区切りの認識を非同期に入れる所、各 OS の入口の違い）
