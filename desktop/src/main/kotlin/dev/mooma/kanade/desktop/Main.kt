@@ -197,7 +197,8 @@ private fun voiceCheck(data: File, args: List<String>) {
         val dll = FakeDll.inProcess(host).apply { hello("fcitx5") }
         dll.send("voice", "toggle", "ja")
         Thread.sleep((wav.length() - 44) * 1000 / 32_000 + 2000)
-        dll.send("voice", "toggle", "ja")
+        // 「止めて」・時間切れで終わっていなければ、もう一度押して終える
+        if (dll.voiceState == "listen") dll.send("voice", "toggle", "ja")
         // 最後の区切りの認識を待つ
         Thread.sleep(args.getOrNull(2)?.toLongOrNull() ?: 10_000)
         println("入った文: ${dll.document}")
