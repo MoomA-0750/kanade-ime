@@ -22,6 +22,15 @@
                     <ComboBoxItem Tag="RERANK" Content="{local:L Ja='並べ替え', En='Rerank'}" />
                 </ComboBox>
             </tk:SettingsCard>
+            <tk:SettingsCard Header="{local:L Ja='入力欄に入ったときのモード', En='Mode when entering a text field'}"
+                             Description="{local:L Ja='入力欄に入るたび（アプリを替えたときも）、日本語か英字から打ち始めます。「前のまま」は最後に使ったモードです', En='Starts in Japanese or English every time you enter a text field (including switching apps). &quot;Keep the last mode&quot; uses the mode you used last'}">
+                <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE774;" /></tk:SettingsCard.HeaderIcon>
+                <ComboBox x:Name="StartMode" SelectionChanged="OnChanged" MinWidth="200">
+                    <ComboBoxItem Tag="LAST" Content="{local:L Ja='前のまま', En='Keep the last mode'}" />
+                    <ComboBoxItem Tag="JAPANESE" Content="{local:L Ja='日本語', En='Japanese'}" />
+                    <ComboBoxItem Tag="ENGLISH" Content="{local:L Ja='英字', En='English'}" />
+                </ComboBox>
+            </tk:SettingsCard>
             <tk:SettingsCard Header="{local:L Ja='数字・記号を全角にする', En='Full-width numbers and symbols'}"
                              Description="{local:L Ja='日本語入力中の数字・記号・大文字を全角で入れます（Space は半角のまま）', En='Types numbers, symbols and capital letters in full width while typing Japanese (Space stays half width)'}">
                 <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8E9;" /></tk:SettingsCard.HeaderIcon>

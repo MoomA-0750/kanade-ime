@@ -1079,6 +1079,15 @@ class KanadeInputMethodService : InputMethodService() {
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         applyKeyboardSettings()
+        // 新しい入力欄に入ったら、設定のモード（日本語・英字）から始める。LAST は前のまま
+        if (!restarting) {
+            val start = when (settings.startMode) {
+                "JAPANESE" -> "JA"
+                "ENGLISH" -> "EN"
+                else -> null
+            }
+            if (start != null) applySource(KeyboardSource(currentSource().layout, start))
+        }
         ensureModeAllowed()
         hideEmojiPanel()
         log("start-input-view pkg=${info?.packageName} restarting=$restarting")

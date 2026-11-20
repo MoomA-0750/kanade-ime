@@ -22,6 +22,7 @@ const QMap<QString, QString> &defaults()
         {"full_width_symbols", "true"},
         {"live_conversion", "true"},
         {"zenz_mode", "CORRECT"},
+        {"start_mode", "LAST"},
         {"punctuation", "、。"},
         {"pair_brackets", "true"},
         {"emoji_shortcodes", "true"},
@@ -45,6 +46,7 @@ const QMap<QString, QString> &comments()
 {
     static const QMap<QString, QString> c{
         {"zenz_mode", "# zenz の使い方（CORRECT は1位を確かめて直す・軽い、RERANK は候補を全部並べ替える・打つたびに重い）"},
+        {"start_mode", "# 入力欄に入ったときのモード（LAST は前のまま、JAPANESE は日本語、ENGLISH は英字から始める）"},
         {"voice_sounds", "# 録音を始めた・終えたときに効果音を鳴らす"},
         {"key_style", "# 入力中の Ctrl のキー（PC は Ctrl+U/I/O/P/T でひらがな・カタカナ・半角カナ・全角英数・半角英数、MAC は macOS と同じ Ctrl+J/K/L/; でひらがな・カタカナ・全角英字・半角英字。F6〜F10 はどちらでも使える）"},
         {"emoji_prefix", "# 絵文字の名前の入り口の文字（: ; / @ ! など、記号1文字）"},

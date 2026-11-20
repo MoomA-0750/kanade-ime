@@ -256,6 +256,11 @@ class KanadeSettings(context: Context) {
         get() = prefs.getInt(KEY_CLIP_OVERLAY_H, 0)
         set(value) = prefs.edit().putInt(KEY_CLIP_OVERLAY_H, value).apply()
 
+    /** 入力欄に入ったときのモード（LAST は前のまま、JAPANESE は日本語、ENGLISH は英字） */
+    var startMode: String
+        get() = prefs.getString(KEY_START_MODE, "LAST")?.takeIf { it in START_MODES } ?: "LAST"
+        set(value) = prefs.edit().putString(KEY_START_MODE, value).apply()
+
     var lastJapanese: Boolean
         get() = prefs.getBoolean(KEY_LAST_MODE, false)
         set(value) = prefs.edit().putBoolean(KEY_LAST_MODE, value).apply()
@@ -323,6 +328,8 @@ class KanadeSettings(context: Context) {
         const val KEY_LIVE = "live_conversion"
         const val KEY_PREDICTION = "prediction"
         const val KEY_ZENZ_MODE = "zenz_mode"
+        const val KEY_START_MODE = "start_mode"
+        val START_MODES = setOf("LAST", "JAPANESE", "ENGLISH")
         const val KEY_ZENZ_PROFILE = "zenz_profile"
         const val KEY_ZENZ_THREADS = "zenz_threads"
         const val KEY_SOFT_KEYBOARD = "soft_keyboard"

@@ -19,6 +19,8 @@ public sealed class Store
     public bool LiveConversion { get; set; } = true;
     /// <summary>zenz の使い方（CORRECT は1位を確かめて直す・軽い、RERANK は候補を全部並べ替える・打つたびに重い）</summary>
     public string ZenzMode { get; set; } = "CORRECT";
+    /// <summary>入力欄に入ったときのモード（LAST は前のまま、JAPANESE は日本語、ENGLISH は英字）</summary>
+    public string StartMode { get; set; } = "LAST";
     public string Punctuation { get; set; } = "、。";
     public bool PairBrackets { get; set; } = true;
     /// <summary>: に続けて絵文字の名前を打つと絵文字を候補に出す（:rocket → 🚀）</summary>
@@ -62,6 +64,7 @@ public sealed class Store
                 case "emoji_shortcodes": s.EmojiShortcodes = Bool(s.EmojiShortcodes); break;
                 case "emoji_prefix": if (value.Length == 1) s.EmojiPrefix = value; break;
                 case "emoji_prefix_twice": s.EmojiPrefixTwice = Bool(s.EmojiPrefixTwice); break;
+                case "start_mode": if (value.ToUpperInvariant() is "LAST" or "JAPANESE" or "ENGLISH") s.StartMode = value.ToUpperInvariant(); break;
                 case "key_style": if (value.ToUpperInvariant() is "PC" or "MAC") s.KeyStyle = value.ToUpperInvariant(); break;
                 case "toggle_triggers": s.Toggles = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToHashSet(); break;
                 case "spoken_punctuation": s.SpokenPunctuation = Bool(s.SpokenPunctuation); break;
@@ -89,6 +92,8 @@ public sealed class Store
             .AppendLine($"live_conversion={B(LiveConversion)}")
             .AppendLine("# zenz の使い方（CORRECT は1位を確かめて直す・軽い、RERANK は候補を全部並べ替える・打つたびに重い）")
             .AppendLine($"zenz_mode={ZenzMode}")
+            .AppendLine("# 入力欄に入ったときのモード（LAST は前のまま、JAPANESE は日本語、ENGLISH は英字から始める）")
+            .AppendLine($"start_mode={StartMode}")
             .AppendLine("# 句読点（、。 ，． 、． ，。 のどれか）")
             .AppendLine($"punctuation={Punctuation}")
             .AppendLine("# 開き括弧を打ったら閉じ括弧も入れ、カーソルを中に置く")

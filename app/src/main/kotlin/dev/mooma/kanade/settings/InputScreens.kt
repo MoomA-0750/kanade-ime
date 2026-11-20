@@ -84,6 +84,14 @@ fun ColumnScope.InputScreen() {
         SwitchRow(stringResource(R.string.input_live_conversion_title), live, { live = it }, stringResource(R.string.input_live_conversion_summary))
         var prediction by rememberPref({ settings.prediction }, { settings.prediction = it })
         SwitchRow(stringResource(R.string.input_prediction_title), prediction, { prediction = it }, stringResource(R.string.input_prediction_summary))
+        Text(stringResource(R.string.input_start_mode_label))
+        var startMode by rememberPref({ settings.startMode }, { settings.startMode = it })
+        ConnectedChoices(listOf(
+            "LAST" to stringResource(R.string.input_start_mode_last),
+            "JAPANESE" to stringResource(R.string.input_start_mode_japanese),
+            "ENGLISH" to stringResource(R.string.input_start_mode_english),
+        ), startMode, { startMode = it })
+        Note(stringResource(R.string.input_start_mode_note))
         Text(stringResource(R.string.input_zenz_mode_label))
         var zenzMode by rememberPref({ settings.zenzMode }, { settings.zenzMode = it })
         ConnectedChoices(listOf(

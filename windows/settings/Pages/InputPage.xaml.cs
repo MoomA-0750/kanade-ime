@@ -13,6 +13,7 @@ public sealed partial class InputPage : Page
         InitializeComponent();
         Live.IsOn = store.LiveConversion;
         ZenzMode.SelectedItem = ZenzMode.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == store.ZenzMode) ?? ZenzMode.Items[0];
+        StartMode.SelectedItem = StartMode.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == store.StartMode) ?? StartMode.Items[0];
         FullWidth.IsOn = store.FullWidthSymbols;
         Punctuation.SelectedItem = Punctuation.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == store.Punctuation) ?? Punctuation.Items[0];
         Brackets.IsOn = store.PairBrackets;
@@ -34,6 +35,7 @@ public sealed partial class InputPage : Page
         if (loading) return;
         store.LiveConversion = Live.IsOn;
         store.ZenzMode = (ZenzMode.SelectedItem as ComboBoxItem)?.Tag as string ?? "CORRECT";
+        store.StartMode = (StartMode.SelectedItem as ComboBoxItem)?.Tag as string ?? "LAST";
         store.FullWidthSymbols = FullWidth.IsOn;
         store.Punctuation = (Punctuation.SelectedItem as ComboBoxItem)?.Tag as string ?? "、。";
         store.PairBrackets = Brackets.IsOn;

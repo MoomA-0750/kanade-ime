@@ -128,6 +128,11 @@
     <string name="input_repeat_note">Applies when you hold Backspace, the arrows and similar keys. Changes apply the next time the keyboard opens.</string>
     <string name="input_tap_correction">Correct off-target taps</string>
     <string name="input_tap_correction_note">On the Glide and 12-key layouts, when you tap near the edge between keys, Kanade picks the key whose character is more likely to come next in the word you\'re typing. Taps near the middle of a key are never changed.</string>
+    <string name="input_start_mode_label">Mode when entering a text field</string>
+    <string name="input_start_mode_last">Keep the last mode</string>
+    <string name="input_start_mode_japanese">Japanese</string>
+    <string name="input_start_mode_english">English</string>
+    <string name="input_start_mode_note">Starts in Japanese or English every time you enter a text field (including switching apps). \"Keep the last mode\" uses the mode you used last.</string>
     <string name="input_zenz_mode_label">How zenz is used</string>
     <string name="input_zenz_mode_rerank">Rerank</string>
     <string name="input_zenz_mode_correct">Check and fix</string>

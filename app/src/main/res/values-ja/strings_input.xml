@@ -128,6 +128,11 @@
     <string name="input_repeat_note">Backspace・矢印などを押し続けたときです。次にキーボードを出したときから変わります。</string>
     <string name="input_tap_correction">タップのずれを補う</string>
     <string name="input_tap_correction_note">グライドとテンキーで、キーの境目あたりを触ったときは、入力中の語のあとに来やすい文字のキーにします。キーの真ん中あたりを触ったときは、そのキーのままです。</string>
+    <string name="input_start_mode_label">入力欄に入ったときのモード</string>
+    <string name="input_start_mode_last">前のまま</string>
+    <string name="input_start_mode_japanese">日本語</string>
+    <string name="input_start_mode_english">英字</string>
+    <string name="input_start_mode_note">入力欄に入るたび（アプリを替えたときも）、日本語か英字から打ち始めます。「前のまま」は最後に使ったモードです。</string>
     <string name="input_zenz_mode_label">zenz の使い方</string>
     <string name="input_zenz_mode_rerank">並べ替え</string>
     <string name="input_zenz_mode_correct">確かめて直す</string>

@@ -63,7 +63,7 @@ class DesktopStoreTest {
     fun exportThenImport() {
         val a = store()
         a.ensureFiles()
-        a.saveSettings(DesktopSettings(liveConversion = false, punctuation = "，．", pairBrackets = false, emojiShortcodes = false, emojiPrefix = ";", emojiPrefixTwice = true, zenzMode = "RERANK", toggles = setOf(WinToggle.F13)))
+        a.saveSettings(DesktopSettings(liveConversion = false, punctuation = "，．", pairBrackets = false, emojiShortcodes = false, emojiPrefix = ";", emojiPrefixTwice = true, zenzMode = "RERANK", startMode = "ENGLISH", toggles = setOf(WinToggle.F13)))
         a.write(a.userDictionaryFile, "かなで Kanade\nもあ MoomA\n")
         val json = File(a.dir, "out.json")
         a.exportAndroid(json)
@@ -77,6 +77,7 @@ class DesktopStoreTest {
         assertEquals(";", s.emojiPrefix)
         assertTrue(s.emojiPrefixTwice)
         assertEquals("RERANK", s.zenzMode)
+        assertEquals("ENGLISH", s.startMode)
         assertEquals("，．", s.punctuation)
         assertEquals(setOf(WinToggle.F13), s.toggles)
         assertEquals("かなで Kanade\nもあ MoomA\n", b.read(b.userDictionaryFile))

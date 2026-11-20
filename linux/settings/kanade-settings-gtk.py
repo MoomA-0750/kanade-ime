@@ -47,6 +47,7 @@ DEFAULTS = {
     "full_width_symbols": "true",
     "live_conversion": "true",
     "zenz_mode": "CORRECT",
+    "start_mode": "LAST",
     "punctuation": "、。",
     "pair_brackets": "true",
     "emoji_shortcodes": "true",
@@ -67,6 +68,7 @@ DEFAULTS = {
 COMMENTS = {
     "zenz_mode": "# zenz の使い方（CORRECT は1位を確かめて直す・軽い、RERANK は候補を全部並べ替える・打つたびに重い）",
     "voice_sounds": "# 録音を始めた・終えたときに効果音を鳴らす",
+    "start_mode": "# 入力欄に入ったときのモード（LAST は前のまま、JAPANESE は日本語、ENGLISH は英字から始める）",
     "key_style": "# 入力中の Ctrl のキー（PC は Ctrl+U/I/O/P/T でひらがな・カタカナ・半角カナ・全角英数・半角英数、MAC は macOS と同じ Ctrl+J/K/L/; でひらがな・カタカナ・全角英字・半角英字。F6〜F10 はどちらでも使える）",
     "emoji_prefix": "# 絵文字の名前の入り口の文字（: ; / @ ! など、記号1文字）",
     "emoji_prefix_twice": "# 入り口の文字を2回続けて打ったときだけ絵文字の名前にする（::rocket）",
@@ -425,6 +427,10 @@ class SettingsWindow(Adw.ApplicationWindow):
                         T("「確かめて直す」は軽く、「並べ替え」は打つたびに CPU を多く使います",
                           "Verify is light; Rerank uses much more CPU on each keystroke"),
                         "zenz_mode", [("CORRECT", T("確かめて直す", "Verify")), ("RERANK", T("並べ替え", "Rerank"))]))
+        g.add(combo_row(T("入力欄に入ったときのモード", "Mode when entering a text field"),
+                        T("入力欄に入るたび（アプリを替えたときも）、日本語か英字から打ち始めます。「前のまま」は最後に使ったモードです",
+                          "Starts in Japanese or English every time you enter a text field (including switching apps). \"Keep the last mode\" uses the mode you used last"),
+                        "start_mode", [("LAST", T("前のまま", "Keep the last mode")), ("JAPANESE", T("日本語", "Japanese")), ("ENGLISH", T("英字", "English"))]))
         g.add(switch_row(T("数字・記号を全角にする", "Full-width numbers and symbols"),
                          T("日本語入力中の数字・記号・大文字を全角で入れます（Space は半角のまま）",
                            "Types numbers, symbols and capital letters in full width while typing Japanese (Space stays half width)"),

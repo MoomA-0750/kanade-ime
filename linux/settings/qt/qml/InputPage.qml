@@ -24,6 +24,13 @@ PrefPage {
                             "Verify is light; Rerank uses much more CPU on each keystroke")
             choices: [["CORRECT", Pal.t("確かめて直す", "Verify")], ["RERANK", Pal.t("並べ替え", "Rerank")]]
         }
+        ComboRow {
+            key: "start_mode"
+            title: Pal.t("入力欄に入ったときのモード", "Mode when entering a text field")
+            subtitle: Pal.t("入力欄に入るたび（アプリを替えたときも）、日本語か英字から打ち始めます。「前のまま」は最後に使ったモードです",
+                            "Starts in Japanese or English every time you enter a text field (including switching apps). \"Keep the last mode\" uses the mode you used last")
+            choices: [["LAST", Pal.t("前のまま", "Keep the last mode")], ["JAPANESE", Pal.t("日本語", "Japanese")], ["ENGLISH", Pal.t("英字", "English")]]
+        }
         SwitchRow {
             key: "full_width_symbols"
             title: Pal.t("数字・記号を全角にする", "Full-width numbers and symbols")
