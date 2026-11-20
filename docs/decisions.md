@@ -618,3 +618,12 @@ SPEC.md の未決事項に本人が答えた。
 - Mac の bash は 3.2 で、`set -u` の下で空の配列を `"${a[@]}"` と展開すると unbound variable で止まる。そのため `${a[@]+"${a[@]}"}` と書く。
 - 2026-11-20: 本人が developer.apple.com で CSR から Developer ID Application・Installer を作り（Installer は一度使った CSR を拒まれ、作り直した）、公証の資格情報を専用のキーチェーンに `store-credentials kanade --keychain …` で作った。2026.11.20.1527 を Developer ID で署名し、公証は Accepted（指摘なし）。staple 済み。隔離の印を付けた pkg は Reiyas-Air でも cramshell でも `spctl -t install` が accepted になった。
 - 2026-11-20: cramshell で 1527 を入れたあと、アクセシビリティの一覧で Kanade が入なのに「アクセシビリティの許可が必要です」が出続けた。TCC の記録の csreq が前の ad-hoc の版の cdhash（`FADE0C00…` の cdhash の条件）で、Developer ID の新しい版とは合わないため。`tccutil reset Accessibility dev.mooma.inputmethod.Kanade` で外し、入力方式を立ち上げ直して許可し直すと直る。Developer ID にしたので、以後は組み直しても許可は残る。案内文に「もう入なのに出るときは − で外して許可し直す」を足した。点検で、サイドバーの行の題（件の題）が切れていたので、題は「確かめてほしいこと」に揃え、英語の「record keys」を「recording keys」に直した。
+
+## 2026-11-20 Mac 版: 日本語⇔英字の切り替えを macOS の入力ソースの切り替えから外す
+
+- 本人の相談。macOS Tahoe 以降、入力ソースを切り替えるショートカットが遅れたり効かなかったりする（iPadOS では 5 年以上直っていない）。直る見込みがないので、macOS には Kanade 1つだけを見せ、切り替えは Kanade の中で終わらせる。
+- 以前は入力モードを「ひらがな」「英字」の2つ登録し、エンジンのキーで変えたら `selectMode` でメニューバーを合わせ、Control+Space・🌐 は macOS の切り替えを経てモードを受けていた。どちらも TIS を通るので、遅れの影響を受ける。
+- 直し: モードは1つ（`Kanade.Japanese`、名前は「Kanade」、印は「か」）にし、`tsInputModeJISKeyboardShortcutKey`（かな・英数を macOS が先に取る）も外した。切り替えはエンジンの状態だけ。Control+Space と 🌐 は、音声入力と同じ CGEventTap で Kanade のときだけ先に取り、エンジンへ Ctrl+Space として渡す。macOS が出す「あ」「A」とメニューバーの印は出なくなるので、「あ」「A」は Kanade が IndicatorWindow で出す（メニューバーの印は、モードごとに替えるには TIS が要るので諦めた）。
+- 3 つの選択肢のうち、モードを残したまま横取りだけ足す案は、メニューバーが「あ」のまま英字を打つ嘘の表示になるので採らなかった。
+- 不確かなこと: ① 🌐 と Control+Space を CGEventTap で先に取れるか（macOS 27 で未確認）。② パスワード欄は macOS が ASCII の入力ソースへ強制するため、Kanade だけだと日本語のままになりうる（ABC を残す案内が要る）。③ モードの登録を変えたので、入れ直したあと入力ソースに Kanade が出るか。戻し方: この commit を戻す。
+

@@ -25,6 +25,8 @@ final class EngineLink {
     weak var target: CommandTarget?
     /** Kanade が選ばれていないとき（ほかの入力方式で音声入力を使ったとき）の書き先 */
     var fallback: CommandTarget?
+    /** エンジンの今のモード（日本語か）。分かるまで nil */
+    var japanese: Bool?
     /** 録音キーの設定が届いた（つないだときと、設定を変えたとき） */
     var onVoiceKeys: ((String, String) -> Void)?
     /** つながった・切れた */

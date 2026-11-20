@@ -1,5 +1,6 @@
 // 入力欄ごとの入力方式（InputMethodKit）。キーをエンジンへ送り、返ってきた命令で入力中の文字・確定・候補の窓を書く
-// モードは「ひらがな」（エンジンの日本語）と「英字」（エンジンの直接入力）。システムのモードとエンジンの状態を両方向に合わせる
+// 日本語と英字（エンジンの直接入力）の切り替えはエンジンの状態だけで行い、macOS の入力ソースの切り替えは通さない
+// （Tahoe 以降、入力ソースの切り替えは遅れたり効かなかったりするため）。切り替えたときの「あ」「A」は自分で出す
 import AppKit
 import Carbon.HIToolbox
 import InputMethodKit
@@ -7,9 +8,6 @@ import InputMethodKit
 @objc(KanadeInputController)
 final class KanadeInputController: IMKInputController, CommandTarget {
     private var composing = false
-    private var japanese = true
-    /** 入力欄に入ったとき・システムでモードを選んだときに、エンジンへ送る状態（送ったら nil） */
-    private var pendingMode: Bool?
     private var down = Set<Int>()
     private var rightOptionDown = false
     private static let context = 64
@@ -23,8 +21,6 @@ final class KanadeInputController: IMKInputController, CommandTarget {
     override func activateServer(_ sender: Any!) {
         super.activateServer(sender)
         EngineLink.shared.target = self
-        // 入力欄に入ったら、選んでいるモード（ひらがな・英字）にエンジンを合わせる
-        pendingMode = Modes.currentIsJapanese()
         guard EngineLink.shared.ensureConnected() else { return }
         sendFocus()
     }
@@ -37,24 +33,6 @@ final class KanadeInputController: IMKInputController, CommandTarget {
         super.deactivateServer(sender)
     }
 
-    /** システムでモードを選んだ（入力メニュー・Control+Space・地球儀キー。こちらの selectMode の後にも呼ばれる） */
-    override func setValue(_ value: Any!, forTag tag: Int, client sender: Any!) {
-        guard tag == Int(kTextServiceInputModePropertyTag), let mode = value as? String else {
-            super.setValue(value, forTag: tag, client: sender)
-            return
-        }
-        let on = mode != Modes.roman
-        if on == japanese && pendingMode == nil { return }
-        if EngineLink.shared.connected {
-            commitAll()
-            EngineLink.shared.target = self
-            EngineLink.shared.send(["mode", on ? "1" : "0"])
-            pendingMode = nil
-        } else {
-            pendingMode = on
-        }
-    }
-
     /** アプリが入力中の文字を終わらせたい（マウスで入力欄を触ったなど）。入力中の文字は確定する（Windows 版と同じ） */
     override func commitComposition(_ sender: Any!) {
         commitAll()
@@ -63,10 +41,6 @@ final class KanadeInputController: IMKInputController, CommandTarget {
 
     private func sendFocus() {
         EngineLink.shared.send(["focus", "1"])
-        if let on = pendingMode {
-            EngineLink.shared.send(["mode", on ? "1" : "0"])
-            pendingMode = nil
-        }
     }
 
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
@@ -93,7 +67,6 @@ final class KanadeInputController: IMKInputController, CommandTarget {
         if k.vk == 0 && k.ch == 0 { return false }
         let link = EngineLink.shared
         guard link.ensureConnected() else { return false }
-        if pendingMode != nil { sendFocus() }
         if !composing && !release { sendContext() }
         let id = link.newId()
         guard let consumed = link.request(id, ["key", String(id), release ? "u" : "d", String(k.vk), String(k.ch), String(k.mods), repeatKey ? "1" : "0"]) else {
@@ -115,11 +88,11 @@ final class KanadeInputController: IMKInputController, CommandTarget {
                 client.insertText(c[1], replacementRange: NSRange(location: NSNotFound, length: 0))
                 composing = false
             case "mode" where c.count >= 2:
+                // 切り替わったときだけ、カーソルの近くに「あ」「A」を少し出す（入力欄に入っただけでは出さない）
                 let on = c[1] == "1"
-                // 「あ」「A」は自分では出さない。モードを選び直すと macOS がカーソルの近くに出すので、出すと二重になる
-                japanese = on
-                // エンジンのキー（かな・英数・F13・右 Option など）で変わったときは、メニューバーのモードも合わせる
-                if on != Modes.currentIsJapanese() { client.selectMode(on ? Modes.japanese : Modes.roman) }
+                let link = EngineLink.shared
+                if let before = link.japanese, before != on { Panels.indicator.show(on ? "あ" : "A", ms: 800, caret: caretRect(client)) }
+                link.japanese = on
             case "cands" where c.count >= 3:
                 Panels.candidates.onSelect = { i in
                     if EngineLink.shared.connected { EngineLink.shared.send(["select", String(i)]) }
@@ -256,18 +229,5 @@ final class KanadeInputController: IMKInputController, CommandTarget {
         let item = (sender as? NSMenuItem) ?? ((sender as? [String: Any])?[kIMKCommandMenuItemName] as? NSMenuItem)
         guard let id = item?.representedObject as? String else { return }
         if EngineLink.shared.ensureConnected() { EngineLink.shared.send(["menu", id]) }
-    }
-}
-
-/** 入力モード（Info.plist の tsInputModeListKey と同じ名前） */
-enum Modes {
-    static let japanese = "dev.mooma.inputmethod.Kanade.Japanese"
-    static let roman = "dev.mooma.inputmethod.Kanade.Roman"
-
-    /** 今選んでいる入力ソースが英字のモードでなければ true */
-    static func currentIsJapanese() -> Bool {
-        guard let src = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
-              let raw = TISGetInputSourceProperty(src, kTISPropertyInputSourceID) else { return true }
-        return (Unmanaged<CFString>.fromOpaque(raw).takeUnretainedValue() as String) != roman
     }
 }

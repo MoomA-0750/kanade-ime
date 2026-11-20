@@ -59,6 +59,7 @@ final class VoiceInput: CommandTarget {
         // 自分で書いた文字（下の type）は見ない
         if event.getIntegerValueField(.eventSourceUserData) == Self.marker { return Unmanaged.passUnretained(event) }
         let code = Int(event.getIntegerValueField(.keyboardEventKeycode))
+        if switchKey(type, code, event.flags) { return nil }
         var release: Bool
         switch type {
         case .keyDown: release = false
@@ -70,6 +71,44 @@ final class VoiceInput: CommandTarget {
         }
         return handle(code: code, flags: event.flags, release: release, repeatKey: event.getIntegerValueField(.keyboardEventAutorepeat) != 0)
             ? nil : Unmanaged.passUnretained(event)
+    }
+
+    // ---- 日本語と英字の切り替え（Kanade のとき。macOS の入力ソースの切り替えは遅れたり効かなかったりするので、先に取ってエンジンへ渡す） ----
+
+    private var switchDown = Set<Int>()
+    private var fnClean = false
+
+    /** Control+Space と 🌐 キー（ほかのキーと一緒でなく単独で押して離したとき）を、エンジンの Ctrl+Space（日本語⇔英字）として渡す。使ったら true */
+    private func switchKey(_ type: CGEventType, _ code: Int, _ flags: CGEventFlags) -> Bool {
+        let link = EngineLink.shared
+        guard link.target != nil, link.connected else { return false }
+        func toggle() {
+            let k = (vk: VK.space, ch: 0x20, mods: 2)
+            for phase in ["d", "u"] {
+                let id = link.newId()
+                _ = link.request(id, ["key", String(id), phase, String(k.vk), String(k.ch), String(k.mods), "0"])
+            }
+        }
+        switch type {
+        case .keyDown where code == kVK_Space && flags.intersection([.maskControl, .maskAlternate, .maskShift, .maskCommand]) == .maskControl:
+            if switchDown.insert(code).inserted { toggle() }
+            return true
+        case .keyUp where switchDown.remove(code) != nil:
+            return true
+        case .keyDown:
+            fnClean = false // 🌐 を押しているあいだにほかのキーを打った（Fn+矢印など）
+            return false
+        case .flagsChanged where code == kVK_Function:
+            if flags.contains(.maskSecondaryFn) {
+                fnClean = true
+            } else if fnClean {
+                fnClean = false
+                toggle()
+            }
+            return true
+        default:
+            return false
+        }
     }
 
     /** 使ったら true（アプリへ渡さない） */

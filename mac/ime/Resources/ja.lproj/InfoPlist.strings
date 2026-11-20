@@ -2,5 +2,4 @@
 "CFBundleName" = "Kanade";
 "CFBundleDisplayName" = "Kanade";
 "dev.mooma.inputmethod.Kanade" = "Kanade";
-"dev.mooma.inputmethod.Kanade.Japanese" = "Kanade ひらがな";
-"dev.mooma.inputmethod.Kanade.Roman" = "Kanade 英字";
+"dev.mooma.inputmethod.Kanade.Japanese" = "Kanade";
