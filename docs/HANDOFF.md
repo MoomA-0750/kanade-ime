@@ -11,10 +11,11 @@ Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は�
 - 設定の画面: 「声のコマンド」「話さなければ止める」を Linux GTK・Qt、Windows、Mac に。`DesktopStore` は `voice_commands`・`continuous_idle_seconds` を読み書き
 - SPEC 8-3・8-11・8-13・8-15・10-3・11-3・未決事項を直した
 - 組めることの確かめ: Kotlin の試験は全部通る。fcitx5 のアドオンと Qt の設定は `podman run fedora:44` の中で組めた。Windows の DLL・設定は to-fu で組めた（`scripts/win.sh tsf Release`・`settings`）。Swift は `ssh mac` の `swiftc -typecheck`（ime と settings）
-- 本物の録音の流れ: この PC で `voice --listen eval/voice-sample-ja.wav` を流すと区切りが3つ出た（モデルが無いので文字にはならない）
+- 本物の録音の流れ: to-fu の parakeet で `kanade-engine voice --listen <wav>` を流し、区切りごとに文字になって話した順に入る・「取り消して」「次へ」「全部消して」「止めて」が働くのを見た（見本は eval/voice-sample-ja.wav と、macOS の say -v Kyoko で作った .cache/voice-commands*-ja.wav。合成音声の「送って」「送信して」は聞き違えられた）。区切りごとだと前の文脈が無く、頭の聞き取りが少し落ちる（「あした」→「明した」）・読点が付かない
+- change-reviewer の指摘7件を直した（b8fcbc0。順序・マイクが使えないとき・つなぎが切れたとき・終えた直後の移動・打っている途中の Esc・Windows の Esc の離し・長押しのロック）。判断が要る4つは確認一覧
+- Mac の pkg 2026.11.21.0043（公証済み、聞き続けるモード入り）を cramshell の ~/Downloads に置いた
 
 ## 残り（次の仕事）
-- change-reviewer の指摘を直す（このセッションの最後に頼んだ。結果が届いていれば decisions か下の「注意」に反映済み）
 - 実機での確かめ（本人）: Mac は pkg を組んで cramshell へ。Linux は配布物を組み直す（cramgent。確認一覧に既存の項目あり）。Windows は to-fu で `win.sh package`→`install` のあと、メモ帳などで F12 短押し
 - 声のコマンドの見本の音声（間を空けた「送って」など）を作り、`voice --listen` で確かめる
 - Android の `continuousTick` を `ContinuousSegmenter` に替える（任意。今は Android は触っていない）
@@ -24,11 +25,12 @@ Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は�
 ## 次のセッションが最初にやること
 1. このファイルと `docs/CONTINUOUS-PC.md`、SPEC 8-3・8-11 を読む
 2. 本人に仮決定5つ（decisions 2026-11-21 の「仮決定」）を確かめる
-3. Mac の pkg を組んで cramshell へ置き、本人に F12 の短押し・長押し・「送って」を試してもらう
+3. 本人に cramshell の pkg 2026.11.21.0043 で F12 の短押し・長押し・「送って」などを試してもらい、結果を聞く
 
 ## 本人の判断待ち
 - 仮決定5つ（トグルのキーも聞き続ける／始めの音を 0.3 秒で決める／入力欄の移動でも終わりの音／「次へ」で終わる／確かめられないときの全部消す・取り消しは何もしない）
-- cramshell で pkg 2026.11.21.0006 を試した結果（聞き続けるモードは入っていない版）
+- cramshell で pkg 2026.11.21.0043 を試した結果（聞き続けるモード入り）
+- レビューで出た判断4つ（終えた直後の移動で最後の区切りを捨てる・打っている途中の Esc・入力方式の切り替えで終わる・「送って」の前に確定）
 - push・Release・tap を出してよいか
 
 ## 注意
@@ -39,7 +41,9 @@ Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は�
 - 効果音を測る: `./gradlew :core:test --rerun-tasks --tests '*VoiceEarconTest' -Pkanade.earconDir=<フォルダ>` → `~/.claude/skills/ui-sound/scripts/measure.sh`
 - `passwordless-sudo on` は使わない。push は本人の直接の確認のあと
 - 組む Mac の bash は 3.2。ssh では ログインのキーチェーンが開けないので、証明書と資格情報は専用のキーチェーン（~/.kanade-sign）
-- 裏で動かしている作業: なし。cramshell の ~/Downloads に Kanade-mac-aarch64-2026.11.21.0006.pkg（聞き続けるモードの前の版）
+- 裏で動かしている作業: なし。cramshell の ~/Downloads に Kanade-mac-aarch64-2026.11.21.0043.pkg（最新。聞き続けるモード入り）
+- to-fu の ssh 越しの System.Speech の音声合成は無音の wav を作る（使えない）。日本語の見本は `ssh mac say -v Kyoko --data-format=LEI16@16000 -o x.wav "..."` で作り、頭の付いた wav から data だけを 44 バイトの頭で書き直す
+- to-fu で本物のモデルを使う: `scripts/win.sh engine` のあと `scripts/win.sh ps "\$env:JAVA_HOME='C:\Program Files\Android\Android Studio\jbr'; \$env:JAVA_OPTS='-Dkanade.voiceFinal=parakeet'; & C:\Users\MoomA\kanade\engine\bin\kanade-engine.bat voice --listen '<wav>'"`
 
 ## 資料
 - docs/CONTINUOUS-PC.md（設計）、SPEC.md（8-3・8-11・8-13・8-15・11-3・12-2）、docs/decisions.md（2026-11-20・21）、docs/WINDOWS-PROTOCOL.md、STATUS.md、Vault の Human/Projects/Kanade.md

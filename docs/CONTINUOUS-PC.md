@@ -104,7 +104,7 @@ class ContinuousSegmenter(
 |---|---|---|---|---|
 | 送って | ためた文を先に入れ、`voiceaction send` | `SendInput` で Enter（今の `Resend` と同じ形） | `ic->forwardKey(Return)` の押す・離す | 両方とも `CGEvent` で Return を投げる（印 `marker` を付けて自分のタップでは見ない） |
 | 次へ | `voiceaction next` | Tab | `forwardKey(Tab)` | Tab |
-| 全部消して | `voiceaction clear`。直前の文の記録・左の文脈を消す | 編集セッションで文書の頭から終わりまでの範囲を空にする。できなければ Ctrl+A・Delete | 周りの文が取れれば `deleteSurroundingText` で全部。取れなければ何もしない（端末など。Ctrl+A が行頭へ移るだけになるため） | Kanade: `insertText("", replacementRange: 0..<length)`。ほか: Cmd+A・Delete |
+| 全部消して | `voiceaction clear`。直前の文の記録・左の文脈を消す | 編集セッションで文書の頭から終わりまでの範囲を空にする。できなければ何もしない | 周りの文が取れれば `deleteSurroundingText` で全部。取れなければ何もしない（端末など。Ctrl+A が行頭へ移るだけになるため） | Kanade: `insertText("", replacementRange: 0..<length)`。ほか: Cmd+A・Delete |
 | 取り消して | 直前に入れた文があれば `voiceaction undo <その文>`、左の文脈から外す | カーソルの前がその文なら消す（`Replace` の中身と同じ確かめ方。違えば何もしない） | 周りの文で確かめて `deleteSurroundingText`。取れなければ何もしない | Kanade: `selectedRange` の前を確かめて消す。ほか: アクセシビリティで欄の文とカーソルを読んで確かめ、合えば BackSpace を文字数ぶん |
 | 止めて | 聞き続けるモードを終える（フロントは何もしない） | — | — | — |
 
