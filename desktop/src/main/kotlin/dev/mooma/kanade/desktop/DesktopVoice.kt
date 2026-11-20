@@ -14,13 +14,22 @@ interface VoiceService {
      * 録音を始める。マイクが使えなければ false。話しながらの途中の文字は [onPartial] で返す（裏のスレッドから）。
      * [english] なら英語のモデル（[DesktopVoice.finalModelEn]）で文字にする（Linux 版で、Kanade 以外の入力方式のとき）
      */
-    fun start(english: Boolean = false, onPartial: (String) -> Unit = {}): Boolean
+    fun start(english: Boolean = false, onPartial: (String) -> Unit = {}, onAudio: ((FloatArray) -> Unit)? = null): Boolean
 
     /** 録音を止めて文字にする。結果（文字にできなければ null）は裏のスレッドから [onText] で返す */
     fun stop(onText: (String?) -> Unit)
 
     /** 録音を止めて、文字にせずに捨てる（録音中の Esc） */
     fun cancel()
+
+    /** 聞き続けるモードを終える: マイクを閉じるだけ（認識しない。残りの音は区切りの判定が持っている） */
+    fun halt() = cancel()
+
+    /** ためている音を後ろ [keepSamples] だけ残して捨てる（話している途中の文字を、今の区切りだけで作るため） */
+    fun trim(keepSamples: Int) {}
+
+    /** ひと区切りの音を文字にする（聞き続けるモード）。呼んだ順に、裏のスレッドから [onText] を返す。文字にできなければ null */
+    fun recognize(pcm: FloatArray, english: Boolean, onText: (String?) -> Unit) = onText(null)
 }
 
 /**
@@ -62,11 +71,13 @@ class DesktopVoice(
     private var recordThread: Thread? = null
     private val samples = java.io.ByteArrayOutputStream()
 
-    override fun start(english: Boolean, onPartial: (String) -> Unit): Boolean {
+    override fun start(english: Boolean, onPartial: (String) -> Unit, onAudio: ((FloatArray) -> Unit)?): Boolean {
         if (line != null) return true
         this.english = english
         val format = AudioFormat(WhisperModel.SAMPLE_RATE.toFloat(), 16, 1, true, false)
-        val l = runCatching { AudioSystem.getTargetDataLine(format).apply { open(format) } }.getOrElse {
+        // 試験用: -Dkanade.voiceStreamWav があれば、マイクの代わりにその wav（16kHz・モノラル・16bit）を実時間で流す
+        val wav = System.getProperty("kanade.voiceStreamWav")?.let { File(it) }?.takeIf { it.exists() }
+        val l: TargetDataLine = if (wav != null) StreamedWav(wav, format) else runCatching { AudioSystem.getTargetDataLine(format).apply { open(format) } }.getOrElse {
             log("マイクを開けない: $it")
             return false
         }
@@ -77,7 +88,13 @@ class DesktopVoice(
             val buf = ByteArray(3200)
             while (line === l) {
                 val n = l.read(buf, 0, buf.size)
-                if (n > 0) synchronized(samples) { if (samples.size() < MAX_BYTES) samples.write(buf, 0, n) }
+                if (n <= 0) continue
+                synchronized(samples) { if (samples.size() < MAX_BYTES) samples.write(buf, 0, n) }
+                // 聞き続けるモード: 読んだ塊（約 100ms）を区切りの判定へ渡す
+                if (onAudio != null && line === l) {
+                    val chunk = FloatArray(n / 2) { i -> ((buf[2 * i].toInt() and 0xFF) or (buf[2 * i + 1].toInt() shl 8)).toShort() / 32768f }
+                    runCatching { onAudio(chunk) }.onFailure { log("聞き続けるモード: $it") }
+                }
             }
         }, "record").apply { isDaemon = true; start() }
         // 録っているあいだにモデルを読んでおく（離してから待たせない）
@@ -107,14 +124,42 @@ class DesktopVoice(
     }
 
     override fun cancel() {
-        val l = line ?: return
+        if (close()) log("録音を取り消した")
+    }
+
+    override fun halt() {
+        if (close()) log("聞き続けるモードを終えた")
+    }
+
+    /** マイクを閉じて、ためた音を捨てる。録っていなければ false */
+    private fun close(): Boolean {
+        val l = line ?: return false
         line = null
         l.stop()
         l.close()
-        recordThread?.join(500)
+        // 区切りの判定（onAudio）からエンジンのロックの中で呼ばれることがあるので、録音のスレッドの終わりは待たない
+        if (Thread.currentThread() !== recordThread) recordThread?.join(500)
         synchronized(samples) { samples.reset() }
-        log("録音を取り消した")
         worker.execute { scheduleUnload() }
+        return true
+    }
+
+    override fun trim(keepSamples: Int) = synchronized(samples) {
+        val bytes = samples.toByteArray()
+        val keep = minOf(bytes.size, keepSamples * 2)
+        if (keep == bytes.size) return@synchronized
+        samples.reset()
+        samples.write(bytes, bytes.size - keep, keep)
+    }
+
+    override fun recognize(pcm: FloatArray, english: Boolean, onText: (String?) -> Unit) {
+        worker.execute {
+            val started = System.nanoTime()
+            val text = runCatching { transcribe(model(english), pcm) }.onFailure { log("音声認識: $it") }.getOrNull()
+            log("${lastModel?.id} 区切り ${pcm.size / WhisperModel.SAMPLE_RATE.toFloat()}秒 -> ${(System.nanoTime() - started) / 1_000_000}ms ${text ?: "（なし）"}")
+            onText(text?.let { spoken(it, english) })
+            scheduleUnload()
+        }
     }
 
     override fun stop(onText: (String?) -> Unit) {
@@ -202,6 +247,33 @@ class DesktopVoice(
             }
         }, 5, java.util.concurrent.TimeUnit.MINUTES)
     }
+
+    /** 試験用: wav ファイルを、マイクのように実時間で読ませる（終わったら無音を返し続ける） */
+    private class StreamedWav(wav: File, private val format: AudioFormat) : TargetDataLine by NoLine {
+        private val data = wav.readBytes().let { it.copyOfRange(minOf(44, it.size), it.size) }
+        private var at = 0
+        @Volatile private var open = true
+        private val started = System.nanoTime()
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            if (!open) return -1
+            // 実時間に合わせる（16kHz・16bit = 1 秒 32000 バイト）
+            val due = started + (at + len) * 1_000_000_000L / 32_000
+            val wait = (due - System.nanoTime()) / 1_000_000
+            if (wait > 0) Thread.sleep(wait)
+            for (i in 0 until len) b[off + i] = if (at + i < data.size) data[at + i] else 0
+            at += len
+            return len
+        }
+        override fun start() {}
+        override fun stop() {}
+        override fun close() { open = false }
+        override fun getFormat() = format
+    }
+
+    /** [StreamedWav] で使わない口（呼ばれたら失敗させる） */
+    private object NoLine : TargetDataLine by (java.lang.reflect.Proxy.newProxyInstance(
+        TargetDataLine::class.java.classLoader, arrayOf(TargetDataLine::class.java),
+    ) { _, m, _ -> throw UnsupportedOperationException(m.name) } as TargetDataLine)
 
     companion object {
         /** 途中の文字を作る間隔（Android 版と同じ） */

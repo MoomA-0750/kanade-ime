@@ -177,7 +177,7 @@ class EngineHostTest {
         var recording = false
         var english: Boolean? = null
         var canceled = 0
-        override fun start(english: Boolean, onPartial: (String) -> Unit): Boolean {
+        override fun start(english: Boolean, onPartial: (String) -> Unit, onAudio: ((FloatArray) -> Unit)?): Boolean {
             recording = true
             this.english = english
             return true

@@ -22,6 +22,10 @@ class FakeDll(private val out: (String) -> Unit) {
     var selectedCandidate = -1
         private set
 
+    /** エンジンが知らせた音声入力の様子（off・hold・listen） */
+    var voiceState = "off"
+        private set
+
     /** 届いたものすべて（確かめる用） */
     val received = mutableListOf<List<String>>()
 
@@ -94,6 +98,13 @@ class FakeDll(private val out: (String) -> Unit) {
                 candidates = emptyList()
                 selectedCandidate = -1
             }
+            // 声のコマンド（送信は改行、次の欄へは記録だけ、全部消す、直前の文がカーソルの前にあれば消す）
+            "voiceaction" -> when (c[1]) {
+                "send" -> document.append('\n')
+                "clear" -> document.setLength(0)
+                "undo" -> if (document.endsWith(c[2])) document.setLength(document.length - c[2].length)
+            }
+            "voicestate" -> voiceState = c[1]
             "replace" -> {
                 val expected = c[1]
                 if (document.endsWith(expected)) {

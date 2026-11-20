@@ -40,8 +40,28 @@ class EngineHost(
     private val voiceKey: Int = VK.F12,
     /** 録音を始めた・終えたときの効果音（試験では null） */
     val earcons: Earcons? = null,
+    /** 今の時刻（ms。録音キーの短押しの判定。試験で差し替える） */
+    clock: () -> Long = { System.nanoTime() / 1_000_000 },
+    /** [ms] 後に動かす（長押しの始めの音。試験で差し替える）。返す関数で取り消す */
+    schedule: (Long, () -> Unit) -> (() -> Unit) = ::scheduleLater,
 ) {
     private val lock = Any()
+
+    /** 録音キーの押し方と音声入力の回（長押し・聞き続けるモード） */
+    private val voiceSession = voice?.let { VoiceSession(this, it, lock, clock, schedule) }
+
+    /** 鳴らした効果音を知らせる（試験用） */
+    @Volatile var earconListener: ((VoiceEarcon.Kind) -> Unit)? = null
+
+    /** 声のコマンドを受け取る（設定の voice_commands） */
+    var voiceCommands: Boolean
+        get() = voiceSession?.commandsEnabled ?: true
+        set(value) = synchronized(lock) { voiceSession?.commandsEnabled = value }
+
+    /** 聞き続けるモードで、これだけ話さなければ終える（秒。0 なら終えない） */
+    var continuousIdleSeconds: Int
+        get() = voiceSession?.idleSeconds ?: 60
+        set(value) = synchronized(lock) { voiceSession?.idleSeconds = value }
     private val mapper = WinKeyMapper()
 
     /** タスクバーの入力の表示の右クリックのメニューで選んだもの（"settings"・"user-dictionary"・"snippets"・"import-android"・"log"） */
@@ -87,7 +107,7 @@ class EngineHost(
                 val key = parseKey(f, 2)
                 client.send(synchronized(lock) { key(client, f[1].toInt(), key) })
             }
-            "commitall" -> client.send(synchronized(lock) { activate(client); reply(f[1].toInt(), engine.commitAll(), true) })
+            "commitall" -> client.send(synchronized(lock) { activate(client); reply(f[1].toInt(), engine.commitAll() + voicePending(client), true) })
             "ctx" -> synchronized(lock) {
                 if (!engine.isComposing) {
                     engine.leftContext = f.getOrElse(1) { "" }.takeLast(InputEngine.MAX_CONTEXT)
@@ -98,6 +118,8 @@ class EngineHost(
                 if (active === client) engine.reset()
             }
             "focus" -> synchronized(lock) {
+                // 入力欄が替わったら、聞き続けるモードは終える
+                voiceSession?.blur()
                 if (f.getOrNull(1) == "1") {
                     activate(client)
                     // 入力欄に入るたびに、設定の始めのモード（日本語・英字）にそろえる（LAST は前のまま）
@@ -113,7 +135,7 @@ class EngineHost(
             "select" -> synchronized(lock) {
                 val index = f.getOrNull(1)?.toIntOrNull() ?: return@synchronized
                 if (active !== client || !engine.isConverting) return@synchronized
-                val commands = run(engine.handle(KeyInput.SelectCandidate(index)).commands)
+                val commands = run(engine.handle(KeyInput.SelectCandidate(index)).commands) + voicePending(client)
                 if (commands.isNotEmpty()) client.send(reply(0, commands, false))
             }
             "mode" -> synchronized(lock) {
@@ -121,16 +143,24 @@ class EngineHost(
                 val on = f.getOrNull(1) == "1"
                 if (engine.japanese != on) client.send(reply(0, run(engine.handle(KeyInput.SetJapanese(on)).commands), false))
             }
-            // 入力方式に関わらない音声入力（fcitx5 のアドオンが、どの入力方式でも録音キーを見て送る）。
-            // voice start <ja|en>・voice stop・voice cancel。結果はこのつなぎへ自分から送る
+            // 入力方式に関わらない音声入力（fcitx5 のアドオン・macOS の入力方式が、どの入力方式でも録音キーを見て送る）。
+            // voice down <ja|en>・voice up・voice toggle <ja|en>・voice cancel・voice blur。結果はこのつなぎへ自分から送る
             "voice" -> synchronized(lock) {
+                val session = voiceSession ?: return@synchronized
+                val english = f.getOrNull(2) == "en"
                 when (f.getOrNull(1)) {
-                    // voice start <ja|en> [hold|tap|none]: 始めの音は hold（長押し。既定）・tap（一回押し）・none（あとで voice cue で決める）
-                    "start" -> client.send(startVoice(client, english = f.getOrNull(2) == "en", cue = f.getOrNull(3) ?: "hold"))
-                    // 押し方が分かったあとの始めの音（短く押して離したら tap、押し続けているなら hold）
-                    "cue" -> if (recording) earcons?.play(if (f.getOrNull(2) == "tap") VoiceEarcon.Kind.START_TAP else VoiceEarcon.Kind.START_HOLD)
-                    "stop" -> stopVoice()
-                    "cancel" -> cancelVoice(quiet = f.getOrNull(2) == "quiet")
+                    // 録音キーを押した・離した（押し方の判定はエンジンが持つ）
+                    "down" -> client.send(reply(0, session.down(client, english).orEmpty(), false))
+                    "up" -> session.up()
+                    // 押すたびに聞き続けるモードを始める・終えるキー
+                    "toggle" -> client.send(reply(0, session.toggle(client, english).orEmpty(), false))
+                    // 録音を始めた入力欄から離れた
+                    "blur" -> session.blur()
+                    "cancel" -> session.cancel(quiet = f.getOrNull(2) == "quiet")
+                    // 古いフロント: voice start <ja|en> [hold|tap|none]・voice cue <tap|hold>・voice stop（押し方はフロントが決める）
+                    "start" -> client.send(reply(0, session.legacyStart(client, english, f.getOrNull(3) ?: "hold").orEmpty(), false))
+                    "cue" -> session.legacyCue(f.getOrNull(2) == "tap")
+                    "stop" -> session.legacyStop()
                 }
             }
             "menu" -> f.getOrNull(1)?.let { action -> Thread({ runCatching { onMenu(action) } }, "menu").start() }
@@ -176,6 +206,8 @@ class EngineHost(
      */
     private fun test(client: Client, key: WinKey): Boolean {
         if (voice != null && key.vk == voiceKey) return true
+        // 録音中・聞き続けるモード中の Esc はエンジンが取る
+        if (key.vk == VK.ESCAPE && voiceSession?.active == true) return true
         if (!key.down) return mapper.onKeyUpWouldToggle(key)
         // 状態（右 Alt と一緒に押したか）は OnKeyDown で同じキーをもう一度通しても同じになるので、ここで進めてよい
         val input = mapper.onKeyDown(key) ?: return false
@@ -192,15 +224,16 @@ class EngineHost(
 
     private fun key(client: Client, id: Int, key: WinKey): List<String> {
         if (voice != null && key.vk == voiceKey) return voiceKey(client, id, key)
+        if (key.vk == VK.ESCAPE && key.down && voiceSession?.cancel() == true) return reply(id, emptyList(), true)
         val input = if (key.down) mapper.onKeyDown(key) else mapper.onKeyUp(key)
         if (input == null) return reply(id, emptyList(), false)
         activate(client)
         val result = engine.handle(input)
-        return reply(id, run(result.commands), result.consumed)
+        return reply(id, run(result.commands) + voicePending(client), result.consumed)
     }
 
-    private var recording = false
-    private var recordingEnglish = false
+    /** 聞き続けるモードで、打っている途中だったので待たせていた文（打ち終えたら入れる） */
+    private fun voicePending(client: Client): List<ImeCommand> = voiceSession?.flushPending(client).orEmpty()
 
     /** fcitx5 のアドオンのつなぎ（録音キーを教える相手） */
     private val fcitxClients = LinkedHashSet<Client>()
@@ -229,67 +262,35 @@ class EngineHost(
 
     private fun voiceKeysLines() = listOf(Protocol.encode("c", "0", "voicekeys", voiceKeys.first, voiceKeys.second, macSwitchKeys), Protocol.encode("done", 0, 0))
 
-    /** 録音キー（Windows の DLL から F12 がキーとして届く）: 押したら録音を始め、離したら文字にする */
+    /** 録音キー（Windows の DLL から F12 がキーとして届く）: 長押しは押している間だけ録音、短く押すと聞き続けるモード */
     private fun voiceKey(client: Client, id: Int, key: WinKey): List<String> {
-        if (voice == null) return reply(id, emptyList(), false)
-        if (key.down) {
-            if (key.repeat || recording) return reply(id, emptyList(), true)
-            return startVoice(client, english = false, id = id)
+        val session = voiceSession ?: return reply(id, emptyList(), false)
+        if (!key.down) {
+            session.up()
+            return reply(id, emptyList(), true)
         }
-        if (!recording) indicate(null) else stopVoice()
-        return reply(id, emptyList(), true)
+        if (key.repeat) return reply(id, emptyList(), true)
+        return reply(id, session.down(client, english = false).orEmpty(), true)
     }
 
-    /** （入力中の文字を確定して）録音を始める。[english] なら英語のモデルで文字にする */
-    private fun startVoice(client: Client, english: Boolean, id: Int = 0, cue: String = "hold"): List<String> {
-        val v = voice ?: return reply(id, emptyList(), false)
-        activate(client)
-        if (recording) return reply(id, emptyList(), true)
-        val commands = run(engine.commitAll())
-        recordingEnglish = english
-        recording = v.start(english) { partial -> synchronized(lock) { if (recording) indicate("🎤 $partial") } }
-        if (recording) when (cue) {
-            "tap" -> earcons?.play(VoiceEarcon.Kind.START_TAP)
-            "none" -> {}
-            else -> earcons?.play(VoiceEarcon.Kind.START_HOLD)
-        }
-        indicate(
-            if (recording) (if (english) "🎤 EN" else "🎤") else Ui.t("マイクを使えません", "Microphone unavailable"),
-            if (recording) 0 else 2000,
-        )
-        return reply(id, commands, true)
+    // ---- VoiceSession から使うもの（ロックの中で呼ぶ） ----
+
+    internal fun activateClient(client: Client) = activate(client)
+
+    internal fun runCommands(commands: List<ImeCommand>) = run(commands)
+
+    /** エンジンから自分から送る命令の行 */
+    internal fun replyLines(commands: List<ImeCommand>) = reply(0, commands, false)
+
+    internal fun voiceEarcon(kind: VoiceEarcon.Kind) {
+        earcons?.play(kind)
+        earconListener?.invoke(kind)
     }
 
-    /** 録音を止めて文字にし、そのときの相手へ確定を送る */
-    private fun stopVoice() {
-        val v = voice ?: return
-        if (!recording) return
-        recording = false
-        val english = recordingEnglish
-        indicate(Ui.t("🎤 認識中", "🎤 Recognizing"))
-        v.stop { text ->
-            synchronized(lock) {
-                indicate(null)
-                // 認識が終わった合図: 文字が入るなら上がる1音、入らなければ下がる2音
-                earcons?.play(if (text.isNullOrEmpty()) VoiceEarcon.Kind.DONE_EMPTY else VoiceEarcon.Kind.DONE_TEXT)
-                val target = active ?: return@synchronized
-                if (text.isNullOrEmpty()) return@synchronized
-                // 認識しているあいだに打ち始めていたら、その文字を先に確定する
-                val commands = run(engine.commitAll()) + ImeCommand.Commit(text)
-                if (!english) engine.leftContext = (engine.leftContext + text).takeLast(InputEngine.MAX_CONTEXT)
-                target.send(reply(0, commands, false))
-            }
-        }
-    }
-
-    /** 録音を捨てる（録音中の Esc。[quiet] なら録音キーをすぐ離した押し間違いで、何も出さない） */
-    private fun cancelVoice(quiet: Boolean = false) {
-        val v = voice ?: return
-        if (!recording) return
-        recording = false
-        v.cancel()
-        if (!quiet) earcons?.play(VoiceEarcon.Kind.DONE_EMPTY)
-        if (quiet) indicate(null) else indicate(Ui.t("🎤 取り消しました", "🎤 Canceled"), 1000)
+    /** 音声入力の様子（off・hold・listen）を fcitx5 と macOS のつなぎへ知らせる（Esc を取るかを決めるため） */
+    internal fun publishVoiceState(state: String) {
+        val lines = listOf(Protocol.encode("c", "0", "voicestate", state), Protocol.encode("done", 0, 0))
+        fcitxClients.forEach { it.send(lines) }
     }
 
     /** 命令のうち、DLL に送らずエンジンで済ませるもの（候補の窓・並べ替え）を片付け、残りを返す */
@@ -311,7 +312,7 @@ class EngineHost(
      * 音声入力の様子（「🎤」と話している途中の文字、「認識中」）をカーソルの近くに出す。DLL が窓を描く。
      * [durationMs] が 0 なら消すまで出しておく。null なら消す
      */
-    private fun indicate(text: String?, durationMs: Int = 0) {
+    internal fun indicate(text: String?, durationMs: Int = 0) {
         val target = active ?: return
         val command = if (text == null) listOf("hideindicator") else listOf("indicator", text, durationMs.toString())
         target.send(listOf(Protocol.encode(listOf("c", "0") + command), Protocol.encode("done", 0, 0)))
@@ -364,4 +365,12 @@ class EngineHost(
     fun close() {
         rerankExecutor.shutdownNow()
     }
+}
+
+/** [ms] 後に [block] を動かす（録音キーの長押しの音） */
+private val timer = java.util.concurrent.Executors.newSingleThreadScheduledExecutor { Thread(it, "voice-timer").apply { isDaemon = true } }
+
+private fun scheduleLater(ms: Long, block: () -> Unit): () -> Unit {
+    val f = timer.schedule(block, ms, java.util.concurrent.TimeUnit.MILLISECONDS)
+    return { f.cancel(false) }
 }

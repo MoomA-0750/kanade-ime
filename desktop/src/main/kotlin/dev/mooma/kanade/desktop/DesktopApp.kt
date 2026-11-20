@@ -65,6 +65,8 @@ class DesktopApp(
         voice?.finalModel = VoiceFinal.of(s.voiceFinal)
         voice?.finalModelEn = VoiceFinal.english(s.voiceFinalEn)
         host.startMode = s.startMode
+        host.voiceCommands = s.voiceCommands
+        host.continuousIdleSeconds = s.continuousIdleSeconds
         host.macSwitchKeys = s.macSwitchKeys
         host.voiceKeys = s.voiceHoldKeys to s.voiceToggleKey
         log(if (first) "設定を読んだ" else "設定を読み直した")

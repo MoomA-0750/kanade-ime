@@ -69,7 +69,11 @@ class ContinuousSegmenter(
     endpointer: VoiceEndpointer = VoiceEndpointer(),   // 0.7 秒の無音・0.15 秒で話し始め・20 秒で区切る
     preRollMs: Int = 500,         // 話し始めの前に残す音（Android と同じ 0.5 秒）
 ) {
-    sealed interface Event { object Start; class Segment(val pcm: FloatArray, val partOfSpeech...); object Idle }
+    sealed interface Event {
+        data object Start : Event                        // 話し始め（途中の文字を出し始める）
+        class Segment(val pcm: FloatArray) : Event       // ひと区切り（前 0.5 秒＋話＋後ろの 0.7 秒の無音）
+        data object Idle : Event                         // idleMs のあいだ話さなかった
+    }
     val inSpeech: Boolean
     fun feed(chunk: FloatArray): List<Event>   // 中で 100ms ずつに切り直して VoiceEndpointer に RMS を渡す
     fun flush(): FloatArray?                    // 終えるとき、話している途中なら、そこまでの音
@@ -100,7 +104,7 @@ class ContinuousSegmenter(
 |---|---|---|---|---|
 | 送って | ためた文を先に入れ、`voiceaction send` | `SendInput` で Enter（今の `Resend` と同じ形） | `ic->forwardKey(Return)` の押す・離す | 両方とも `CGEvent` で Return を投げる（印 `marker` を付けて自分のタップでは見ない） |
 | 次へ | `voiceaction next` | Tab | `forwardKey(Tab)` | Tab |
-| 全部消して | `voiceaction clear`。直前の文の記録・左の文脈を消す | 編集セッションで文書の頭から終わりまでの範囲を空にする。できなければ Ctrl+A・Delete | 周りの文が取れれば `deleteSurroundingText` で全部。取れなければ Ctrl+A・BackSpace | Kanade: `insertText("", replacementRange: 0..<length)`。ほか: Cmd+A・Delete |
+| 全部消して | `voiceaction clear`。直前の文の記録・左の文脈を消す | 編集セッションで文書の頭から終わりまでの範囲を空にする。できなければ Ctrl+A・Delete | 周りの文が取れれば `deleteSurroundingText` で全部。取れなければ何もしない（端末など。Ctrl+A が行頭へ移るだけになるため） | Kanade: `insertText("", replacementRange: 0..<length)`。ほか: Cmd+A・Delete |
 | 取り消して | 直前に入れた文があれば `voiceaction undo <その文>`、左の文脈から外す | カーソルの前がその文なら消す（`Replace` の中身と同じ確かめ方。違えば何もしない） | 周りの文で確かめて `deleteSurroundingText`。取れなければ何もしない | Kanade: `selectedRange` の前を確かめて消す。ほか: アクセシビリティで欄の文とカーソルを読んで確かめ、合えば BackSpace を文字数ぶん |
 | 止めて | 聞き続けるモードを終える（フロントは何もしない） | — | — | — |
 
@@ -190,7 +194,7 @@ PRESSED/HOLD --Esc--> OFF（今の cancelVoice）
 - **Windows の `focus` の数**: TSF の `OnSetFocus`・`OnSetThreadFocus` が、入力欄を移っていないのに呼ばれるアプリがあると、聞き続けるモードがすぐ切れる。to-fu で、メモ帳・ブラウザ・ターミナルで確かめる。切れすぎるなら、DLL が文書（`ITfDocumentMgr`）が替わったときだけ `voice blur` を送る形に替える（DLL の変更が1つ増える）
 - **Mac のフォーカスの見張り**: Electron など、アクセシビリティでフォーカスのある要素を返さないアプリでは、移っても気づけない（前面のアプリが替わったことだけは分かる）。取りこぼしても、無音の時間切れ・もう一度押す・Esc で終えられる
 - **Mac のほかの入力ソースでの「取り消して」**: アクセシビリティで欄の文が読めないアプリでは何もしない
-- **端末で「全部消して」**: Ctrl+A が行頭へ移るだけで、BackSpace が1文字消す。端末では効かない（Android にも端末の問題は無い）。気になるなら、周りの文が取れないときは何もしない形にする
+- **端末で「全部消して」**: Linux で周りの文が取れない欄（端末など）では何もしない。Windows・Mac のキーでの代わり（Ctrl+A / Cmd+A と Delete）は、Windows の端末では Ctrl+A が全選択にならないことがある（効かないだけで、壊しはしない見込み）
 - **Linux の押し間違い**: 今は 0.3 秒未満の押しを「押し間違い」として捨てているが、仕様どおり聞き続けるモードに入るようになる（Android・Mac と同じ）。誤って入ったら、もう一度押すか Esc
 - **マイクを開く時間**: javax.sound の `open` が遅い機械では、短く押したのに長押しに数えられるのを避けるため、録音が始まってから数える（Android と同じ）。逆に、押し続けた時間が少し短く数えられる
 - **2 分の上限**: 聞き続けるモードでは `trim` で捨て続けるので当たらない。押している間の録音は今のまま 2 分
@@ -203,4 +207,4 @@ PRESSED/HOLD --Esc--> OFF（今の cancelVoice）
 2. **Windows の F12・Linux の録音キーの始めの音**を、押した瞬間の長押しの音から、0.3 秒で決める形（Android・Mac と同じ）に替える。仮: 替える（8-15 を一本にする）
 3. **入力欄を移って終わったときの音**。Android は鳴らさない。仮: PC は他の終わり方と同じく、文字が入ったかで鳴らす（Android もそろえるなら別に直す）
 4. **「次へ」で聞き続けるモードが終わる**（入力欄が替わるため。Android と同じ）。仮: 終わる
-5. 確かめられないときの「取り消して」「全部消して」は何もしない（端末など）。仮: そのとおり
+5. カーソルの前の文を確かめられないときの「取り消して」は何もしない（BackSpace を文字数ぶん送る形は、違う所を消すおそれがあるので取らない）。Linux で周りの文が取れないときの「全部消して」も何もしない。仮: そのとおり
