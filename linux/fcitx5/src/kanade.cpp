@@ -100,6 +100,12 @@ public:
         setVoiceKeys("F12,Alt_R", "Control+Alt+space");
         voiceWatcher_ = instance_->watchEvent(fcitx::EventType::InputContextKeyEvent, fcitx::EventWatcherPhase::PreInputMethod,
                                               [this](fcitx::Event &e) { onAnyKey(static_cast<fcitx::KeyEvent &>(e)); });
+        // 聞き続けるモードは、録音を始めた入力欄から離れたら終える（どの入力方式でも）
+        focusWatcher_ = instance_->watchEvent(fcitx::EventType::InputContextFocusOut, fcitx::EventWatcherPhase::Default,
+                                              [this](fcitx::Event &e) {
+                                                  auto *ic = static_cast<fcitx::InputContextEvent &>(e).inputContext();
+                                                  if (voiceState_ == "listen" && ic == voiceIc_.get()) send({"voice", "blur"});
+                                              });
         // 録音キーの設定をエンジンからもらうため、fcitx5 の起動のあとでつなぐ（エンジンが動いていなければ起こし、少し待ってつなぎ直す）
         connectTimer_ = instance_->eventLoop().addTimeEvent(CLOCK_MONOTONIC, fcitx::now(CLOCK_MONOTONIC) + 1000000, 0,
                                                             [this](fcitx::EventSourceTime *source, uint64_t) {
@@ -192,10 +198,9 @@ public:
 
 private:
     // ---- 音声入力（どの入力方式でも） ----
-    // 押している間だけ録音するキー・押すたびに始める/終えるキー・録音中の Esc（取り消し）。
+    // 押している間だけ録音するキー（録音キー）・押すたびに聞き続けるモードを始める/終えるキー・録音中の Esc（取り消し）。
+    // 押し方の判定（短く押したら聞き続けるモード）はエンジンが持つので、ここは押した・離したをそのまま送る。
     // Kanade のときは日本語、ほかの入力方式（keyboard-us など）のときは英語のモデルで文字にする（エンジンが選ぶ）
-    enum class VoiceMode { None, Hold, Toggle };
-
     void setVoiceKeys(const std::string &hold, const std::string &toggle) {
         holdKeys_.clear();
         size_t pos = 0;
@@ -230,20 +235,16 @@ private:
             // 押したときに使ったキーは、離したときも使う（アプリへ片方だけ届かないように）
             if (!voiceDown_.erase(sym)) return;
             event.filterAndAccept();
-            if (voiceMode_ == VoiceMode::Hold && isHoldKey(key)) {
-                // すぐ離した（押し間違い）なら、認識せずに捨てる
-                bool tap = Clock::now() - voiceStarted_ < std::chrono::milliseconds(300);
-                send({"voice", tap ? "cancel" : "stop", tap ? "quiet" : ""});
-                voiceMode_ = VoiceMode::None;
-            }
+            if (isHoldKey(key)) send({"voice", "up"});
             return;
         }
         bool repeat = voiceDown_.count(sym) > 0;
-        if (voiceMode_ != VoiceMode::None && sym == FcitxKey_Escape) {
+        // 録音中・聞き続けるモード中の Esc（エンジンが知らせる様子で決める）
+        if (voiceState_ != "off" && sym == FcitxKey_Escape) {
             voiceDown_.insert(sym);
             event.filterAndAccept();
             send({"voice", "cancel"});
-            voiceMode_ = VoiceMode::None;
+            voiceState_ = "off";
             return;
         }
         bool hold = isHoldKey(key);
@@ -252,24 +253,20 @@ private:
         voiceDown_.insert(sym);
         event.filterAndAccept();
         if (repeat) return;
-        if (voiceMode_ != VoiceMode::None) {
-            // 録音中にもう一度押したら終える（トグルのキーで始めたとき。押しているキーでは離したときに終える）
-            if (toggle || voiceMode_ == VoiceMode::Toggle) {
-                send({"voice", "stop"});
-                voiceMode_ = VoiceMode::None;
+        bool kanade = instance_->inputMethod(ic) == "kanade";
+        if (voiceState_ == "off") {
+            if (!ensureConnected()) {
+                showNotice(ic, env("LANG", "").rfind("ja", 0) == 0 ? "Kanade を起動しています…" : "Starting Kanade…");
+                return;
             }
-            return;
+            current_ = ic->watch();
+            voiceIc_ = ic->watch();
+            // 入力中の文字を確定してから録音を始める（Kanade のときはエンジンが確定を返す）
+            if (kanade && composing_) commitAll(ic);
+            // エンジンの知らせ（voicestate）が届くまでの Esc にも備える
+            voiceState_ = hold ? "hold" : "listen";
         }
-        if (!ensureConnected()) {
-            showNotice(ic, env("LANG", "").rfind("ja", 0) == 0 ? "Kanade を起動しています…" : "Starting Kanade…");
-            return;
-        }
-        current_ = ic->watch();
-        // 入力中の文字を確定してから録音を始める（Kanade のときはエンジンが確定を返す）
-        if (instance_->inputMethod(ic) == "kanade" && composing_) commitAll(ic);
-        voiceMode_ = hold ? VoiceMode::Hold : VoiceMode::Toggle;
-        voiceStarted_ = Clock::now();
-        send({"voice", "start", instance_->inputMethod(ic) == "kanade" ? "ja" : "en"});
+        send({"voice", hold ? "down" : "toggle", kanade ? "ja" : "en"});
     }
 
     // カーソルの近くに短く出す（エンジンにつながっていないとき）
@@ -342,7 +339,7 @@ private:
 
     void disconnect() {
         io_.reset();
-        voiceMode_ = VoiceMode::None;
+        voiceState_ = "off";
         if (fd_ >= 0) close(fd_);
         fd_ = -1;
         composing_ = false;
@@ -412,6 +409,9 @@ private:
         if (f[0] == "c" && f.size() >= 5 && f[2] == "voicekeys") {
             // 録音キーの設定（つないだときと、設定を変えたとき）。入力欄がなくても受ける
             setVoiceKeys(f[3], f[4]);
+        } else if (f[0] == "c" && f.size() >= 4 && f[2] == "voicestate") {
+            // 音声入力の様子（off・hold・listen）。エンジンが自分で終えることがあるので、これで Esc を取るかを決める
+            voiceState_ = f[3];
         } else if (f[0] == "c" && f.size() >= 3) {
             pending_[toInt(f[1])].push_back(Fields(f.begin() + 2, f.end()));
         } else if (f[0] == "done" && f.size() >= 3) {
@@ -467,6 +467,8 @@ private:
             } else if (type == "hideindicator") {
                 indicatorTimer_.reset();
                 panel.setAuxUp(fcitx::Text());
+            } else if (type == "voiceaction" && c.size() >= 2) {
+                voiceAction(ic, c[1], c.size() >= 3 ? c[2] : "");
             } else if (type == "replace" && c.size() >= 4) {
                 replaceBeforeCursor(ic, c[1], c[2], c[3]);
             }
@@ -557,6 +559,40 @@ private:
         ic->inputPanel().setCandidateList(std::move(list));
     }
 
+    // 声のコマンド: send は Enter、next は Tab、clear は入力欄の文字を全部消す、undo はカーソルの前が text なら消す。
+    // 周りの文が取れない入力欄（端末など）では、clear・undo は何もしない（Ctrl+A が行頭へ移るだけになるため）
+    void voiceAction(fcitx::InputContext *ic, const std::string &kind, const std::string &text) {
+        auto press = [ic](fcitx::KeySym sym) {
+            ic->forwardKey(fcitx::Key(sym), false);
+            ic->forwardKey(fcitx::Key(sym), true);
+        };
+        if (kind == "send") {
+            press(FcitxKey_Return);
+            return;
+        }
+        if (kind == "next") {
+            press(FcitxKey_Tab);
+            return;
+        }
+        auto &st = ic->surroundingText();
+        if (!ic->capabilityFlags().test(fcitx::CapabilityFlag::SurroundingText) || !st.isValid()) {
+            KLOG() << "voiceaction " << kind << ": 周りの文が取れない";
+            return;
+        }
+        const std::string &all = st.text();
+        size_t length = fcitx::utf8::length(all);
+        size_t cursorChars = std::min<size_t>(st.cursor(), length);
+        if (kind == "clear") {
+            ic->deleteSurroundingText(-static_cast<int>(cursorChars), static_cast<unsigned int>(length));
+        } else if (kind == "undo" && !text.empty()) {
+            size_t cursor = fcitx::utf8::ncharByteLength(all.begin(), cursorChars);
+            size_t n = fcitx::utf8::length(text);
+            if (cursor >= text.size() && all.compare(cursor - text.size(), text.size(), text) == 0) {
+                ic->deleteSurroundingText(-static_cast<int>(n), static_cast<unsigned int>(n));
+            }
+        }
+    }
+
     // スニペット（直接入力中）: カーソルの前が expected なら消して replacement を入れる。違えば打った文字を入れる
     void replaceBeforeCursor(fcitx::InputContext *ic, const std::string &expected, const std::string &typed, const std::string &replacement) {
         int ch = toInt(typed);
@@ -644,9 +680,12 @@ private:
     int connectTries_ = 0;
     std::vector<fcitx::KeySym> holdKeys_;
     fcitx::Key toggleKey_;
+    std::unique_ptr<fcitx::HandlerTableEntry<fcitx::EventHandler>> focusWatcher_;
     std::set<fcitx::KeySym> voiceDown_;
-    VoiceMode voiceMode_ = VoiceMode::None;
-    Clock::time_point voiceStarted_{};
+    // エンジンが知らせる音声入力の様子（off・hold・listen）
+    std::string voiceState_ = "off";
+    // 録音を始めた入力欄（聞き続けるモードで、ここから離れたら終える）
+    fcitx::TrackableObjectReference<fcitx::InputContext> voiceIc_;
 };
 
 KanadeCandidate::KanadeCandidate(KanadeEngine *engine, int index, const std::string &text, const std::string &comment)
