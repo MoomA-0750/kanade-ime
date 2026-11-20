@@ -21,7 +21,7 @@ class Earcons(private val log: (String) -> Unit = {}) {
         player.execute {
             if (Os.isMac && !macUiSoundsOn()) return@execute
             runCatching {
-                val pcm = VoiceEarcon.pcm(kind, VoiceEarcon.randomCents())
+                val pcm = VoiceEarcon.pcm(kind)
                 val bytes = ByteArray(pcm.size * 2)
                 for (i in pcm.indices) {
                     bytes[2 * i] = (pcm[i].toInt() and 0xFF).toByte()

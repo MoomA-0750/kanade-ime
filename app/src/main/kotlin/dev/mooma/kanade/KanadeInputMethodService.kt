@@ -1497,6 +1497,7 @@ class KanadeInputMethodService : InputMethodService() {
     private var vadIndex = 0
     private var lastSpeechAt = 0L
     private var voiceKeyDownAt = 0L
+    private var continuousGotText = false
     private var voiceKeyStopped = false
     /** 入力中の文字があって入れられずに待っている、認識した文 */
     private val pendingVoice = StringBuilder()
@@ -1554,6 +1555,9 @@ class KanadeInputMethodService : InputMethodService() {
             startVoice()
             // 録音の準備に時間がかかることがあるので、短く押したかは録音が始まってから数える
             voiceKeyDownAt = android.os.SystemClock.uptimeMillis()
+            // 押し続けているなら長押しの始めの音（短く離したら、離したときに一回押しの音）
+            main.removeCallbacks(holdCue)
+            main.postDelayed(holdCue, TAP_MS)
             return
         }
         if (voiceKeyStopped) {
@@ -1561,11 +1565,22 @@ class KanadeInputMethodService : InputMethodService() {
             return
         }
         if (!VoiceInput.isRecording) return
-        if (now - voiceKeyDownAt < TAP_MS) startContinuous() else stopVoice()
+        main.removeCallbacks(holdCue)
+        if (now - voiceKeyDownAt < TAP_MS) {
+            if (settings.voiceSounds) earcons.play(VoiceEarcon.Kind.START_TAP)
+            startContinuous()
+        } else {
+            stopVoice()
+        }
+    }
+
+    private val holdCue = Runnable {
+        if (VoiceInput.isRecording && !continuous && settings.voiceSounds) earcons.play(VoiceEarcon.Kind.START_HOLD)
     }
 
     private fun startContinuous() {
         continuous = true
+        continuousGotText = false
         continuousIdleMs = settings.continuousIdleSeconds * 1000L
         endpointer.reset()
         VoiceInput.trimTo(0)
@@ -1582,7 +1597,8 @@ class KanadeInputMethodService : InputMethodService() {
     /** 聞き続けるモードを終える。話している途中の音声があれば文字にして入れる */
     private fun stopContinuous(message: String, keepSpeech: Boolean = true) {
         continuous = false
-        if (settings.voiceSounds) earcons.play(VoiceEarcon.Kind.STOP)
+        // 聞き続けるモードを終える合図: このモードで文字が入ったなら上がる1音、入らなければ下がる2音（取り消しは入らなかった扱い）
+        if (settings.voiceSounds) earcons.play(if (continuousGotText && keepSpeech) VoiceEarcon.Kind.DONE_TEXT else VoiceEarcon.Kind.DONE_EMPTY)
         keyboardView?.voiceActive = false
         flickView?.voiceActive = false
         main.removeCallbacks(continuousTick)
@@ -1626,7 +1642,6 @@ class KanadeInputMethodService : InputMethodService() {
         // 逐次認識のモデルは大きく、初めの読み込みに数秒かかるので、録音を始めたらすぐ読み始める
         if (partialStreaming) StreamingRecognizer.preload(this, settings.voiceThreads)
         partialText = null
-        if (settings.voiceSounds) earcons.play(VoiceEarcon.Kind.START)
         showIndicatorText("🎤", 0)
         if (voiceStreaming) main.postDelayed(partialTick, if (partialStreaming) STREAM_INTERVAL_MS else PARTIAL_INTERVAL_MS)
     }
@@ -1755,7 +1770,7 @@ class KanadeInputMethodService : InputMethodService() {
         }
         if (!VoiceInput.isRecording) return
         VoiceInput.cancel()
-        if (settings.voiceSounds) earcons.play(VoiceEarcon.Kind.STOP)
+        if (settings.voiceSounds) earcons.play(VoiceEarcon.Kind.DONE_EMPTY)
         main.removeCallbacks(partialTick)
         if (partialStreaming) StreamingRecognizer.finishStream()
         if (partialText != null || !previewInBar) {
@@ -1871,7 +1886,6 @@ class KanadeInputMethodService : InputMethodService() {
 
     private fun stopVoice() {
         val pcm = VoiceInput.stopRecording() ?: return
-        if (settings.voiceSounds) earcons.play(VoiceEarcon.Kind.STOP)
         main.removeCallbacks(partialTick)
         if (partialStreaming) StreamingRecognizer.finishStream()
         showIndicatorText("…", 0)
@@ -1930,6 +1944,7 @@ class KanadeInputMethodService : InputMethodService() {
                     showVoiceDisplay()
                     return@post
                 }
+                if (settings.voiceSounds) earcons.play(if (final != null) VoiceEarcon.Kind.DONE_TEXT else VoiceEarcon.Kind.DONE_EMPTY)
                 // 認識しているあいだに打ち始めていたら、その文字を先に確定する（未確定を上書きしないため）
                 val typing = engine.isComposing
                 if (typing && final != null) apply(engine.commitAll())
@@ -1951,6 +1966,7 @@ class KanadeInputMethodService : InputMethodService() {
                     modeIndicator?.dismiss()
                     if (!stillHere()) return@post
                     log("voice: ${model.id} ${(System.nanoTime() - started) / 1_000_000}ms $parts")
+                    if (settings.voiceSounds) earcons.play(if (parts.any { it is String && spoken(it).isNotEmpty() }) VoiceEarcon.Kind.DONE_TEXT else VoiceEarcon.Kind.DONE_EMPTY)
                     val typing = engine.isComposing
                     if (typing) apply(engine.commitAll())
                     clearPartial(typing)
@@ -1967,6 +1983,7 @@ class KanadeInputMethodService : InputMethodService() {
 
     /** 聞き続けるモードで認識した文を入れる。入力中の文字があれば、それが確定するまで待つ */
     private fun insertVoiceText(text: String) {
+        if (text.isNotEmpty()) continuousGotText = true
         pendingVoice.append(text)
         flushPendingVoice()
     }

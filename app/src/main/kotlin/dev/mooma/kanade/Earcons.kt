@@ -26,7 +26,7 @@ class Earcons(private val context: Context) {
         val audio = context.getSystemService(AudioManager::class.java) ?: return
         if (audio.ringerMode != AudioManager.RINGER_MODE_NORMAL) return
         runCatching {
-            val pcm = VoiceEarcon.pcm(kind, VoiceEarcon.randomCents())
+            val pcm = VoiceEarcon.pcm(kind)
             val track = AudioTrack.Builder()
                 .setAudioAttributes(attributes)
                 .setAudioFormat(format)

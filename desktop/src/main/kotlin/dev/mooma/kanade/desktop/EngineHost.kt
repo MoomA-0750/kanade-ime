@@ -119,7 +119,10 @@ class EngineHost(
             // voice start <ja|en>・voice stop・voice cancel。結果はこのつなぎへ自分から送る
             "voice" -> synchronized(lock) {
                 when (f.getOrNull(1)) {
-                    "start" -> client.send(startVoice(client, english = f.getOrNull(2) == "en"))
+                    // voice start <ja|en> [hold|tap|none]: 始めの音は hold（長押し。既定）・tap（一回押し）・none（あとで voice cue で決める）
+                    "start" -> client.send(startVoice(client, english = f.getOrNull(2) == "en", cue = f.getOrNull(3) ?: "hold"))
+                    // 押し方が分かったあとの始めの音（短く押して離したら tap、押し続けているなら hold）
+                    "cue" -> if (recording) earcons?.play(if (f.getOrNull(2) == "tap") VoiceEarcon.Kind.START_TAP else VoiceEarcon.Kind.START_HOLD)
                     "stop" -> stopVoice()
                     "cancel" -> cancelVoice(quiet = f.getOrNull(2) == "quiet")
                 }
@@ -221,14 +224,18 @@ class EngineHost(
     }
 
     /** （入力中の文字を確定して）録音を始める。[english] なら英語のモデルで文字にする */
-    private fun startVoice(client: Client, english: Boolean, id: Int = 0): List<String> {
+    private fun startVoice(client: Client, english: Boolean, id: Int = 0, cue: String = "hold"): List<String> {
         val v = voice ?: return reply(id, emptyList(), false)
         activate(client)
         if (recording) return reply(id, emptyList(), true)
         val commands = run(engine.commitAll())
         recordingEnglish = english
         recording = v.start(english) { partial -> synchronized(lock) { if (recording) indicate("🎤 $partial") } }
-        if (recording) earcons?.play(VoiceEarcon.Kind.START)
+        if (recording) when (cue) {
+            "tap" -> earcons?.play(VoiceEarcon.Kind.START_TAP)
+            "none" -> {}
+            else -> earcons?.play(VoiceEarcon.Kind.START_HOLD)
+        }
         indicate(
             if (recording) (if (english) "🎤 EN" else "🎤") else Ui.t("マイクを使えません", "Microphone unavailable"),
             if (recording) 0 else 2000,
@@ -241,12 +248,13 @@ class EngineHost(
         val v = voice ?: return
         if (!recording) return
         recording = false
-        earcons?.play(VoiceEarcon.Kind.STOP)
         val english = recordingEnglish
         indicate(Ui.t("🎤 認識中", "🎤 Recognizing"))
         v.stop { text ->
             synchronized(lock) {
                 indicate(null)
+                // 認識が終わった合図: 文字が入るなら上がる1音、入らなければ下がる2音
+                earcons?.play(if (text.isNullOrEmpty()) VoiceEarcon.Kind.DONE_EMPTY else VoiceEarcon.Kind.DONE_TEXT)
                 val target = active ?: return@synchronized
                 if (text.isNullOrEmpty()) return@synchronized
                 // 認識しているあいだに打ち始めていたら、その文字を先に確定する
@@ -263,7 +271,7 @@ class EngineHost(
         if (!recording) return
         recording = false
         v.cancel()
-        if (!quiet) earcons?.play(VoiceEarcon.Kind.STOP)
+        if (!quiet) earcons?.play(VoiceEarcon.Kind.DONE_EMPTY)
         if (quiet) indicate(null) else indicate(Ui.t("🎤 取り消しました", "🎤 Canceled"), 1000)
     }
 

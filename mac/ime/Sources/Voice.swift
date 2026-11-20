@@ -16,6 +16,9 @@ final class VoiceInput: CommandTarget {
     private var down = Set<Int>()
     private var tap: CFMachPort?
     private var retry: Timer?
+    private var cueTimer: Timer?
+    /** これより短く押して離したら一回押し、押し続けたら長押し */
+    private static let tapSeconds = 0.3
 
     func setKeys(hold: String, toggle: String) {
         holdKeys = hold.split(separator: ",").compactMap { KeyMap.names[String($0)] }
@@ -118,16 +121,22 @@ final class VoiceInput: CommandTarget {
             // 押したときに使ったキーは、離したときも使う（アプリへ片方だけ届かないように）
             guard down.remove(code) != nil else { return false }
             if mode == .hold && holdKeys.contains(code) {
-                // すぐ離した（押し間違い）なら、認識せずに捨てる
-                let tap = Date().timeIntervalSince(started) < 0.3
-                link.send(["voice", tap ? "cancel" : "stop", tap ? "quiet" : ""])
-                mode = .none
+                cueTimer?.invalidate()
+                if Date().timeIntervalSince(started) < Self.tapSeconds {
+                    // 短く押して離した（一回押し）: 録音を続け、もう一度押すと終える（Android と同じ）
+                    mode = .toggle
+                    link.send(["voice", "cue", "tap"])
+                } else {
+                    link.send(["voice", "stop"])
+                    mode = .none
+                }
             }
             return true
         }
         let wasDown = down.contains(code)
         if mode != .none && code == kVK_Escape {
             down.insert(code)
+            cueTimer?.invalidate()
             link.send(["voice", "cancel"])
             mode = .none
             return true
@@ -155,7 +164,14 @@ final class VoiceInput: CommandTarget {
         let kanade = link.target != nil
         mode = hold ? .hold : .toggle
         started = Date()
-        link.send(["voice", "start", kanade ? "ja" : "en"])
+        // 始めの音は押し方が分かってから鳴らす（押し続けているなら長押し、短く離したら一回押し）。聞き始める録音そのものはすぐ始める
+        link.send(["voice", "start", kanade ? "ja" : "en", hold ? "none" : "tap"])
+        if hold {
+            cueTimer?.invalidate()
+            cueTimer = Timer.scheduledTimer(withTimeInterval: Self.tapSeconds, repeats: false) { [weak self] _ in
+                if self?.mode == .hold { EngineLink.shared.send(["voice", "cue", "hold"]) }
+            }
+        }
         return true
     }
 
