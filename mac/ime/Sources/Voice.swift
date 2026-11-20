@@ -169,9 +169,8 @@ final class VoiceInput: CommandTarget {
         // 録音中・聞き続けるモード中の Esc（エンジンが知らせる様子で決める）
         if state != "off" && code == kVK_Escape {
             down.insert(code)
+            // 終えたかはエンジンが voicestate で知らせる（打っている途中なら、入力中の文字の Esc になって聞き続ける）
             link.send(["voice", "cancel"])
-            state = "off"
-            stopWatchingFocus()
             return true
         }
         let hold = holdKeys.contains(code)

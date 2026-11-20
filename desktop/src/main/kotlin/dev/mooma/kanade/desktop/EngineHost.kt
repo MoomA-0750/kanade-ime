@@ -115,7 +115,11 @@ class EngineHost(
                 }
             }
             "reset" -> synchronized(lock) {
-                if (active === client) engine.reset()
+                if (active === client) {
+                    engine.reset()
+                    // 打っている途中だったので待たせていた音声の文を入れる
+                    voicePending(client).takeIf { it.isNotEmpty() }?.let { client.send(reply(0, it, false)) }
+                }
             }
             "focus" -> synchronized(lock) {
                 // 入力欄が替わったら、聞き続けるモードは終える
@@ -141,7 +145,7 @@ class EngineHost(
             "mode" -> synchronized(lock) {
                 activate(client)
                 val on = f.getOrNull(1) == "1"
-                if (engine.japanese != on) client.send(reply(0, run(engine.handle(KeyInput.SetJapanese(on)).commands), false))
+                if (engine.japanese != on) client.send(reply(0, run(engine.handle(KeyInput.SetJapanese(on)).commands) + voicePending(client), false))
             }
             // 入力方式に関わらない音声入力（fcitx5 のアドオン・macOS の入力方式が、どの入力方式でも録音キーを見て送る）。
             // voice down <ja|en>・voice up・voice toggle <ja|en>・voice cancel・voice blur。結果はこのつなぎへ自分から送る
@@ -150,15 +154,18 @@ class EngineHost(
                 val english = f.getOrNull(2) == "en"
                 when (f.getOrNull(1)) {
                     // 録音キーを押した・離した（押し方の判定はエンジンが持つ）
-                    "down" -> client.send(reply(0, session.down(client, english).orEmpty(), false))
+                    "down" -> client.send(reply(0, session.down(client, english), false))
                     "up" -> session.up()
                     // 押すたびに聞き続けるモードを始める・終えるキー
-                    "toggle" -> client.send(reply(0, session.toggle(client, english).orEmpty(), false))
+                    "toggle" -> client.send(reply(0, session.toggle(client, english), false))
                     // 録音を始めた入力欄から離れた
                     "blur" -> session.blur()
-                    "cancel" -> session.cancel(quiet = f.getOrNull(2) == "quiet")
+                    "cancel" -> if (!session.cancel(quiet = f.getOrNull(2) == "quiet") && engine.isComposing && active === client) {
+                        // 聞き続けるモードで打っている途中の Esc: 入力中の文字のための Esc として扱う
+                        client.send(reply(0, run(engine.handle(KeyInput.Escape).commands) + voicePending(client), false))
+                    }
                     // 古いフロント: voice start <ja|en> [hold|tap|none]・voice cue <tap|hold>・voice stop（押し方はフロントが決める）
-                    "start" -> client.send(reply(0, session.legacyStart(client, english, f.getOrNull(3) ?: "hold").orEmpty(), false))
+                    "start" -> client.send(reply(0, session.legacyStart(client, english, f.getOrNull(3) ?: "hold"), false))
                     "cue" -> session.legacyCue(f.getOrNull(2) == "tap")
                     "stop" -> session.legacyStop()
                 }
@@ -179,6 +186,7 @@ class EngineHost(
 
     fun disconnected(client: Client) = synchronized(lock) {
         fcitxClients.remove(client)
+        voiceSession?.disconnected(client)
         if (active === client) {
             engine.reset()
             active = null
@@ -206,8 +214,8 @@ class EngineHost(
      */
     private fun test(client: Client, key: WinKey): Boolean {
         if (voice != null && key.vk == voiceKey) return true
-        // 録音中・聞き続けるモード中の Esc はエンジンが取る
-        if (key.vk == VK.ESCAPE && voiceSession?.active == true) return true
+        // 録音中・聞き続けるモード中の Esc はエンジンが取る（取った Esc は離しも取る）
+        if (key.vk == VK.ESCAPE && (if (key.down) voiceSession?.active == true && !(voiceSession.state == VoiceSession.State.LISTEN && engine.isComposing) else escTaken)) return true
         if (!key.down) return mapper.onKeyUpWouldToggle(key)
         // 状態（右 Alt と一緒に押したか）は OnKeyDown で同じキーをもう一度通しても同じになるので、ここで進めてよい
         val input = mapper.onKeyDown(key) ?: return false
@@ -224,13 +232,25 @@ class EngineHost(
 
     private fun key(client: Client, id: Int, key: WinKey): List<String> {
         if (voice != null && key.vk == voiceKey) return voiceKey(client, id, key)
-        if (key.vk == VK.ESCAPE && key.down && voiceSession?.cancel() == true) return reply(id, emptyList(), true)
+        if (key.vk == VK.ESCAPE) {
+            if (key.down && voiceSession?.cancel() == true) {
+                escTaken = true
+                return reply(id, emptyList(), true)
+            }
+            if (!key.down && escTaken) {
+                escTaken = false
+                return reply(id, emptyList(), true)
+            }
+        }
         val input = if (key.down) mapper.onKeyDown(key) else mapper.onKeyUp(key)
         if (input == null) return reply(id, emptyList(), false)
         activate(client)
         val result = engine.handle(input)
         return reply(id, run(result.commands) + voicePending(client), result.consumed)
     }
+
+    /** 録音を取り消した Esc（離しもアプリへ渡さない） */
+    private var escTaken = false
 
     /** 聞き続けるモードで、打っている途中だったので待たせていた文（打ち終えたら入れる） */
     private fun voicePending(client: Client): List<ImeCommand> = voiceSession?.flushPending(client).orEmpty()
@@ -270,7 +290,7 @@ class EngineHost(
             return reply(id, emptyList(), true)
         }
         if (key.repeat) return reply(id, emptyList(), true)
-        return reply(id, session.down(client, english = false).orEmpty(), true)
+        return reply(id, session.down(client, english = false), true)
     }
 
     // ---- VoiceSession から使うもの（ロックの中で呼ぶ） ----

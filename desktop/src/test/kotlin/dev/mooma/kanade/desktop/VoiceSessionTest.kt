@@ -271,4 +271,86 @@ class VoiceSessionTest {
         assertEquals("off", d.voiceState)
         assertEquals("こんにちは。", d.toString())
     }
+
+    /** ためた文より後の区切りが先に入らない。アプリが入力を終わらせた（reset）ときも、ためた文を入れる */
+    @Test
+    fun pendingKeepsOrder() {
+        val d = fcitx()
+        d.type("{Ctrl+Space}")
+        d.tap()
+        d.type("ka")
+        voice.push(utterance(0.2f))
+        d.send("reset")
+        assertEquals("こんにちは。", d.document.toString())
+        voice.push(utterance(0.3f))
+        assertEquals("こんにちは。元気です。", d.document.toString())
+    }
+
+    /** マイクが使えなくても、打っている途中の文字は確定する。フロントへは off を知らせる */
+    @Test
+    fun microphoneUnavailableStillCommits() {
+        val broken = object : VoiceService {
+            override fun start(english: Boolean, onPartial: (String) -> Unit, onAudio: ((FloatArray) -> Unit)?) = false
+            override fun stop(onText: (String?) -> Unit) = onText(null)
+            override fun cancel() {}
+        }
+        val h = EngineHost(InputEngine(), voice = broken)
+        val d = FakeDll.inProcess(h).apply { hello("fcitx5") }
+        d.type("{Ctrl+Space}ka")
+        d.send("voice", "down", "ja")
+        assertEquals("か", d.toString())
+        assertEquals("off", d.voiceState)
+    }
+
+    /** つなぎが切れたら録音を止める */
+    @Test
+    fun disconnectStopsRecording() {
+        val d = fcitx()
+        d.tap()
+        assertTrue(voice.recording)
+        d.send("bye")
+        assertTrue(!voice.recording)
+    }
+
+    /** 終えた直後に入力欄を移ったら、まだ届いていない区切りの結果は新しい欄に入れない */
+    @Test
+    fun blurAfterStopDropsLateResults() {
+        val d = fcitx()
+        voice.autoAnswer = false
+        d.tap()
+        voice.push(sound(500, 0f) + sound(800, 0.2f))
+        d.tap()
+        d.send("voice", "blur")
+        voice.waiting.forEach { (text, answer) -> answer(text) }
+        assertEquals("", d.toString())
+    }
+
+    /** 打っている途中の Esc は入力中の文字の取り消しに使い、聞き続けるモードは続ける。ためた文も消えない */
+    @Test
+    fun escapeWhileTypingCancelsTypingOnly() {
+        val d = fcitx()
+        d.type("{Ctrl+Space}")
+        d.tap()
+        d.type("ka")
+        voice.push(utterance(0.2f))
+        d.send("voice", "cancel")
+        assertEquals("listen", d.voiceState)
+        assertEquals("こんにちは。", d.toString())
+        // 打っていなければ、Esc で終える
+        d.send("voice", "cancel")
+        assertEquals("off", d.voiceState)
+    }
+
+    /** Windows: 録音を取り消した Esc は、離しもアプリへ渡さない */
+    @Test
+    fun windowsEscapeUpIsTakenToo() {
+        val d = FakeDll.inProcess(host).apply { hello() }
+        d.key(WinKey(down = true, vk = VK.F12, char = 0, mods = 0))
+        advance(100)
+        d.key(WinKey(down = false, vk = VK.F12, char = 0, mods = 0))
+        d.received.clear()
+        d.key(WinKey(down = true, vk = VK.ESCAPE, char = 0x1B, mods = 0))
+        d.key(WinKey(down = false, vk = VK.ESCAPE, char = 0x1B, mods = 0))
+        assertEquals("", d.toString())
+    }
 }

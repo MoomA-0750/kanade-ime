@@ -243,8 +243,8 @@ private:
         if (voiceState_ != "off" && sym == FcitxKey_Escape) {
             voiceDown_.insert(sym);
             event.filterAndAccept();
+            // 終えたかはエンジンが voicestate で知らせる（打っている途中なら、入力中の文字の Esc になって聞き続ける）
             send({"voice", "cancel"});
-            voiceState_ = "off";
             return;
         }
         bool hold = isHoldKey(key);

@@ -68,8 +68,8 @@ internal class VoiceSession(
 
     // ---- 押し方 ----
 
-    /** 録音キーを押した。録音を始めたら、打っている途中の文字を確定する命令を返す。マイクが使えなければ null */
-    fun down(c: Client, english: Boolean): List<ImeCommand>? {
+    /** 録音キーを押した。打っている途中の文字を確定する命令を返す（マイクが使えなくても確定はする） */
+    fun down(c: Client, english: Boolean): List<ImeCommand> {
         when (state) {
             State.LISTEN -> {
                 stopListening(keep = true, message = Ui.t("🎤 止めました", "🎤 Stopped"))
@@ -80,7 +80,8 @@ internal class VoiceSession(
             State.OFF -> {}
         }
         ignoreUp = false
-        val commands = begin(c, english) ?: return null
+        val (commands, started) = begin(c, english)
+        if (!started) return commands
         state = State.PRESSED
         val id = recording
         // マイクを開くのに時間がかかることがあるので、短く押したかは録音が始まってから数える
@@ -110,9 +111,12 @@ internal class VoiceSession(
     }
 
     /** 押すたびに始める・終えるキー（Linux・macOS の Control+Alt+Space）: 聞き続けるモードの入り・切り */
-    fun toggle(c: Client, english: Boolean): List<ImeCommand>? {
+    fun toggle(c: Client, english: Boolean): List<ImeCommand> {
         return when (state) {
-            State.OFF -> begin(c, english)?.also { startListening() }
+            State.OFF -> begin(c, english).let { (commands, started) ->
+                if (started) startListening()
+                commands
+            }
             State.LISTEN -> {
                 stopListening(keep = true, message = Ui.t("🎤 止めました", "🎤 Stopped"))
                 emptyList()
@@ -121,10 +125,13 @@ internal class VoiceSession(
         }
     }
 
-    /** Esc（録音中・聞き続けるモード中）: 話している途中の音声を捨てて終える。何もしなかったら false */
+    /**
+     * Esc（録音中・聞き続けるモード中）: 話している途中の音声を捨てて終える。何もしなかったら false。
+     * 聞き続けるモードで Kanade で打っている途中なら、Esc は入力中の文字のためのもの（聞き続けるモードは続ける）なので false
+     */
     fun cancel(quiet: Boolean = false): Boolean = when (state) {
         State.OFF -> false
-        State.LISTEN -> {
+        State.LISTEN -> if (engine.isComposing) false else {
             stopListening(keep = false, message = Ui.t("🎤 取り消しました", "🎤 Canceled"))
             true
         }
@@ -136,15 +143,35 @@ internal class VoiceSession(
 
     /** 入力欄が替わった: 聞き続けるモードを終える（話している途中の音声と、認識中の結果は捨てる） */
     fun blur() {
-        if (state == State.LISTEN) stopListening(keep = false, message = null)
+        if (state == State.LISTEN) {
+            stopListening(keep = false, message = null)
+        } else if (state == State.OFF && (nextDeliver < nextSeq || pending.isNotEmpty())) {
+            // 終えた直後に移った: まだ届いていない区切りの結果を、新しい入力欄に入れない
+            generation++
+            pending.clear()
+        }
+    }
+
+    /** つなぎが切れた（アプリを閉じた・落ちた）: その相手のための録音を止める */
+    fun disconnected(c: Client) {
+        if (c !== client) return
+        when (state) {
+            State.LISTEN -> stopListening(keep = false, message = null)
+            State.PRESSED, State.HOLD -> cancelHold(quiet = true)
+            State.OFF -> {}
+        }
+        generation++
+        pending.clear()
+        client = null
     }
 
     // ---- 古いフロント（voice start/cue/stop） ----
 
     /** 押している間の録音を始める（押し方はフロントが決める）。[cue] は始めの音（hold・tap・none） */
-    fun legacyStart(c: Client, english: Boolean, cue: String): List<ImeCommand>? {
+    fun legacyStart(c: Client, english: Boolean, cue: String): List<ImeCommand> {
         if (state != State.OFF) return emptyList()
-        val commands = begin(c, english) ?: return null
+        val (commands, started) = begin(c, english)
+        if (!started) return commands
         state = State.HOLD
         when (cue) {
             "tap" -> host.voiceEarcon(VoiceEarcon.Kind.START_TAP)
@@ -164,27 +191,33 @@ internal class VoiceSession(
 
     // ---- 録音 ----
 
-    /** 録音を始める（打っている途中の文字は確定する）。マイクが使えなければ null */
-    private fun begin(c: Client, english: Boolean): List<ImeCommand>? {
+    /** 録音を始める（打っている途中の文字は確定する。その命令と、録音を始められたか） */
+    private fun begin(c: Client, english: Boolean): Pair<List<ImeCommand>, Boolean> {
         host.activateClient(c)
         val commands = host.runCommands(engine.commitAll())
         val id = ++recording
         val started = voice.start(
             english,
             onPartial = { text -> synchronized(lock) { onPartial(id, text) } },
-            onAudio = { chunk -> synchronized(lock) { onAudio(id, chunk) } },
+            // 長押しのあいだは区切らないので、ロックを取らずに捨てる（録音のスレッドを待たせない）
+            onAudio = { chunk -> if (listening == id) synchronized(lock) { onAudio(id, chunk) } },
         )
         if (!started) {
             host.indicate(Ui.t("マイクを使えません", "Microphone unavailable"), 2000)
-            return null
+            // フロントは押したときに録音中と思っているので、戻す
+            host.publishVoiceState("off")
+            return commands to false
         }
         client = c
         this.english = english
         partial = null
         host.indicate(if (english) "🎤 EN" else "🎤")
         host.publishVoiceState("hold")
-        return commands
+        return commands to true
     }
+
+    /** 聞き続けるモードで区切っている録音の回（録音のスレッドがロックを取らずに見る。0 なら区切らない） */
+    @Volatile private var listening = 0
 
     private fun onPartial(id: Int, text: String) {
         if (id != recording) return
@@ -257,6 +290,7 @@ internal class VoiceSession(
     private fun startListening() {
         cancelHoldCue?.invoke()
         state = State.LISTEN
+        listening = recording
         host.voiceEarcon(VoiceEarcon.Kind.START_TAP)
         // 押しているあいだに録った音は捨てて、ここから区切る
         voice.trim(0)
@@ -274,6 +308,7 @@ internal class VoiceSession(
     private fun stopListening(keep: Boolean, message: String?) {
         if (state != State.LISTEN) return
         state = State.OFF
+        listening = 0
         recording++
         val pcm = segmenter?.flush()
         segmenter = null
@@ -320,14 +355,11 @@ internal class VoiceSession(
         val text = (r.text ?: r.fallback)?.takeIf { it.isNotEmpty() } ?: return
         gotText = true
         lastVoice = text
-        if (engine.isComposing) {
-            // 打っている途中の文字を上書きしないよう、それが確定するまで待つ
-            pending.append(text)
-            return
-        }
+        // 打っている途中の文字を上書きしないよう、それが確定するまで待つ（前に待たせた文があれば、その後ろに並べる）
+        pending.append(text)
         val target = client ?: return
-        if (!english) addContext(text)
-        target.send(host.replyLines(listOf(ImeCommand.Commit(text))))
+        val commands = flushPending(target)
+        if (commands.isNotEmpty()) target.send(host.replyLines(commands))
     }
 
     /** キー・候補のクリックを処理したあと: 打っている途中でなくなったら、待たせていた文を入れる命令 */
@@ -354,10 +386,11 @@ internal class VoiceSession(
         host.indicate("🎤 $label", 1500)
         when (c) {
             VoiceCommand.SEND -> {
-                // 待たせていた文を先に入れてから送る
-                if (pending.isNotEmpty()) host.runCommands(engine.commitAll()).let { committed ->
-                    val target = client ?: return@let
-                    target.send(host.replyLines(committed + flushPending(target)))
+                // 打っている途中の文字と、待たせていた文を先に入れてから送る
+                val target = client
+                if (target != null) {
+                    val commands = host.runCommands(engine.commitAll()) + flushPending(target)
+                    if (commands.isNotEmpty()) target.send(host.replyLines(commands))
                 }
                 action("send")
             }
