@@ -35,6 +35,10 @@ public sealed class Store
     public bool SpokenPunctuation { get; set; } = true;
     /// <summary>録音を始めた・終えたときに効果音を鳴らす</summary>
     public bool VoiceSounds { get; set; } = true;
+    /// <summary>声のコマンド（送って・次へ・全部消して・止めて・取り消して）を受け取る</summary>
+    public bool VoiceCommands { get; set; } = true;
+    /// <summary>聞き続けるモードで、これだけ話さなければ終える（秒。0 なら終えない）</summary>
+    public int ContinuousIdleSeconds { get; set; } = 60;
     public bool Learning { get; set; } = true;
     public bool LastJapanese { get; set; }
     public string VoiceFinal { get; set; } = VoiceModel.DefaultId;
@@ -69,6 +73,8 @@ public sealed class Store
                 case "toggle_triggers": s.Toggles = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToHashSet(); break;
                 case "spoken_punctuation": s.SpokenPunctuation = Bool(s.SpokenPunctuation); break;
                 case "voice_sounds": s.VoiceSounds = Bool(s.VoiceSounds); break;
+                case "voice_commands": s.VoiceCommands = Bool(s.VoiceCommands); break;
+                case "continuous_idle_seconds": if (int.TryParse(value, out var idle) && idle is 0 or 30 or 60 or 120) s.ContinuousIdleSeconds = idle; break;
                 case "learning": s.Learning = Bool(s.Learning); break;
                 case "last_japanese": s.LastJapanese = Bool(s.LastJapanese); break;
                 case "ui_language": if (value is "auto" or "ja" or "en") s.UiLanguage = value; break;
@@ -112,6 +118,10 @@ public sealed class Store
             .AppendLine($"spoken_punctuation={B(SpokenPunctuation)}")
             .AppendLine("# 録音を始めた・終えたときに効果音を鳴らす")
             .AppendLine($"voice_sounds={B(VoiceSounds)}")
+            .AppendLine("# 声のコマンド（送って・次へ・全部消して・止めて・取り消して）を受け取る")
+            .AppendLine($"voice_commands={B(VoiceCommands)}")
+            .AppendLine("# 聞き続けるモード（録音キーを短く押す）で、これだけ話さなければ終える秒数（30・60・120。0 なら終えない）")
+            .AppendLine($"continuous_idle_seconds={ContinuousIdleSeconds}")
             .AppendLine("# 音声入力の確定の文を作るモデル（parakeet・reazon・sensevoice・whisper-small・whisper-kotoba・whisper-turbo）")
             .AppendLine($"voice_final={VoiceFinal}")
             .AppendLine("# 選んだ変換を覚えて次から先に出す")

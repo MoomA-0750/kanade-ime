@@ -16,6 +16,8 @@ public sealed partial class VoicePage : Page
         InitializeComponent();
         Spoken.IsOn = store.SpokenPunctuation;
         Sounds.IsOn = store.VoiceSounds;
+        Commands.IsOn = store.VoiceCommands;
+        Idle.SelectedItem = Idle.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == store.ContinuousIdleSeconds.ToString()) ?? Idle.Items[1];
         BuildModels();
         loading = false;
     }
@@ -25,6 +27,8 @@ public sealed partial class VoicePage : Page
         if (loading) return;
         store.SpokenPunctuation = Spoken.IsOn;
         store.VoiceSounds = Sounds.IsOn;
+        store.VoiceCommands = Commands.IsOn;
+        store.ContinuousIdleSeconds = int.TryParse((Idle.SelectedItem as ComboBoxItem)?.Tag as string, out var idle) ? idle : 60;
         store.Save();
     }
 

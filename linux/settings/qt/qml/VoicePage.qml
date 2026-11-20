@@ -18,15 +18,17 @@ PrefPage {
 
     PrefGroup {
         title: Pal.t("録音キー", "Record keys")
-        description: Pal.t("どの入力方式でも使えます。Kanade のときは日本語、ほかの入力方式（英字など）のときは英語で書きます。録音中に Esc で取り消します",
+        description: Pal.t("どの入力方式でも使えます。Kanade のときは日本語、ほかの入力方式（英字など）のときは英語で書きます。"
+                           + "短く押すと聞き続けるモードになり、黙るたびにそこまでを入れます（もう一度押すと終わります）。録音中に Esc で取り消します",
                            "Work with any input method. With Kanade you get Japanese, with other input methods (such as English) you get English. "
+                           + "A short press starts continuous listening, which writes each sentence when you pause (press again to stop). "
                            + "Press Esc while recording to cancel")
         Repeater {
             model: page.holds
             PrefRow {
                 required property string modelData
                 title: KeyGrab.label(modelData, Store.english)
-                subtitle: Pal.t("押している間だけ録音し、離すと文字にします", "Records while held and writes the text when released")
+                subtitle: Pal.t("押している間だけ録音し、離すと文字にします。短く押すと聞き続けます", "Records while held and writes the text when released. A short press keeps listening")
                 prefix: Icon { name: "mic"; color: Pal.fg }
                 IconButton {
                     iconName: "remove"
@@ -43,7 +45,7 @@ PrefPage {
             onClicked: capture.ask(false, k => page.setHolds(page.holds.includes(k) ? page.holds : page.holds.concat([k])))
         }
         PrefRow {
-            title: Pal.t("押すたびに始める・終える", "Press to start and stop")
+            title: Pal.t("押すたびに聞き続けるモードを始める・終える", "Press to start and stop continuous listening")
             subtitle: page.toggle ? KeyGrab.label(page.toggle, Store.english) : Pal.t("使わない", "Not used")
             prefix: Icon { name: "record"; color: Pal.fg }
             KButton {
@@ -71,6 +73,22 @@ PrefPage {
             title: Pal.t("話した句読点", "Spoken punctuation")
             subtitle: Pal.t("日本語で「まる」「てん」「かいぎょう」などを、句読点や改行にします",
                             "In Japanese, turns spoken words such as maru, ten and kaigyou into punctuation and line breaks")
+        }
+    }
+
+    PrefGroup {
+        title: Pal.t("聞き続けるモード", "Continuous listening")
+        SwitchRow {
+            key: "voice_commands"
+            title: Pal.t("声のコマンド", "Voice commands")
+            subtitle: Pal.t("間を空けて「送って」「次へ」「全部消して」「取り消して」「止めて」と言うと、その操作をします",
+                            "Say \"okutte\" (send), \"tsugi e\" (next), \"zenbu keshite\" (clear), \"torikeshite\" (undo) or \"tomete\" (stop) with a pause before and after")
+        }
+        ComboRow {
+            key: "continuous_idle_seconds"
+            title: Pal.t("話さなければ止める", "Stop after silence")
+            subtitle: Pal.t("聞き続けるモードで、この時間話さなければ終えます", "Ends continuous listening when you do not speak for this long")
+            choices: [["30", Pal.t("30 秒", "30 seconds")], ["60", Pal.t("1 分", "1 minute")], ["120", Pal.t("2 分", "2 minutes")], ["0", Pal.t("止めない", "Never")]]
         }
     }
 

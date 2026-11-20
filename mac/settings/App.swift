@@ -308,7 +308,7 @@ struct VoicePage: View {
                     } label: {
                         Label {
                             Text(KeyNames.label(key))
-                            Text(T("押している間だけ録音し、離すと文字にします", "Records while held and writes the text when released"))
+                            Text(T("押している間だけ録音し、離すと文字にします。短く押すと聞き続けます", "Records while held and writes the text when released. A short press keeps listening"))
                         } icon: { Image(systemName: "mic") }
                     }
                 }
@@ -322,15 +322,15 @@ struct VoicePage: View {
                     }
                 } label: {
                     Label {
-                        Text(T("押すたびに始める・終える", "Press to start and stop"))
+                        Text(T("押すたびに聞き続けるモードを始める・終える", "Press to start and stop continuous listening"))
                         Text((settings.values["voice_toggle_key"] ?? "").isEmpty ? T("使わない", "Not used") : KeyNames.label(settings.values["voice_toggle_key"]!))
                     } icon: { Image(systemName: "record.circle") }
                 }
             } header: {
                 Text(T("録音キー", "Record keys"))
             } footer: {
-                Text(T("どの入力ソースでも使えます。Kanade のときは日本語、ほかの入力ソース（ABC など）のときは英語で書きます。録音中に Esc で取り消します。使うにはアクセシビリティの許可が要ります",
-                       "Work with any input source. With Kanade you get Japanese, with other input sources (such as ABC) you get English. Press Esc while recording to cancel. Needs Accessibility permission"))
+                Text(T("どの入力ソースでも使えます。Kanade のときは日本語、ほかの入力ソース（ABC など）のときは英語で書きます。押している間だけ録音し、短く押すと聞き続けるモードになって、黙るたびにそこまでを入れます（もう一度押すと終わります）。録音中に Esc で取り消します。使うにはアクセシビリティの許可が要ります",
+                       "Work with any input source. With Kanade you get Japanese, with other input sources (such as ABC) you get English. Records while held; a short press starts continuous listening, which writes each sentence when you pause (press again to stop). Press Esc while recording to cancel. Needs Accessibility permission"))
             }
             Section(T("書き方", "Writing")) {
                 Toggle(isOn: settings.bool("voice_sounds")) {
@@ -342,6 +342,22 @@ struct VoicePage: View {
                     Text(T("話した句読点", "Spoken punctuation"))
                     Text(T("日本語で「まる」「てん」「かいぎょう」などを、句読点や改行にします",
                            "In Japanese, turns spoken words such as maru, ten and kaigyou into punctuation and line breaks"))
+                }
+            }
+            Section(T("聞き続けるモード", "Continuous listening")) {
+                Toggle(isOn: settings.bool("voice_commands")) {
+                    Text(T("声のコマンド", "Voice commands"))
+                    Text(T("間を空けて「送って」「次へ」「全部消して」「取り消して」「止めて」と言うと、その操作をします",
+                           "Say okutte (send), tsugi e (next), zenbu keshite (clear), torikeshite (undo) or tomete (stop) with a pause before and after"))
+                }
+                Picker(selection: settings.string("continuous_idle_seconds")) {
+                    Text(T("30 秒", "30 seconds")).tag("30")
+                    Text(T("1 分", "1 minute")).tag("60")
+                    Text(T("2 分", "2 minutes")).tag("120")
+                    Text(T("止めない", "Never")).tag("0")
+                } label: {
+                    Text(T("話さなければ止める", "Stop after silence"))
+                    Text(T("聞き続けるモードで、この時間話さなければ終えます", "Ends continuous listening when you do not speak for this long"))
                 }
             }
             ModelSection(settings: settings, key: "voice_final", title: T("日本語の文を作るモデル", "Model for Japanese"),

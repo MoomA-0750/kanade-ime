@@ -30,6 +30,8 @@ const QMap<QString, QString> &defaults()
         {"emoji_prefix_twice", "false"},
         {"spoken_punctuation", "true"},
         {"voice_sounds", "true"},
+        {"voice_commands", "true"},
+        {"continuous_idle_seconds", "60"},
         {"voice_final", "parakeet"},
         {"learning", "true"},
         {"ui_language", "auto"},
@@ -48,13 +50,15 @@ const QMap<QString, QString> &comments()
         {"zenz_mode", "# zenz の使い方（CORRECT は1位を確かめて直す・軽い、RERANK は候補を全部並べ替える・打つたびに重い）"},
         {"start_mode", "# 入力欄に入ったときのモード（LAST は前のまま、JAPANESE は日本語、ENGLISH は英字から始める）"},
         {"voice_sounds", "# 録音を始めた・終えたときに効果音を鳴らす"},
+        {"voice_commands", "# 声のコマンド（送って・次へ・全部消して・止めて・取り消して）を受け取る"},
+        {"continuous_idle_seconds", "# 聞き続けるモード（録音キーを短く押す）で、これだけ話さなければ終える秒数（30・60・120。0 なら終えない）"},
         {"key_style", "# 入力中の Ctrl のキー（PC は Ctrl+U/I/O/P/T でひらがな・カタカナ・半角カナ・全角英数・半角英数、MAC は macOS と同じ Ctrl+J/K/L/; でひらがな・カタカナ・全角英字・半角英字。F6〜F10 はどちらでも使える）"},
         {"emoji_prefix", "# 絵文字の名前の入り口の文字（: ; / @ ! など、記号1文字）"},
         {"emoji_prefix_twice", "# 入り口の文字を2回続けて打ったときだけ絵文字の名前にする（::rocket）"},
         {"emoji_shortcodes", "# : に続けて絵文字の名前を打つと絵文字を候補に出す（:rocket → 🚀）"},
         {"voice_final_en", "# Linux 版: 英語の口述のモデル（Kanade 以外の入力方式で録音キーを押したとき。parakeet-en・whisper-small・whisper-turbo）"},
         {"voice_hold_keys", "# Linux 版: どの入力方式でも、押している間だけ録音するキー（fcitx5 のキーの名前をカンマ区切り。例 F12,Alt_R,F9）"},
-        {"voice_toggle_key", "# Linux 版: 押すたびに録音を始める・終えるキー（例 Control+Alt+space。空なら使わない）。録音中の Esc で取り消す"},
+        {"voice_toggle_key", "# Linux 版: 押すたびに聞き続けるモードを始める・終えるキー（例 Control+Alt+space。空なら使わない）。録音中の Esc で取り消す"},
     };
     return c;
 }

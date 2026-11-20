@@ -55,6 +55,8 @@ DEFAULTS = {
     "emoji_prefix_twice": "false",
     "spoken_punctuation": "true",
     "voice_sounds": "true",
+    "voice_commands": "true",
+    "continuous_idle_seconds": "60",
     "voice_final": "parakeet",
     "learning": "true",
     "ui_language": "auto",
@@ -68,6 +70,8 @@ DEFAULTS = {
 COMMENTS = {
     "zenz_mode": "# zenz の使い方（CORRECT は1位を確かめて直す・軽い、RERANK は候補を全部並べ替える・打つたびに重い）",
     "voice_sounds": "# 録音を始めた・終えたときに効果音を鳴らす",
+    "voice_commands": "# 声のコマンド（送って・次へ・全部消して・止めて・取り消して）を受け取る",
+    "continuous_idle_seconds": "# 聞き続けるモード（録音キーを短く押す）で、これだけ話さなければ終える秒数（30・60・120。0 なら終えない）",
     "start_mode": "# 入力欄に入ったときのモード（LAST は前のまま、JAPANESE は日本語、ENGLISH は英字から始める）",
     "key_style": "# 入力中の Ctrl のキー（PC は Ctrl+U/I/O/P/T でひらがな・カタカナ・半角カナ・全角英数・半角英数、MAC は macOS と同じ Ctrl+J/K/L/; でひらがな・カタカナ・全角英字・半角英字。F6〜F10 はどちらでも使える）",
     "emoji_prefix": "# 絵文字の名前の入り口の文字（: ; / @ ! など、記号1文字）",
@@ -75,7 +79,7 @@ COMMENTS = {
     "emoji_shortcodes": "# : に続けて絵文字の名前を打つと絵文字を候補に出す（:rocket → 🚀）",
     "voice_final_en": "# Linux 版: 英語の口述のモデル（Kanade 以外の入力方式で録音キーを押したとき。parakeet-en・whisper-small・whisper-turbo）",
     "voice_hold_keys": "# Linux 版: どの入力方式でも、押している間だけ録音するキー（fcitx5 のキーの名前をカンマ区切り。例 F12,Alt_R,F9）",
-    "voice_toggle_key": "# Linux 版: 押すたびに録音を始める・終えるキー（例 Control+Alt+space。空なら使わない）。録音中の Esc で取り消す",
+    "voice_toggle_key": "# Linux 版: 押すたびに聞き続けるモードを始める・終えるキー（例 Control+Alt+space。空なら使わない）。録音中の Esc で取り消す",
 }
 
 
@@ -514,12 +518,14 @@ class SettingsWindow(Adw.ApplicationWindow):
         page = Adw.PreferencesPage()
         s = load_settings()
         g = group(T("録音キー", "Record keys"),
-                  T("どの入力方式でも使えます。Kanade のときは日本語、ほかの入力方式（英字など）のときは英語で書きます。録音中に Esc で取り消します",
+                  T("どの入力方式でも使えます。Kanade のときは日本語、ほかの入力方式（英字など）のときは英語で書きます。"
+                    "短く押すと聞き続けるモードになり、黙るたびにそこまでを入れます（もう一度押すと終わります）。録音中に Esc で取り消します",
                     "Work with any input method. With Kanade you get Japanese, with other input methods (such as English) you get English. "
+                    "A short press starts continuous listening, which writes each sentence when you pause (press again to stop). "
                     "Press Esc while recording to cancel"))
         holds = [k for k in s.get("voice_hold_keys", "").split(",") if k]
         for key in holds:
-            row = Adw.ActionRow(title=key_label(key), subtitle=T("押している間だけ録音し、離すと文字にします", "Records while held and writes the text when released"))
+            row = Adw.ActionRow(title=key_label(key), subtitle=T("押している間だけ録音し、離すと文字にします。短く押すと聞き続けます", "Records while held and writes the text when released. A short press keeps listening"))
             row.add_prefix(Gtk.Image.new_from_icon_name("audio-input-microphone-symbolic"))
             remove = Gtk.Button(icon_name="list-remove-symbolic", valign=Gtk.Align.CENTER, tooltip_text=T("外す", "Remove"))
             remove.add_css_class("flat")
@@ -530,7 +536,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         add.connect("activated", lambda _r: self.capture_key(False, lambda k: self.set_hold_keys(holds + [k] if k not in holds else holds)))
         g.add(add)
         toggle = s.get("voice_toggle_key", "")
-        row = Adw.ActionRow(title=T("押すたびに始める・終える", "Press to start and stop"),
+        row = Adw.ActionRow(title=T("押すたびに聞き続けるモードを始める・終える", "Press to start and stop continuous listening"),
                             subtitle=key_label(toggle) if toggle else T("使わない", "Not used"))
         row.add_prefix(Gtk.Image.new_from_icon_name("media-record-symbolic"))
         change = Gtk.Button(label=T("変える…", "Change…"), valign=Gtk.Align.CENTER)
@@ -549,6 +555,17 @@ class SettingsWindow(Adw.ApplicationWindow):
         g.add(switch_row(T("話した句読点", "Spoken punctuation"),
                          T("日本語で「まる」「てん」「かいぎょう」などを、句読点や改行にします",
                            "In Japanese, turns spoken words such as maru, ten and kaigyou into punctuation and line breaks"), "spoken_punctuation"))
+        page.add(g)
+
+        g = group(T("聞き続けるモード", "Continuous listening"))
+        g.add(switch_row(T("声のコマンド", "Voice commands"),
+                         T("間を空けて「送って」「次へ」「全部消して」「取り消して」「止めて」と言うと、その操作をします",
+                           "Say \"okutte\" (send), \"tsugi e\" (next), \"zenbu keshite\" (clear), \"torikeshite\" (undo) or \"tomete\" (stop) with a pause before and after"),
+                         "voice_commands"))
+        g.add(combo_row(T("話さなければ止める", "Stop after silence"),
+                        T("聞き続けるモードで、この時間話さなければ終えます", "Ends continuous listening when you do not speak for this long"),
+                        "continuous_idle_seconds", [("30", T("30 秒", "30 seconds")), ("60", T("1 分", "1 minute")),
+                                                    ("120", T("2 分", "2 minutes")), ("0", T("止めない", "Never"))]))
         page.add(g)
 
         self.model_group(page, T("日本語の文を作るモデル", "Model for Japanese"),
