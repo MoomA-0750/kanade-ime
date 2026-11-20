@@ -30,6 +30,10 @@ data class DesktopSettings(
     val spokenPunctuation: Boolean = true,
     /** 録音を始めた・終えたときに効果音を鳴らす */
     val voiceSounds: Boolean = true,
+    /** 声のコマンド（送って・次へ・全部消して・止めて・取り消して）を受け取る */
+    val voiceCommands: Boolean = true,
+    /** 聞き続けるモードで、これだけ話さなければ終える（秒。0 なら終えない） */
+    val continuousIdleSeconds: Int = 60,
     val learning: Boolean = true,
     val lastJapanese: Boolean = false,
     /** 確定の文を作る音声認識のモデル（Android 版と同じ id。VoiceFinal） */
@@ -90,6 +94,8 @@ class DesktopStore(val dir: File = defaultDir()) {
             keyStyle = p.getProperty(KEY_KEY_STYLE)?.trim()?.uppercase()?.let { v -> KeyStyle.entries.find { it.name == v } } ?: d.keyStyle,
             spokenPunctuation = bool(KEY_SPOKEN_PUNCT, d.spokenPunctuation),
             voiceSounds = bool(KEY_VOICE_SOUNDS, d.voiceSounds),
+            voiceCommands = bool(KEY_VOICE_COMMANDS, d.voiceCommands),
+            continuousIdleSeconds = p.getProperty(KEY_CONTINUOUS_IDLE)?.trim()?.toIntOrNull()?.takeIf { it in CONTINUOUS_IDLES } ?: d.continuousIdleSeconds,
             learning = bool(KEY_LEARNING, d.learning),
             lastJapanese = bool(KEY_LAST_MODE, d.lastJapanese),
             voiceFinal = p.getProperty(KEY_VOICE_FINAL)?.trim()?.takeIf { id -> VoiceFinal.entries.any { it.id == id } } ?: d.voiceFinal,
@@ -129,6 +135,10 @@ class DesktopStore(val dir: File = defaultDir()) {
             appendLine("$KEY_SPOKEN_PUNCT=${s.spokenPunctuation}")
             appendLine("# 録音を始めた・終えたときに効果音を鳴らす")
             appendLine("$KEY_VOICE_SOUNDS=${s.voiceSounds}")
+            appendLine("# 声のコマンド（送って・次へ・全部消して・止めて・取り消して）を受け取る")
+            appendLine("$KEY_VOICE_COMMANDS=${s.voiceCommands}")
+            appendLine("# 聞き続けるモード（録音キーを短く押す）で、これだけ話さなければ終える秒数（30・60・120。0 なら終えない）")
+            appendLine("$KEY_CONTINUOUS_IDLE=${s.continuousIdleSeconds}")
             appendLine("# 音声入力の確定の文を作るモデル（parakeet・reazon・sensevoice・whisper-small・whisper-kotoba・whisper-turbo）")
             appendLine("$KEY_VOICE_FINAL=${s.voiceFinal}")
             appendLine("# 選んだ変換を覚えて次から先に出す")
@@ -198,6 +208,8 @@ class DesktopStore(val dir: File = defaultDir()) {
             }, now.toggles),
             spokenPunctuation = take(KEY_SPOKEN_PUNCT, { it as? Boolean }, now.spokenPunctuation),
             voiceSounds = take(KEY_VOICE_SOUNDS, { it as? Boolean }, now.voiceSounds),
+            voiceCommands = take(KEY_VOICE_COMMANDS, { it as? Boolean }, now.voiceCommands),
+            continuousIdleSeconds = take(KEY_CONTINUOUS_IDLE, { (it as? Number)?.toInt()?.takeIf { v -> v in CONTINUOUS_IDLES } }, now.continuousIdleSeconds),
             learning = take(KEY_LEARNING, { it as? Boolean }, now.learning),
             voiceFinal = take(KEY_VOICE_FINAL, { v -> (v as? String)?.takeIf { id -> VoiceFinal.entries.any { it.id == id } } }, now.voiceFinal),
         ).let { base ->
@@ -246,6 +258,8 @@ class DesktopStore(val dir: File = defaultDir()) {
             .put(KEY_TRIGGERS, entry("stringSet", org.json.JSONArray(s.toggles.map { it.name }.sorted())))
             .put(KEY_SPOKEN_PUNCT, entry("boolean", s.spokenPunctuation))
             .put(KEY_VOICE_SOUNDS, entry("boolean", s.voiceSounds))
+            .put(KEY_VOICE_COMMANDS, entry("boolean", s.voiceCommands))
+            .put(KEY_CONTINUOUS_IDLE, entry("int", s.continuousIdleSeconds))
             .put(KEY_LEARNING, entry("boolean", s.learning))
             .put(KEY_VOICE_FINAL, entry("string", s.voiceFinal))
         val files = JSONObject()
@@ -289,6 +303,10 @@ class DesktopStore(val dir: File = defaultDir()) {
         fun emojiPrefixOrNull(s: String): String? = s.takeIf { it.length == 1 && EngineSettings.isEmojiPrefix(it[0]) }
         const val KEY_SPOKEN_PUNCT = "spoken_punctuation"
         const val KEY_VOICE_SOUNDS = "voice_sounds"
+        const val KEY_VOICE_COMMANDS = "voice_commands"
+        const val KEY_CONTINUOUS_IDLE = "continuous_idle_seconds"
+        /** 聞き続けるモードの、話さなければ終える秒数の選択肢（Android 版と同じ。0 は終えない） */
+        val CONTINUOUS_IDLES = setOf(0, 30, 60, 120)
         const val KEY_LEARNING = "learning"
         const val KEY_LAST_MODE = "last_japanese"
         const val KEY_VOICE_FINAL = "voice_final"
