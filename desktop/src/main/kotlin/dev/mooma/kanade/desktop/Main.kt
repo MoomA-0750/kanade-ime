@@ -39,6 +39,7 @@ fun main(args: Array<String>) {
                 kanade-engine send [--socket PATH] <キー列>...      動いているエンジンへソケット越しにキー列を流す
                 kanade-engine zenz [--data DIR] <読み>...           zenz を読み、辞書の候補を並べ替えた結果を出す（ネイティブの確認）
                 kanade-engine voice [--data DIR] <wav> | --mic 秒    wav（16kHz モノラル）を文字にする / マイクで録って文字にする（-Dkanade.voiceEnglish=1 で英語）
+                kanade-engine voice [--data DIR] --listen <wav>      聞き続けるモードに wav をマイクの代わりに実時間で流し、区切りごとに入った文を出す
                 kanade-engine import-android <json>                Android 版の設定の書き出しを読み込む
                 キー列: 文字はそのまま、特別なキーは {Space} {Enter} {BS} {Esc} {F7} {Ctrl+Space} {RAlt} {Henkan} など
                 """.trimIndent(),
@@ -186,6 +187,21 @@ private fun voiceCheck(data: File, args: List<String>) {
             val started = System.nanoTime()
             println("$wav: ${reazon.recognize(pcm)} (${(System.nanoTime() - started) / 1_000_000}ms)")
         }
+        return
+    }
+    if (args.firstOrNull() == "--listen") {
+        // 聞き続けるモードを、声を出さずに通しで確かめる（マイクの代わりに wav を実時間で流す）
+        val wav = File(args.getOrNull(1) ?: return println("wav を渡してください"))
+        System.setProperty("kanade.voiceStreamWav", wav.absolutePath)
+        val host = EngineHost(dev.mooma.kanade.core.InputEngine(), voice = voice)
+        val dll = FakeDll.inProcess(host).apply { hello("fcitx5") }
+        dll.send("voice", "toggle", "ja")
+        Thread.sleep((wav.length() - 44) * 1000 / 32_000 + 2000)
+        dll.send("voice", "toggle", "ja")
+        // 最後の区切りの認識を待つ
+        Thread.sleep(args.getOrNull(2)?.toLongOrNull() ?: 10_000)
+        println("入った文: ${dll.document}")
+        dll.received.filter { it[0] == "voiceaction" || it[0] == "voicestate" }.forEach { println(it.joinToString(" ")) }
         return
     }
     if (args.firstOrNull() == "--mic") {
