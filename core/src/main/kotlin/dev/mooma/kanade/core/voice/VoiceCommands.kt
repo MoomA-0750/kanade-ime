@@ -39,6 +39,11 @@ enum class VoiceCommand(val lastOnly: Boolean, vararg val words: String) {
         /** コマンドとして見る区切りの長さ（話している部分） */
         const val MIN_SPEECH_MS = 250
         const val MAX_SPEECH_MS = 2000
+
+        /** 聞き続けるモードのひと区切りが、声のコマンドかもしれないか（話している部分が1つだけで、短い） */
+        fun isCandidate(pcm: FloatArray, sampleRate: Int): Boolean =
+            PauseSplitter.split(pcm, sampleRate, PAUSE_MS, MIN_SPEECH_MS)
+                .let { it.size == 1 && it[0].length * 1000L / sampleRate <= MAX_SPEECH_MS }
     }
 }
 
