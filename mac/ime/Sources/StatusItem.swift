@@ -12,7 +12,14 @@ enum MenuEntries {
 
 final class StatusMenu: NSObject {
     static let shared = StatusMenu()
-    private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    /** 「あ」「A」「か」で幅が変わると、左の項目が動いてしまう。いちばん広い字に合わせて固定する */
+    private let item = NSStatusBar.system.statusItem(withLength: StatusMenu.fixedWidth())
+
+    private static func fixedWidth() -> CGFloat {
+        let font = NSFont.menuBarFont(ofSize: 0)
+        let widest = ["あ", "A", "か"].map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 14
+        return ceil(widest) + 14
+    }
     private let toggleItem = NSMenuItem()
 
     func start() {
@@ -29,6 +36,7 @@ final class StatusMenu: NSObject {
         }
         item.menu = menu
         item.button?.toolTip = "Kanade"
+        item.button?.alignment = .center
         EngineLink.shared.onModeChange = { [weak self] _ in self?.refresh() }
         refresh()
     }
