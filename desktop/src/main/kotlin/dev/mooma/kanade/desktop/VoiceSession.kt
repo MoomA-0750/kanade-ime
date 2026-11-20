@@ -91,6 +91,7 @@ internal class VoiceSession(
                 if (recording == id && state == State.PRESSED) {
                     state = State.HOLD
                     host.voiceEarcon(VoiceEarcon.Kind.START_HOLD)
+                    host.indicate(micLabel())
                 }
             }
         }
@@ -103,6 +104,7 @@ internal class VoiceSession(
             ignoreUp = false
             return
         }
+        if (state == State.PRESSED || state == State.HOLD) host.log("voice: up ${clock() - downAt}ms after start")
         when (state) {
             State.PRESSED -> if (clock() - downAt < TAP_MS) startListening() else stopHold()
             State.HOLD -> stopHold()
@@ -173,6 +175,7 @@ internal class VoiceSession(
         val (commands, started) = begin(c, english)
         if (!started) return commands
         state = State.HOLD
+        host.indicate(micLabel())
         when (cue) {
             "tap" -> host.voiceEarcon(VoiceEarcon.Kind.START_TAP)
             "none" -> {}
@@ -211,7 +214,7 @@ internal class VoiceSession(
         client = c
         this.english = english
         partial = null
-        host.indicate(if (english) "🎤 EN" else "🎤")
+        // 「🎤」は押し方が決まってから出す（Windows の DLL は最初の表示の窓を作るのに 0.3 秒ほどかかり、そのあいだ離したキーが届かず、短く押したのに長押しになるため）
         host.publishVoiceState("hold")
         return commands to true
     }
@@ -222,7 +225,8 @@ internal class VoiceSession(
     private fun onPartial(id: Int, text: String) {
         if (id != recording) return
         when (state) {
-            State.PRESSED, State.HOLD -> host.indicate("🎤 $text")
+            State.HOLD -> host.indicate("🎤 $text")
+            State.PRESSED -> {}
             State.LISTEN -> if (segmenter?.inSpeech == true) {
                 partial = text
                 host.indicate("🎤 $text")
@@ -286,6 +290,8 @@ internal class VoiceSession(
     // ---- 聞き続けるモード ----
 
     private fun listening() = Ui.t("🎤 聞いています", "🎤 Listening")
+
+    private fun micLabel() = if (english) "🎤 EN" else "🎤"
 
     private fun startListening() {
         cancelHoldCue?.invoke()
@@ -384,6 +390,7 @@ internal class VoiceSession(
             VoiceCommand.CLEAR -> Ui.t("全部消す", "Clear")
         }
         host.indicate("🎤 $label", 1500)
+        host.log("voice: command $c")
         when (c) {
             VoiceCommand.SEND -> {
                 // 打っている途中の文字と、待たせていた文を先に入れてから送る
@@ -402,8 +409,9 @@ internal class VoiceSession(
                 action("clear")
             }
             VoiceCommand.UNDO -> {
-                val text = lastVoice ?: return
+                val text = lastVoice ?: return host.log("voice: nothing to undo")
                 lastVoice = null
+                host.log("voice: undo ${text.length} chars (pending ${pending.length})")
                 if (pending.endsWith(text)) {
                     pending.setLength(pending.length - text.length)
                 } else {
@@ -417,7 +425,7 @@ internal class VoiceSession(
 
     /** 声のコマンドの実行をフロントへ頼む（voiceaction <send|next|clear|undo> [消す文]） */
     private fun action(kind: String, text: String? = null) {
-        val target = client ?: return
+        val target = client ?: return host.log("voice: no client for $kind")
         val fields = listOfNotNull("c", "0", "voiceaction", kind, text)
         target.send(listOf(Protocol.encode(fields), Protocol.encode("done", 0, 0)))
     }

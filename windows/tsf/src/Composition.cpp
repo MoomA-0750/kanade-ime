@@ -192,6 +192,7 @@ void TextService::Replace(TfEditCookie ec, ITfContext* context, const std::wstri
 }
 
 void TextService::VoiceEdit(TfEditCookie ec, ITfContext* context, const std::string& kind, const std::wstring& text) {
+    Log("voiceaction %s (%zu)", kind.c_str(), text.size());
     if (kind == "clear") {
         // 文書の頭から終わりまでを空にする
         ComPtr<ITfRange> all, end;
@@ -206,7 +207,10 @@ void TextService::VoiceEdit(TfEditCookie ec, ITfContext* context, const std::str
     // カーソルの前が直前に音声で入れた文なら消す（違えば何もしない）
     TF_SELECTION sel;
     ULONG fetched = 0;
-    if (FAILED(context->GetSelection(ec, TF_DEFAULT_SELECTION, 1, &sel, &fetched)) || fetched != 1) return;
+    if (FAILED(context->GetSelection(ec, TF_DEFAULT_SELECTION, 1, &sel, &fetched)) || fetched != 1) {
+        Log("voiceaction undo: no selection");
+        return;
+    }
     ComPtr<ITfRange> selection;
     selection.Attach(sel.range);
     ComPtr<ITfRange> before;
@@ -214,16 +218,23 @@ void TextService::VoiceEdit(TfEditCookie ec, ITfContext* context, const std::str
     LONG shifted = 0;
     before->Collapse(ec, TF_ANCHOR_START);
     before->ShiftStart(ec, -static_cast<LONG>(text.size()), &shifted, nullptr);
-    if (-shifted != static_cast<LONG>(text.size())) return;
+    if (-shifted != static_cast<LONG>(text.size())) {
+        Log("voiceaction undo: shifted %ld of %zu", -shifted, text.size());
+        return;
+    }
     std::wstring actual(text.size() + 1, L'\0');
     ULONG n = 0;
-    if (FAILED(before->GetText(ec, 0, actual.data(), static_cast<ULONG>(text.size()), &n))) return;
+    if (FAILED(before->GetText(ec, 0, actual.data(), static_cast<ULONG>(text.size()), &n))) {
+        Log("voiceaction undo: GetText failed");
+        return;
+    }
     actual.resize(n);
     if (actual != text) {
         Log("voiceaction undo skipped (text before the caret does not match)");
         return;
     }
-    before->SetText(ec, 0, L"", 0);
+    HRESULT hr = before->SetText(ec, 0, L"", 0);
+    Log("voiceaction undo: SetText %08lx", hr);
     SetSelectionAt(ec, context, before.Get(), TF_ANCHOR_END);
 }
 

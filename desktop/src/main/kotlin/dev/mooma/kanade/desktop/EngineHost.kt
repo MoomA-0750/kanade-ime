@@ -50,6 +50,9 @@ class EngineHost(
     /** 録音キーの押し方と音声入力の回（長押し・聞き続けるモード） */
     private val voiceSession = voice?.let { VoiceSession(this, it, lock, clock, schedule) }
 
+    /** 記録（エンジンの engine.log） */
+    @Volatile var log: (String) -> Unit = {}
+
     /** 鳴らした効果音を知らせる（試験用） */
     @Volatile var earconListener: ((VoiceEarcon.Kind) -> Unit)? = null
 

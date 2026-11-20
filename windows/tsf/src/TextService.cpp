@@ -534,6 +534,7 @@ void TextService::ApplyCommands(ITfContext* context, std::vector<Command> comman
     std::vector<WORD> keys;
     int mode = -1;
     for (auto& c : commands) {
+        if (c[0] == "voiceaction") Log("apply voiceaction %s context=%p", c.size() > 1 ? c[1].c_str() : "", context);
         if (c[0] == "mode") {
             mode = c.size() > 1 && c[1] == "1";
         } else if (c[0] == "voiceaction" && c.size() >= 2 && (c[1] == "send" || c[1] == "next")) {

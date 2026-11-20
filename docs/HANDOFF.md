@@ -42,6 +42,8 @@ Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は�
 - `passwordless-sudo on` は使わない。push は本人の直接の確認のあと
 - 組む Mac の bash は 3.2。ssh では ログインのキーチェーンが開けないので、証明書と資格情報は専用のキーチェーン（~/.kanade-sign）
 - 裏で動かしている作業: なし。cramshell の ~/Downloads に Kanade-mac-aarch64-2026.11.21.0043.pkg（最新。聞き続けるモード入り）
+- Windows の DLL を to-fu で試す: `scripts/win.sh tsf`（Release を付けない。reg は tsf-build を登録する）→ `win.sh reg` → エンジンを `-Dkanade.voiceStreamWav=<wav>` 付きで起こす（`win.sh start` の命令に足して ps で）→ `win.sh type --rich "{f12}{wait}…"`。DLL の記録は %LOCALAPPDATA%\Kanade\tsf-log を作ると出る（試したあと消した）。終わったら `win.sh start` で普段の起動に戻す（戻してある）
+- Windows の通しの確かめ（2026-11-21 夜）: 試験の窓（RichEdit）で F12 短押し→区切りごとに入る・取り消して・次へ・全部消して・止めてを見た
 - to-fu の ssh 越しの System.Speech の音声合成は無音の wav を作る（使えない）。日本語の見本は `ssh mac say -v Kyoko --data-format=LEI16@16000 -o x.wav "..."` で作り、頭の付いた wav から data だけを 44 バイトの頭で書き直す
 - to-fu で本物のモデルを使う: `scripts/win.sh engine` のあと `scripts/win.sh ps "\$env:JAVA_HOME='C:\Program Files\Android\Android Studio\jbr'; \$env:JAVA_OPTS='-Dkanade.voiceFinal=parakeet'; & C:\Users\MoomA\kanade\engine\bin\kanade-engine.bat voice --listen '<wav>'"`
 
