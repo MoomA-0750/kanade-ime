@@ -31,7 +31,7 @@ Kanade（日本語 IME、Android・Windows・Linux・macOS）。Mac 版は署名
 - 効果音を測る: `./gradlew :core:test --rerun-tasks --tests '*VoiceEarconTest' -Pkanade.earconDir=<フォルダ>` → `~/.claude/skills/ui-sound/scripts/measure.sh`
 - `passwordless-sudo on` は使わない。push は本人の直接の確認のあと
 - 組む Mac の bash は 3.2。ssh では ログインのキーチェーンが開けないので、証明書と資格情報は専用のキーチェーン（~/.kanade-sign）
-- 裏で動かしている作業: pkg の組み立て（build3.log）
+- 裏で動かしている作業: なし。cramshell の ~/Downloads に Kanade-mac-aarch64-2026.11.20.2359.pkg（最新。メニューバーの項目・一回押し/長押し・効果音・start_mode・mac_switch_keys を含む）
 
 ## 資料
 - SPEC.md（8-3・8-15・12-2・12-5）、docs/decisions.md（2026-11-20・21）、STATUS.md、Vault の Human/Projects/Kanade.md
