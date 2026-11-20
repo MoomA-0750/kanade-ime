@@ -165,6 +165,23 @@ struct InputPage: View {
                     Text(T("「確かめて直す」は軽く、「並べ替え」は打つたびに CPU を多く使います",
                            "Verify is light; Rerank uses much more CPU on each keystroke"))
                 }
+                Picker(selection: settings.string("start_mode")) {
+                    Text(T("前のまま", "Keep the last mode")).tag("LAST")
+                    Text(T("日本語", "Japanese")).tag("JAPANESE")
+                    Text(T("英字", "English")).tag("ENGLISH")
+                } label: {
+                    Text(T("入力欄に入ったときのモード", "Mode when entering a text field"))
+                    Text(T("入力欄に入るたび（アプリを替えたときも）、日本語か英字から打ち始めます。「前のまま」は最後に使ったモードです",
+                           "Starts in Japanese or English every time you enter a text field (including switching apps). \"Keep the last mode\" uses the mode you used last"))
+                }
+                Picker(selection: settings.string("mac_switch_keys")) {
+                    Text(T("Kanade が受ける", "Kanade handles them")).tag("KANADE")
+                    Text(T("macOS に任せる", "Leave them to macOS")).tag("MACOS")
+                } label: {
+                    Text(T("Control+Space・🌐 キー", "Control+Space and the globe key"))
+                    Text(T("日本語と英字の切り替えを Kanade の中で行います。macOS の入力ソースの切り替えが遅れるときに便利です。「macOS に任せる」にすると、これらのキーは macOS の入力ソースの切り替えに使われます（かな・英数キーは、どちらでも Kanade が受けます）",
+                           "Switches between Japanese and English inside Kanade, which avoids the delay of macOS input source switching. With \"Leave them to macOS\" these keys switch macOS input sources (the Kana and Eisu keys are always handled by Kanade)"))
+                }
                 Toggle(isOn: settings.bool("full_width_symbols")) {
                     Text(T("数字・記号を全角にする", "Full-width numbers and symbols"))
                     Text(T("日本語入力中の数字・記号・大文字を全角で入れます（Space は半角のまま）",

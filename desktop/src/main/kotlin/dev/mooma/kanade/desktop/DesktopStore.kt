@@ -20,6 +20,10 @@ data class DesktopSettings(
     val emojiPrefixTwice: Boolean = false,
     /** zenz の使い方（Android 版と同じ）。CORRECT は1位を確かめて直す（軽い）、RERANK は候補を全部並べ替える（打つたびに重い） */
     val zenzMode: String = "CORRECT",
+    /** 入力欄に入ったとき（IME が働き始めたとき）の始めのモード: LAST（前のまま）・JAPANESE・ENGLISH */
+    val startMode: String = "LAST",
+    /** macOS の版: 日本語⇔英字の Control+Space・🌐 を Kanade が取る（KANADE）か、macOS の入力ソースの切り替えに任せる（MACOS） */
+    val macSwitchKeys: String = "KANADE",
     val toggles: Set<WinToggle> = WinToggle.entries.toSet(),
     /** 入力中の Ctrl のキーの割り当て（PC は Ctrl+U/I/O/P/T、MAC は Ctrl+J/K/L/;）。既定は macOS なら MAC */
     val keyStyle: KeyStyle = KeyStyle.DEFAULT,
@@ -79,6 +83,8 @@ class DesktopStore(val dir: File = defaultDir()) {
             emojiPrefix = p.getProperty(KEY_EMOJI_PREFIX)?.trim()?.let(::emojiPrefixOrNull) ?: d.emojiPrefix,
             emojiPrefixTwice = bool(KEY_EMOJI_TWICE, d.emojiPrefixTwice),
             zenzMode = p.getProperty(KEY_ZENZ_MODE)?.trim()?.uppercase()?.takeIf { it in ZENZ_MODES } ?: d.zenzMode,
+            startMode = p.getProperty(KEY_START_MODE)?.trim()?.uppercase()?.takeIf { it in START_MODES } ?: d.startMode,
+            macSwitchKeys = p.getProperty(KEY_MAC_SWITCH_KEYS)?.trim()?.uppercase()?.takeIf { it in MAC_SWITCH_KEYS } ?: d.macSwitchKeys,
             toggles = p.getProperty(KEY_TRIGGERS)?.split(',')?.mapNotNull { name -> WinToggle.entries.find { it.name == name.trim() } }?.toSet()
                 ?: d.toggles,
             keyStyle = p.getProperty(KEY_KEY_STYLE)?.trim()?.uppercase()?.let { v -> KeyStyle.entries.find { it.name == v } } ?: d.keyStyle,
@@ -113,6 +119,8 @@ class DesktopStore(val dir: File = defaultDir()) {
             appendLine("$KEY_EMOJI_TWICE=${s.emojiPrefixTwice}")
             appendLine("# zenz の使い方（CORRECT は1位を確かめて直す・軽い、RERANK は候補を全部並べ替える・打つたびに重い）")
             appendLine("$KEY_ZENZ_MODE=${s.zenzMode}")
+            appendLine("$KEY_START_MODE=${s.startMode}")
+            appendLine("$KEY_MAC_SWITCH_KEYS=${s.macSwitchKeys}")
             appendLine("# 日本語のオン/オフに使うキー（RIGHT_ALT_TAP・CTRL_SPACE・F13 をカンマ区切りで。変換/無変換・半角/全角はいつでも使える）")
             appendLine("$KEY_TRIGGERS=${s.toggles.joinToString(",") { it.name }}")
             appendLine("# 入力中の Ctrl のキー（PC は Ctrl+U/I/O/P/T でひらがな・カタカナ・半角カナ・全角英数・半角英数、MAC は macOS と同じ Ctrl+J/K/L/; でひらがな・カタカナ・全角英字・半角英字。F6〜F10 はどちらでも使える）")
@@ -183,6 +191,8 @@ class DesktopStore(val dir: File = defaultDir()) {
             emojiPrefix = take(KEY_EMOJI_PREFIX, { (it as? String)?.let(::emojiPrefixOrNull) }, now.emojiPrefix),
             emojiPrefixTwice = take(KEY_EMOJI_TWICE, { it as? Boolean }, now.emojiPrefixTwice),
             zenzMode = take(KEY_ZENZ_MODE, { (it as? String)?.takeIf { m -> m in ZENZ_MODES } }, now.zenzMode),
+            startMode = take(KEY_START_MODE, { (it as? String)?.takeIf { m -> m in START_MODES } }, now.startMode),
+            macSwitchKeys = take(KEY_MAC_SWITCH_KEYS, { (it as? String)?.takeIf { m -> m in MAC_SWITCH_KEYS } }, now.macSwitchKeys),
             toggles = take(KEY_TRIGGERS, { v ->
                 (v as? org.json.JSONArray)?.let { arr -> (0 until arr.length()).mapNotNull { i -> WinToggle.entries.find { it.name == arr.getString(i) } }.toSet() }
             }, now.toggles),
@@ -231,6 +241,8 @@ class DesktopStore(val dir: File = defaultDir()) {
             .put(KEY_EMOJI_PREFIX, entry("string", s.emojiPrefix))
             .put(KEY_EMOJI_TWICE, entry("boolean", s.emojiPrefixTwice))
             .put(KEY_ZENZ_MODE, entry("string", s.zenzMode))
+            .put(KEY_START_MODE, entry("string", s.startMode))
+            .put(KEY_MAC_SWITCH_KEYS, entry("string", s.macSwitchKeys))
             .put(KEY_TRIGGERS, entry("stringSet", org.json.JSONArray(s.toggles.map { it.name }.sorted())))
             .put(KEY_SPOKEN_PUNCT, entry("boolean", s.spokenPunctuation))
             .put(KEY_VOICE_SOUNDS, entry("boolean", s.voiceSounds))
@@ -268,6 +280,10 @@ class DesktopStore(val dir: File = defaultDir()) {
         const val KEY_EMOJI_TWICE = "emoji_prefix_twice"
         const val KEY_ZENZ_MODE = "zenz_mode"
         val ZENZ_MODES = setOf("CORRECT", "RERANK")
+        const val KEY_START_MODE = "start_mode"
+        val START_MODES = setOf("LAST", "JAPANESE", "ENGLISH")
+        const val KEY_MAC_SWITCH_KEYS = "mac_switch_keys"
+        val MAC_SWITCH_KEYS = setOf("KANADE", "MACOS")
 
         /** 入り口の文字として使える1文字なら、その文字 */
         fun emojiPrefixOrNull(s: String): String? = s.takeIf { it.length == 1 && EngineSettings.isEmojiPrefix(it[0]) }

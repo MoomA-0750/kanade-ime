@@ -100,7 +100,13 @@ class EngineHost(
             "focus" -> synchronized(lock) {
                 if (f.getOrNull(1) == "1") {
                     activate(client)
-                    client.send(reply(0, listOf(ImeCommand.ModeChanged(engine.japanese)), false))
+                    // 入力欄に入るたびに、設定の始めのモード（日本語・英字）にそろえる（LAST は前のまま）
+                    val want = when (startMode) { "JAPANESE" -> true; "ENGLISH" -> false; else -> null }
+                    if (want != null && engine.japanese != want) {
+                        client.send(reply(0, run(engine.handle(KeyInput.SetJapanese(want)).commands), false))
+                    } else {
+                        client.send(reply(0, listOf(ImeCommand.ModeChanged(engine.japanese)), false))
+                    }
                 }
             }
             // 候補の窓で候補をクリックした（数字キーと同じ）。結果はこの DLL へ自分から送る
@@ -210,7 +216,18 @@ class EngineHost(
             fcitxClients.forEach { it.send(voiceKeysLines()) }
         }
 
-    private fun voiceKeysLines() = listOf(Protocol.encode("c", "0", "voicekeys", voiceKeys.first, voiceKeys.second), Protocol.encode("done", 0, 0))
+    /** 入力欄に入ったときの始めのモード（LAST・JAPANESE・ENGLISH）。設定の start_mode */
+    @Volatile var startMode: String = "LAST"
+
+    /** macOS の版: 日本語⇔英字の Control+Space・🌐 を Kanade が取るか（KANADE）、macOS に任せるか（MACOS）。録音キーと一緒に macOS の入力方式へ教える */
+    var macSwitchKeys: String = "KANADE"
+        set(value) = synchronized(lock) {
+            if (field == value) return
+            field = value
+            fcitxClients.forEach { it.send(voiceKeysLines()) }
+        }
+
+    private fun voiceKeysLines() = listOf(Protocol.encode("c", "0", "voicekeys", voiceKeys.first, voiceKeys.second, macSwitchKeys), Protocol.encode("done", 0, 0))
 
     /** 録音キー（Windows の DLL から F12 がキーとして届く）: 押したら録音を始め、離したら文字にする */
     private fun voiceKey(client: Client, id: Int, key: WinKey): List<String> {

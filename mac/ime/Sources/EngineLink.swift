@@ -30,7 +30,7 @@ final class EngineLink {
     /** モードが変わった（メニューバーの項目を映す） */
     var onModeChange: ((Bool) -> Void)?
     /** 録音キーの設定が届いた（つないだときと、設定を変えたとき） */
-    var onVoiceKeys: ((String, String) -> Void)?
+    var onVoiceKeys: ((String, String, String) -> Void)?
     /** つながった・切れた */
     var onConnected: (() -> Void)?
 
@@ -193,7 +193,7 @@ final class EngineLink {
     private func onLine(_ line: String) {
         let f = Wire.decode(line)
         if f[0] == "c", f.count >= 5, f[2] == "voicekeys" {
-            onVoiceKeys?(f[3], f[4])
+            onVoiceKeys?(f[3], f[4], f.count >= 6 ? f[5] : "KANADE")
         } else if f[0] == "c", f.count >= 3 {
             pending[Int(f[1]) ?? 0, default: []].append(Array(f[2...]))
         } else if f[0] == "done", f.count >= 3 {

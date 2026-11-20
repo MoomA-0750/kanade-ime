@@ -56,7 +56,7 @@ app.setActivationPolicy(.accessory)
 StatusMenu.shared.start()
 let voice = VoiceInput()
 EngineLink.shared.fallback = voice
-EngineLink.shared.onVoiceKeys = { hold, toggle in voice.setKeys(hold: hold, toggle: toggle) }
+EngineLink.shared.onVoiceKeys = { hold, toggle, switchKeys in voice.setKeys(hold: hold, toggle: toggle, switchKeys: switchKeys) }
 voice.start()
 // 録音キーの設定をもらうため、起動のあとでつなぐ（エンジンが動いていなければ起こし、少し待ってつなぎ直す）
 var connectTries = 0

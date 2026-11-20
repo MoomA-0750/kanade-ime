@@ -20,7 +20,11 @@ final class VoiceInput: CommandTarget {
     /** これより短く押して離したら一回押し、押し続けたら長押し */
     private static let tapSeconds = 0.3
 
-    func setKeys(hold: String, toggle: String) {
+    /** 日本語⇔英字の Control+Space・🌐 を Kanade が取るか（設定の mac_switch_keys が KANADE）。MACOS なら macOS の入力ソースの切り替えに任せる */
+    private var takeSwitchKeys = true
+
+    func setKeys(hold: String, toggle: String, switchKeys: String) {
+        takeSwitchKeys = switchKeys != "MACOS"
         holdKeys = hold.split(separator: ",").compactMap { KeyMap.names[String($0)] }
         toggleKey = toggle.isEmpty ? nil : KeyMap.combo(toggle)
         klog("voice keys: hold=\(hold) toggle=\(toggle)")
@@ -84,7 +88,7 @@ final class VoiceInput: CommandTarget {
     /** Control+Space と 🌐 キー（ほかのキーと一緒でなく単独で押して離したとき）を、エンジンの Ctrl+Space（日本語⇔英字）として渡す。使ったら true */
     private func switchKey(_ type: CGEventType, _ code: Int, _ flags: CGEventFlags) -> Bool {
         let link = EngineLink.shared
-        guard link.target != nil, link.connected else { return false }
+        guard takeSwitchKeys, link.target != nil, link.connected else { return false }
         func toggle() {
             let k = (vk: VK.space, ch: 0x20, mods: 2)
             for phase in ["d", "u"] {

@@ -64,6 +64,8 @@ class DesktopApp(
         host.earcons?.enabled = s.voiceSounds
         voice?.finalModel = VoiceFinal.of(s.voiceFinal)
         voice?.finalModelEn = VoiceFinal.english(s.voiceFinalEn)
+        host.startMode = s.startMode
+        host.macSwitchKeys = s.macSwitchKeys
         host.voiceKeys = s.voiceHoldKeys to s.voiceToggleKey
         log(if (first) "設定を読んだ" else "設定を読み直した")
     }

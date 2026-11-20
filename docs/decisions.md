@@ -642,3 +642,10 @@ SPEC.md の未決事項に本人が答えた。
 - 入力方式のアプリ（Kanade.app）に NSStatusItem を持たせ、今のモードを「あ」「A」で見せる。モードは EngineLink の `japanese`（エンジンからの `mode` 命令で更新。Kanade が選ばれていないときも覚える）を見て映す。Kanade が選ばれていないあいだは薄くする。メニューは入力メニューと同じ項目（`MenuEntries`）に、モードの切り替えを足した。
 - 入力ソースの印と2つ並ぶ。出したくない人のための設定は、まだ付けていない（要望が出たら `settings.properties` に足す）。
 
+## 2026-11-21 入力欄に入ったときの始めのモード（全部の版）と、Mac の切り替えキーの持ち主の選択
+
+- 本人の要望。① 入力欄に入ってIMEが働き始めたとき、必ず英字か日本語から打ち始める設定。② 日本語⇔英字の切り替えを Kanade が持つか macOS に任せるかを選べる設定。
+- ①は `start_mode`（LAST・JAPANESE・ENGLISH、既定 LAST）。PC の版はエンジンが `focus` のたびに適用する（EngineHost）ので、Windows・Linux・macOS で同じ。Android は入力欄に入った所（onStartInputView）で適用する。LAST のときの「前のまま」は、これまでの `last_japanese`（再起動をまたいで覚える）と同じ。
+- ②は `mac_switch_keys`（KANADE・MACOS、既定 KANADE）。「macOS に任せる」の意味は、Control+Space と 🌐 を CGEventTap で先に取らず、macOS の入力ソースの切り替えに使わせること。入力モードは Info.plist で静的に1つだけ登録しているので、「2モードを登録して macOS のモード切り替えで日本語⇔英字を行き来する」形（2026-11-18 の版）は、実行中には切り替えられず、この設定では戻らない。それが要るなら、モードを2つ登録した別の版にする必要がある（要望が出たら考える）。
+- 値の伝え方: エンジンが録音キーと一緒に macOS の入力方式へ送る `voicekeys` の行に 3 つ目として `mac_switch_keys` を足した（fcitx5 のアドオンは 3 つ目を無視する）。
+
