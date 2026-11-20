@@ -76,7 +76,8 @@ fi
 SIGN_ID=${KANADE_SIGN_ID:-}
 SIGN_KC=()
 if [ -z "$SIGN_ID" ] && [ -f "$LOCAL_KC" ]; then
-  SIGN_ID=$(security find-identity -v -p codesigning "$LOCAL_KC" 2>/dev/null | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1)
+  # 名前でなく指紋（SHA-1）で指す。ssh では LANG が無く、codesign が日本語の名前を読み違えて「no identity found」になるため
+  SIGN_ID=$(security find-identity -v -p codesigning "$LOCAL_KC" 2>/dev/null | sed -n 's/.*) \([0-9A-F]\{40\}\) "Developer ID Application: .*/\1/p' | head -1)
   [ -n "$SIGN_ID" ] && SIGN_KC=(--keychain "$LOCAL_KC")
 fi
 if [ -z "$SIGN_ID" ]; then
@@ -157,7 +158,7 @@ sed -e "s/@ARCH@/$HOST_ARCH/" -e "s/@VERSION@/$PKG_VERSION/" mac/pkg/distributio
 INSTALLER_ID=${KANADE_INSTALLER_ID:-}
 INSTALLER_KC=()
 if [ -z "$INSTALLER_ID" ] && [ -f "$LOCAL_KC" ]; then
-  INSTALLER_ID=$(security find-identity -v "$LOCAL_KC" 2>/dev/null | sed -n 's/.*"\(Developer ID Installer: [^"]*\)".*/\1/p' | head -1)
+  INSTALLER_ID=$(security find-identity -v "$LOCAL_KC" 2>/dev/null | sed -n 's/.*) \([0-9A-F]\{40\}\) "Developer ID Installer: .*/\1/p' | head -1)
   [ -n "$INSTALLER_ID" ] && INSTALLER_KC=(--keychain "$LOCAL_KC")
 fi
 [ -z "$INSTALLER_ID" ] && INSTALLER_ID=$(security find-identity -v 2>/dev/null | sed -n 's/.*"\(Developer ID Installer: [^"]*\)".*/\1/p' | head -1)
