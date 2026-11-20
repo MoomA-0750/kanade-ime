@@ -108,6 +108,8 @@ final class KanadeInputController: IMKInputController, CommandTarget {
                 Panels.indicator.hide()
             case "replace" where c.count >= 4:
                 replaceBeforeCursor(client, c[1], c[2], c[3])
+            case "voiceaction" where c.count >= 2:
+                voiceAction(client, c[1], c.count >= 3 ? c[2] : "")
             default:
                 break
             }
@@ -199,6 +201,24 @@ final class KanadeInputController: IMKInputController, CommandTarget {
             }
         }
         client.insertText(typedText, replacementRange: NSRange(location: NSNotFound, length: 0))
+    }
+
+    /** 声のコマンド: send は Return、next は Tab、clear は入力欄の文字を全部消す、undo はカーソルの前が [text] なら消す */
+    private func voiceAction(_ client: any IMKTextInput & NSObjectProtocol, _ kind: String, _ text: String) {
+        switch kind {
+        case "send": VoiceInput.postKey(kVK_Return)
+        case "next": VoiceInput.postKey(kVK_Tab)
+        case "clear":
+            let total = client.length()
+            if total > 0 { client.insertText("", replacementRange: NSRange(location: 0, length: total)) }
+        case "undo":
+            let sel = client.selectedRange()
+            let n = (text as NSString).length
+            guard n > 0, sel.location != NSNotFound, sel.length == 0, sel.location >= n else { return }
+            let r = NSRange(location: sel.location - n, length: n)
+            if client.attributedSubstring(from: r)?.string == text { client.insertText("", replacementRange: r) }
+        default: break
+        }
     }
 
     private func commitAll() {

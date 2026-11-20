@@ -31,6 +31,8 @@ final class EngineLink {
     var onModeChange: ((Bool) -> Void)?
     /** 録音キーの設定が届いた（つないだときと、設定を変えたとき） */
     var onVoiceKeys: ((String, String, String) -> Void)?
+    /** 音声入力の様子（off・hold・listen）が届いた。エンジンが自分で終えることがあるので、これで Esc を取るかを決める */
+    var onVoiceState: ((String) -> Void)?
     /** つながった・切れた */
     var onConnected: (() -> Void)?
 
@@ -194,6 +196,8 @@ final class EngineLink {
         let f = Wire.decode(line)
         if f[0] == "c", f.count >= 5, f[2] == "voicekeys" {
             onVoiceKeys?(f[3], f[4], f.count >= 6 ? f[5] : "KANADE")
+        } else if f[0] == "c", f.count >= 4, f[2] == "voicestate" {
+            onVoiceState?(f[3])
         } else if f[0] == "c", f.count >= 3 {
             pending[Int(f[1]) ?? 0, default: []].append(Array(f[2...]))
         } else if f[0] == "done", f.count >= 3 {

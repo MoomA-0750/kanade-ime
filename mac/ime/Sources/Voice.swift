@@ -1,5 +1,5 @@
 // 入力方式に関わらない音声入力。システム全体のキーを見て（CGEventTap。アクセシビリティの許可が要る）、
-// 録音キーを押している間だけ録音する。Kanade のときは日本語、ほかの入力方式のときは英語のモデルで文字にする（エンジンが選ぶ）。
+// 録音キーを押した・離したをエンジンへ送る。押し方の判定はエンジン（長押しは押している間だけ録音、短く押すと聞き続けるモード）。Kanade のときは日本語、ほかの入力方式のときは英語のモデルで文字にする（エンジンが選ぶ）。
 // Kanade が選ばれていないときの確定は、ここ（[apply]）で前のアプリへ書く
 import AppKit
 import ApplicationServices
@@ -7,18 +7,56 @@ import AVFoundation
 import Carbon.HIToolbox
 
 final class VoiceInput: CommandTarget {
-    private enum Mode { case none, hold, toggle }
-
     private var holdKeys: [Int] = [kVK_F12, kVK_RightOption]
     private var toggleKey: (Int, CGEventFlags)? = (kVK_Space, [.maskControl, .maskAlternate])
-    private var mode = Mode.none
-    private var started = Date.distantPast
+    /** エンジンが知らせる音声入力の様子（off・hold・listen） */
+    private var state = "off"
     private var down = Set<Int>()
     private var tap: CFMachPort?
     private var retry: Timer?
-    private var cueTimer: Timer?
-    /** これより短く押して離したら一回押し、押し続けたら長押し */
-    private static let tapSeconds = 0.3
+    /** 聞き続けるモードのあいだ、入力欄が替わったかを見る（Kanade が選ばれていないときは知らせが無いため） */
+    private var focusTimer: Timer?
+    private var focusedElement: AXUIElement?
+    private var focusedApp: pid_t = 0
+
+    /** エンジンからの音声入力の様子 */
+    func setState(_ s: String) {
+        state = s
+        if s == "listen" { watchFocus() } else { stopWatchingFocus() }
+    }
+
+    private func watchFocus() {
+        guard focusTimer == nil else { return }
+        (focusedElement, focusedApp) = Self.focus()
+        focusTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            guard let self, self.state == "listen" else { return }
+            let (element, app) = Self.focus()
+            var moved = app != self.focusedApp
+            if let a = element, let b = self.focusedElement, !CFEqual(a, b) { moved = true }
+            if moved {
+                klog("voice: focus moved; stop listening")
+                EngineLink.shared.send(["voice", "blur"])
+                self.stopWatchingFocus()
+            }
+        }
+    }
+
+    private func stopWatchingFocus() {
+        focusTimer?.invalidate()
+        focusTimer = nil
+        focusedElement = nil
+    }
+
+    /** いまフォーカスのある要素（アクセシビリティで取れなければ nil）と前面のアプリ */
+    private static func focus() -> (AXUIElement?, pid_t) {
+        let app = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
+        var focused: CFTypeRef?
+        let system = AXUIElementCreateSystemWide()
+        guard AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &focused) == .success, let el = focused else {
+            return (nil, app)
+        }
+        return ((el as! AXUIElement), app)
+    }
 
     /** 日本語⇔英字の Control+Space・🌐 を Kanade が取るか（設定の mac_switch_keys が KANADE）。MACOS なら macOS の入力ソースの切り替えに任せる */
     private var takeSwitchKeys = true
@@ -124,25 +162,16 @@ final class VoiceInput: CommandTarget {
         if release {
             // 押したときに使ったキーは、離したときも使う（アプリへ片方だけ届かないように）
             guard down.remove(code) != nil else { return false }
-            if mode == .hold && holdKeys.contains(code) {
-                cueTimer?.invalidate()
-                if Date().timeIntervalSince(started) < Self.tapSeconds {
-                    // 短く押して離した（一回押し）: 録音を続け、もう一度押すと終える（Android と同じ）
-                    mode = .toggle
-                    link.send(["voice", "cue", "tap"])
-                } else {
-                    link.send(["voice", "stop"])
-                    mode = .none
-                }
-            }
+            if holdKeys.contains(code) { link.send(["voice", "up"]) }
             return true
         }
         let wasDown = down.contains(code)
-        if mode != .none && code == kVK_Escape {
+        // 録音中・聞き続けるモード中の Esc（エンジンが知らせる様子で決める）
+        if state != "off" && code == kVK_Escape {
             down.insert(code)
-            cueTimer?.invalidate()
             link.send(["voice", "cancel"])
-            mode = .none
+            state = "off"
+            stopWatchingFocus()
             return true
         }
         let hold = holdKeys.contains(code)
@@ -153,29 +182,16 @@ final class VoiceInput: CommandTarget {
         if hold && KeyMap.modifierFlag[code] != nil && mods.subtracting(KeyMap.modifierFlag[code]!) != [] { return false }
         down.insert(code)
         if wasDown || repeatKey { return true }
-        if mode != .none {
-            // 録音中にもう一度押したら終える（トグルのキーで始めたとき。押しているキーでは離したときに終える）
-            if toggle || mode == .toggle {
-                link.send(["voice", "stop"])
-                mode = .none
+        if state == "off" {
+            guard link.ensureConnected() else {
+                showIndicator(L.t("Kanade を起動しています…", "Starting Kanade…"), ms: 2000)
+                return true
             }
-            return true
+            // エンジンの知らせ（voicestate）が届くまでの Esc にも備える
+            state = hold ? "hold" : "listen"
         }
-        guard link.ensureConnected() else {
-            showIndicator(L.t("Kanade を起動しています…", "Starting Kanade…"), ms: 2000)
-            return true
-        }
-        let kanade = link.target != nil
-        mode = hold ? .hold : .toggle
-        started = Date()
-        // 始めの音は押し方が分かってから鳴らす（押し続けているなら長押し、短く離したら一回押し）。聞き始める録音そのものはすぐ始める
-        link.send(["voice", "start", kanade ? "ja" : "en", hold ? "none" : "tap"])
-        if hold {
-            cueTimer?.invalidate()
-            cueTimer = Timer.scheduledTimer(withTimeInterval: Self.tapSeconds, repeats: false) { [weak self] _ in
-                if self?.mode == .hold { EngineLink.shared.send(["voice", "cue", "hold"]) }
-            }
-        }
+        // 押し方（短く押したら聞き続けるモード）・始めの音・終わりはエンジンが決める
+        link.send(["voice", hold ? "down" : "toggle", link.target != nil ? "ja" : "en"])
         return true
     }
 
@@ -187,12 +203,60 @@ final class VoiceInput: CommandTarget {
             case "commit" where c.count >= 2: type(c[1])
             case "indicator" where c.count >= 2: showIndicator(c[1], ms: c.count >= 3 ? Int(c[2]) ?? 0 : 0)
             case "hideindicator": Panels.indicator.hide()
+            case "voiceaction" where c.count >= 2: voiceAction(c[1], c.count >= 3 ? c[2] : "")
             default: break
             }
         }
     }
 
     private static let marker: Int64 = 0x4B414E41 // "KANA"
+
+    /** キーを1回押して離す（声のコマンド。自分のタップでは見ないよう印を付ける） */
+    static func postKey(_ code: Int, flags: CGEventFlags = [], times: Int = 1) {
+        for _ in 0..<times {
+            for keyDown in [true, false] {
+                guard let e = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(code), keyDown: keyDown) else { continue }
+                e.flags = flags
+                e.setIntegerValueField(.eventSourceUserData, value: marker)
+                e.post(tap: .cgSessionEventTap)
+            }
+        }
+    }
+
+    /**
+     * 声のコマンド（Kanade が選ばれていないとき）: send は Return、next は Tab、clear は Command+A と Delete、
+     * undo はアクセシビリティで欄の文とカーソルを読み、カーソルの前が [text] なら Delete を文字数ぶん（読めなければ何もしない）
+     */
+    private func voiceAction(_ kind: String, _ text: String) {
+        switch kind {
+        case "send": Self.postKey(kVK_Return)
+        case "next": Self.postKey(kVK_Tab)
+        case "clear":
+            Self.postKey(kVK_ANSI_A, flags: .maskCommand)
+            Self.postKey(kVK_Delete)
+        case "undo":
+            guard !text.isEmpty, Self.textBeforeCaret(length: (text as NSString).length) == text else {
+                klog("voice: undo skipped (text before the caret does not match)")
+                return
+            }
+            Self.postKey(kVK_Delete, times: text.count)
+        default: break
+        }
+    }
+
+    /** いまの入力欄の、カーソルの前の [length] 文字（UTF-16）。読めなければ nil */
+    private static func textBeforeCaret(length: Int) -> String? {
+        guard let el = focus().0 else { return nil }
+        var value: CFTypeRef?
+        var range: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(el, kAXValueAttribute as CFString, &value) == .success, let text = value as? String,
+              AXUIElementCopyAttributeValue(el, kAXSelectedTextRangeAttribute as CFString, &range) == .success, let r = range else { return nil }
+        var sel = CFRange()
+        guard AXValueGetValue(r as! AXValue, .cfRange, &sel), sel.length == 0, sel.location >= length else { return nil }
+        let ns = text as NSString
+        guard sel.location <= ns.length else { return nil }
+        return ns.substring(with: NSRange(location: sel.location - length, length: length))
+    }
 
     /** 前のアプリへ文字を書く。いまの入力ソースがキー配列（ABC など）なら文字のキーとして、ほかの入力方式ならペーストで */
     private func type(_ text: String) {
