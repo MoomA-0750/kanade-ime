@@ -426,6 +426,17 @@ void TextService::Resend(WPARAM wParam, LPARAM lParam) {
     SendInput(2, in, sizeof(INPUT));
 }
 
+void TextService::PressKey(WORD vk) {
+    INPUT in[2] = {};
+    for (int i = 0; i < 2; i++) {
+        in[i].type = INPUT_KEYBOARD;
+        in[i].ki.wVk = vk;
+        in[i].ki.wScan = static_cast<WORD>(MapVirtualKeyW(vk, MAPVK_VK_TO_VSC));
+        in[i].ki.dwFlags = i == 1 ? KEYEVENTF_KEYUP : 0;
+    }
+    SendInput(2, in, sizeof(INPUT));
+}
+
 void TextService::SendContext(ITfContext* context) {
     std::wstring left, right;
     EditSync(context, TF_ES_READ, [&](TfEditCookie ec) {
@@ -520,10 +531,14 @@ void TextService::ApplyCommands(ITfContext* context, std::vector<Command> comman
     // 文字は編集セッションで書き、モードはそのあとで切り替える。先に切り替えると、IMM のアプリ（EDIT など）では
     // 入力中の文字をシステムが確定させ、そのあとの確定と2重になる
     std::vector<Command> edits, ui;
+    std::vector<WORD> keys;
     int mode = -1;
     for (auto& c : commands) {
         if (c[0] == "mode") {
             mode = c.size() > 1 && c[1] == "1";
+        } else if (c[0] == "voiceaction" && c.size() >= 2 && (c[1] == "send" || c[1] == "next")) {
+            // 声のコマンドの送信・次の欄は、書いたあとにキーとして送る（アプリの送信・次の欄への移動が動くように）
+            keys.push_back(c[1] == "send" ? VK_RETURN : VK_TAB);
         } else if (c[0] == "cands" || c[0] == "hidecands" || c[0] == "indicator" || c[0] == "hideindicator") {
             ui.push_back(std::move(c));
         } else {
@@ -533,10 +548,12 @@ void TextService::ApplyCommands(ITfContext* context, std::vector<Command> comman
     struct ModeAfter {
         TextService* self;
         int mode;
+        std::vector<WORD> keys;
         ~ModeAfter() {
             if (mode >= 0) self->SetMode(mode == 1);
+            for (WORD vk : keys) PressKey(vk);
         }
-    } modeAfter{this, mode};
+    } modeAfter{this, mode, keys};
     if (edits.empty() || !context) {
         // 窓だけのもの（音声入力の様子など）。入力中でなければ、カーソルの位置を取ってから出す
         if (!ui.empty()) {

@@ -71,6 +71,8 @@ void TextService::ApplyInSession(TfEditCookie ec, ITfContext* context, const std
             Commit(ec, context, FromUtf8(c[1]));
         } else if (type == "replace" && c.size() >= 4) {
             Replace(ec, context, FromUtf8(c[1]), FromUtf8(c[2]), FromUtf8(c[3]));
+        } else if (type == "voiceaction" && c.size() >= 2) {
+            VoiceEdit(ec, context, c[1], c.size() >= 3 ? FromUtf8(c[2]) : std::wstring());
         }
     }
     if (composition_) UpdateCaret(ec, compositionContext_ ? compositionContext_.Get() : context);
@@ -187,6 +189,42 @@ void TextService::Replace(TfEditCookie ec, ITfContext* context, const std::wstri
         }
     }
     Commit(ec, context, typed);
+}
+
+void TextService::VoiceEdit(TfEditCookie ec, ITfContext* context, const std::string& kind, const std::wstring& text) {
+    if (kind == "clear") {
+        // 文書の頭から終わりまでを空にする
+        ComPtr<ITfRange> all, end;
+        if (FAILED(context->GetStart(ec, &all)) || FAILED(context->GetEnd(ec, &end))) return;
+        if (FAILED(all->ShiftEndToRange(ec, end.Get(), TF_ANCHOR_END))) return;
+        HRESULT hr = all->SetText(ec, 0, L"", 0);
+        if (FAILED(hr)) Log("voiceaction clear failed %08lx", hr);
+        else SetSelectionAt(ec, context, all.Get(), TF_ANCHOR_END);
+        return;
+    }
+    if (kind != "undo" || text.empty()) return;
+    // カーソルの前が直前に音声で入れた文なら消す（違えば何もしない）
+    TF_SELECTION sel;
+    ULONG fetched = 0;
+    if (FAILED(context->GetSelection(ec, TF_DEFAULT_SELECTION, 1, &sel, &fetched)) || fetched != 1) return;
+    ComPtr<ITfRange> selection;
+    selection.Attach(sel.range);
+    ComPtr<ITfRange> before;
+    if (FAILED(selection->Clone(&before))) return;
+    LONG shifted = 0;
+    before->Collapse(ec, TF_ANCHOR_START);
+    before->ShiftStart(ec, -static_cast<LONG>(text.size()), &shifted, nullptr);
+    if (-shifted != static_cast<LONG>(text.size())) return;
+    std::wstring actual(text.size() + 1, L'\0');
+    ULONG n = 0;
+    if (FAILED(before->GetText(ec, 0, actual.data(), static_cast<ULONG>(text.size()), &n))) return;
+    actual.resize(n);
+    if (actual != text) {
+        Log("voiceaction undo skipped (text before the caret does not match)");
+        return;
+    }
+    before->SetText(ec, 0, L"", 0);
+    SetSelectionAt(ec, context, before.Get(), TF_ANCHOR_END);
 }
 
 void TextService::EndComposition(TfEditCookie ec) {

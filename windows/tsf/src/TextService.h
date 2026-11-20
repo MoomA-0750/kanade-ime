@@ -87,6 +87,8 @@ private:
     void EndCompositionLater();
     static bool IsTransitory(ITfContext* context);
     static void Resend(WPARAM wParam, LPARAM lParam);
+    // 声のコマンドの送信・次の欄（Enter・Tab を押して離す）
+    static void PressKey(WORD vk);
     void HandleKey(ITfContext* context, WPARAM wParam, LPARAM lParam, bool down, BOOL* eaten);
     void SendContext(ITfContext* context);
     void UpdateSelectionRect(ITfContext* context);
@@ -118,6 +120,8 @@ private:
     void Commit(TfEditCookie ec, ITfContext* context, const std::wstring& text);
     void Replace(TfEditCookie ec, ITfContext* context, const std::wstring& expected, const std::wstring& typed,
                  const std::wstring& replacement);
+    // 声のコマンドの「全部消して」「取り消して」（Composition.cpp）
+    void VoiceEdit(TfEditCookie ec, ITfContext* context, const std::string& kind, const std::wstring& text);
     void EndComposition(TfEditCookie ec);
     void UpdateCaret(TfEditCookie ec, ITfContext* context);
     static void SetSelectionAt(TfEditCookie ec, ITfContext* context, ITfRange* range, TfAnchor anchor);
