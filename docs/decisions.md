@@ -616,3 +616,4 @@ SPEC.md の未決事項に本人が答えた。
 - 組み立ては ssh から走らせるので、ログインのキーチェーンにある鍵は使えない。codesign は errSecInternalComponent、notarytool は keychainLocked で失敗する。そこで、自己署名の証明書用に作ってある専用のキーチェーン（`~/.kanade-sign`、パスワードはファイル）に Developer ID も入れる。build.sh は専用のキーチェーンを先に探し、codesign・productbuild・notarytool に `--keychain` を渡す。ログインのキーチェーンにあれば、それも使う（画面から組むとき）。
 - 鍵は Xcode では作らない。Xcode で作るとログインのキーチェーンに入り、ssh からは書き出せないため。`scripts/mac-devid.sh csr` が組む Mac で鍵と CSR を作り、本人が developer.apple.com で CSR を上げて .cer を落とす（iPhone の Safari からでもできる）。`import` で専用のキーチェーンへ入れ、鍵のファイルは消す。
 - Mac の bash は 3.2 で、`set -u` の下で空の配列を `"${a[@]}"` と展開すると unbound variable で止まる。そのため `${a[@]+"${a[@]}"}` と書く。
+- 2026-11-20: 本人が developer.apple.com で CSR から Developer ID Application・Installer を作り（Installer は一度使った CSR を拒まれ、作り直した）、公証の資格情報を専用のキーチェーンに `store-credentials kanade --keychain …` で作った。2026.11.20.1527 を Developer ID で署名し、公証は Accepted（指摘なし）。staple 済み。隔離の印を付けた pkg は Reiyas-Air でも cramshell でも `spctl -t install` が accepted になった。
