@@ -6,18 +6,18 @@ Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は�
 ## できたこと（2026-11-21 夜、commit は未 push）
 - 設計: `docs/CONTINUOUS-PC.md`（design-planner の案。推す案で仮決定）。要点と捨てた案は `docs/decisions.md` 2026-11-21「聞き続けるモードを PC の版に入れる」
 - core: `ContinuousSegmenter`（区切り・時間切れ。音の長さで時刻を数える）、`VoiceCommand.isCandidate`。試験 `ContinuousSegmenterTest`
-- エンジン（desktop）: `VoiceSession`（押し方の判定 0.3 秒・長押し・聞き続けるモード・順序・遅れた結果を捨てる・打っている途中は待たせる・声のコマンド）、`DesktopVoice` に `onAudio`・`halt`・`trim`・`recognize`、試験用 `-Dkanade.voiceStreamWav`。プロトコル `voice down/up/toggle/blur`・`voicestate`・`voiceaction`（`docs/WINDOWS-PROTOCOL.md`）。試験 `VoiceSessionTest`（11件）。`kanade-engine voice --listen <wav>` で声を出さずに通しで流せる
+- エンジン（desktop）: `VoiceSession`（押し方の判定 0.3 秒・長押し・聞き続けるモード・順序・遅れた結果を捨てる・打っている途中は待たせる・声のコマンド）、`DesktopVoice` に `onAudio`・`halt`・`trim`・`recognize`、試験用 `-Dkanade.voiceStreamWav`。プロトコル `voice down/up/toggle/blur`・`voicestate`・`voiceaction`（`docs/WINDOWS-PROTOCOL.md`）。試験 `VoiceSessionTest`（17件）。`kanade-engine voice --listen <wav>` で声を出さずに通しで流せる
 - フロント: fcitx5（kanade.cpp）、macOS（Voice.swift・InputController.swift・EngineLink.swift・main.swift）、Windows（TSF の voiceaction）。Windows の F12 短押し・Esc・入力欄の移動はエンジンだけで済む
 - 設定の画面: 「声のコマンド」「話さなければ止める」を Linux GTK・Qt、Windows、Mac に。`DesktopStore` は `voice_commands`・`continuous_idle_seconds` を読み書き
 - SPEC 8-3・8-11・8-13・8-15・10-3・11-3・未決事項を直した
-- 組めることの確かめ: Kotlin の試験は全部通る。fcitx5 のアドオンと Qt の設定は `podman run fedora:44` の中で組めた。Windows の DLL・設定は to-fu で組めた（`scripts/win.sh tsf Release`・`settings`）。Swift は `ssh mac` の `swiftc -typecheck`（ime と settings）
+- 組めることの確かめ: Kotlin の試験は全部通る。fcitx5 のアドオンと Qt の設定は `podman run fedora:44` の中で組めた。Windows の DLL・設定は to-fu で組めた（`scripts/win.sh tsf`・`settings`）。Swift は `ssh mac` の `swiftc -typecheck`（ime と settings）
 - 本物の録音の流れ: to-fu の parakeet で `kanade-engine voice --listen <wav>` を流し、区切りごとに文字になって話した順に入る・「取り消して」「次へ」「全部消して」「止めて」が働くのを見た（見本は eval/voice-sample-ja.wav と、macOS の say -v Kyoko で作った .cache/voice-commands*-ja.wav。合成音声の「送って」「送信して」は聞き違えられた）。区切りごとだと前の文脈が無く、頭の聞き取りが少し落ちる（「あした」→「明した」）・読点が付かない
 - change-reviewer の指摘7件を直した（b8fcbc0。順序・マイクが使えないとき・つなぎが切れたとき・終えた直後の移動・打っている途中の Esc・Windows の Esc の離し・長押しのロック）。判断が要る4つは確認一覧
 - Mac の pkg 2026.11.21.0101（公証済み、聞き続けるモード入り）を cramshell の ~/Downloads に置いた
 
 ## 残り（次の仕事）
-- 実機での確かめ（本人）: Mac は pkg を組んで cramshell へ。Linux は配布物を組み直す（cramgent。確認一覧に既存の項目あり）。Windows は to-fu で `win.sh package`→`install` のあと、メモ帳などで F12 短押し
-- 声のコマンドの見本の音声（間を空けた「送って」など）を作り、`voice --listen` で確かめる
+- 実機での確かめ（本人）: Mac は cramshell の pkg 2026.11.21.0101。Linux は配布物を組み直す（cramgent。2026-11-21 夜は ssh がつながらなかった。確認一覧に既存の項目あり）。Windows は to-fu の開発用の登録（新しい DLL とエンジン）で試験の窓までは確かめた。本人がふだんのアプリ（ブラウザ・ターミナル）で F12 短押しを試すのはまだ
+- 「送って」を本物の声で確かめる（合成音声では聞き違えられた。単体試験では確かめてある）
 - Android の `continuousTick` を `ContinuousSegmenter` に替える（任意。今は Android は触っていない）
 - 押している間の録音での声のコマンドを PC に（設計の手順 10。Android の `recognizeWithCommands` を core へ）
 - 公開: 未 push の commit（06ed2b5〜）の push、Release、Homebrew tap。**本人の直接の「出して」が要る**
@@ -41,7 +41,7 @@ Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は�
 - 効果音を測る: `./gradlew :core:test --rerun-tasks --tests '*VoiceEarconTest' -Pkanade.earconDir=<フォルダ>` → `~/.claude/skills/ui-sound/scripts/measure.sh`
 - `passwordless-sudo on` は使わない。push は本人の直接の確認のあと
 - 組む Mac の bash は 3.2。ssh では ログインのキーチェーンが開けないので、証明書と資格情報は専用のキーチェーン（~/.kanade-sign）
-- 裏で動かしている作業: なし。cramshell の ~/Downloads に Kanade-mac-aarch64-2026.11.21.0101.pkg（最新。聞き続けるモード入り）
+- 裏で動かしている作業: なし（to-fu のエンジンは `win.sh start` の普段の起動に戻してある）。未 commit のまま: linux/settings/__pycache__ の .pyc と .claude/（このセッションの作業ではない）。cramshell の ~/Downloads に Kanade-mac-aarch64-2026.11.21.0101.pkg（最新。聞き続けるモード入り）
 - Windows の DLL を to-fu で試す: `scripts/win.sh tsf`（Release を付けない。reg は tsf-build を登録する）→ `win.sh reg` → エンジンを `-Dkanade.voiceStreamWav=<wav>` 付きで起こす（`win.sh start` の命令に足して ps で）→ `win.sh type --rich "{f12}{wait}…"`。DLL の記録は %LOCALAPPDATA%\Kanade\tsf-log を作ると出る（試したあと消した）。終わったら `win.sh start` で普段の起動に戻す（戻してある）
 - Windows の通しの確かめ（2026-11-21 夜）: 試験の窓（RichEdit）で F12 短押し→区切りごとに入る・取り消して・次へ・全部消して・止めてを見た
 - to-fu の ssh 越しの System.Speech の音声合成は無音の wav を作る（使えない）。日本語の見本は `ssh mac say -v Kyoko --data-format=LEI16@16000 -o x.wav "..."` で作り、頭の付いた wav から data だけを 44 バイトの頭で書き直す
