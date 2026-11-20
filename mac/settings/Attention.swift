@@ -40,8 +40,8 @@ final class Attention {
         }
         if perms["accessibility"] == "false" {
             list.append(Issue(id: "accessibility", title: T("アクセシビリティの許可が必要です", "Accessibility permission is needed"),
-                              detail: T("録音キーを使うのに要ります。プライバシーとセキュリティ → アクセシビリティで「Kanade」を入にします",
-                                        "Needed for the record keys. Turn on Kanade in Privacy & Security → Accessibility"),
+                              detail: T("録音キーを使うのに要ります。プライバシーとセキュリティ → アクセシビリティで「Kanade」を入にします。もう入なのに出るときは、前の版の許可が残っています。「Kanade」を選んで − で外し、Kanade に切り替えて出る確認で許可し直します",
+                                        "Needed for the recording keys. Turn on Kanade in Privacy & Security → Accessibility. If it is already on, the permission belongs to an earlier version: select Kanade, remove it with −, then switch to Kanade and allow it again when asked"),
                               action: T("許可の設定を開く", "Open privacy settings"), fix: .privacy("Privacy_Accessibility"), symbol: "accessibility"))
         }
         if perms["microphone"] == "denied" || perms["microphone"] == "restricted" {
@@ -101,7 +101,8 @@ struct AttentionRow: View {
     let issues: [Issue]
 
     var body: some View {
-        Label(issues.count == 1 ? issues[0].title : T("確かめてほしいことがあります", "Needs your attention"),
+        // 件の題は長くサイドバーで切れるので、題は1件でも同じ短い言葉にし、件数はバッジで出す
+        Label(T("確かめてほしいこと", "Needs your attention"),
               systemImage: "exclamationmark.triangle.fill")
             .badge(issues.count)
             .badgeProminence(.increased)
