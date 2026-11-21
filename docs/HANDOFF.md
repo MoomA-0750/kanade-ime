@@ -54,3 +54,8 @@ Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は�
 - 本人の了承を受け、4442358（メニューバーの項目の幅固定まで）を origin/main へ push した。それより後の commit（聞き続けるモード・a618716 まで）は未 push
 - Release と tap は止めている。本人が確かめた pkg 0006 は cramshell から消え、Mac の dist にあるのは別セッションの 0101（聞き続けるモード入り、本人は未確認）だけ。どれを出すかを確認一覧に積んだ（A: 0101 を出して残りも push、B: 4442358 で組み直し、C: 試してから）。本人が選んだら `scripts/mac-release.sh`（dist/ に pkg と .version を置いて使う。tap は ../homebrew-tap）
 - 本人が C を選んだ（2026-11-22）: 聞き続けるモードを cramshell の 0101 で試してから、その pkg（または直した新しい版）で Release と tap を出す。本人が「出して」と言うまで出さない。出すときは残りの commit も push し、`scripts/mac-release.sh` を使う
+
+## 追記（2026-11-22、続き）
+- 0101 を Release（mac-v2026.11.21.0101）と tap に出した（本人の了承、e4a1636 まで push 済み）
+- f9494b1: リモートデスクトップが手前のときキーを通す（RemoteApps.swift・設定 remote_apps）、設定の「バージョン情報」のページ（Mac）。pkg 2026.11.22.0041 を cramshell へ置いた。未 push
+- 残り: Linux・Windows・Android の設定の画面に「バージョン情報」を足す（揃えるなら）。入力データを集める仕組みは別セッションが設計中（docs/INPUT-LOG-REQUEST.md）
