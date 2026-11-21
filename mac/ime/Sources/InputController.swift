@@ -43,6 +43,22 @@ final class KanadeInputController: IMKInputController, CommandTarget {
 
     private func sendFocus() {
         EngineLink.shared.send(["focus", "1"])
+        lastField = nil
+        sendField()
+    }
+
+    private var lastField: String?
+
+    /// 入力の記録のため、今の入力欄の種類（セキュア入力中は secret。システム全体の印）とアプリの bundle id を知らせる。
+    /// 変わったときだけ送る（focus 1 の直後は lastField を消してから呼ぶので必ず送る）
+    private func sendField() {
+        let secret = IsSecureEventInputEnabled()
+        let app = (textClient?.bundleIdentifier() ?? "").replacingOccurrences(of: "\t", with: " ").replacingOccurrences(of: "\n", with: " ")
+        let kind = secret ? "secret" : "normal"
+        let key = kind + "\t" + app
+        if key == lastField { return }
+        lastField = key
+        EngineLink.shared.send(["field", kind, app, ""])
     }
 
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
@@ -71,6 +87,7 @@ final class KanadeInputController: IMKInputController, CommandTarget {
         if k.vk == 0 && k.ch == 0 { return false }
         let link = EngineLink.shared
         guard link.ensureConnected() else { return false }
+        if !release { sendField() }
         if !composing && !release { sendContext() }
         let id = link.newId()
         guard let consumed = link.request(id, ["key", String(id), release ? "u" : "d", String(k.vk), String(k.ch), String(k.mods), repeatKey ? "1" : "0"]) else {
