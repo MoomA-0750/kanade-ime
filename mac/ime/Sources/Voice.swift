@@ -103,6 +103,9 @@ final class VoiceInput: CommandTarget {
         }
         // 自分で書いた文字（下の type）は見ない
         if event.getIntegerValueField(.eventSourceUserData) == Self.marker { return Unmanaged.passUnretained(event) }
+        // リモートデスクトップなどが手前のときは、録音キーも含めて何も取らず、向こう側のホストへ通す
+        // （録音中・取ったキーを押している最中は、押したキーの離しまで扱う）
+        if mode == .none && down.isEmpty && switchDown.isEmpty && RemoteApps.isFrontmost { return Unmanaged.passUnretained(event) }
         let code = Int(event.getIntegerValueField(.keyboardEventKeycode))
         if switchKey(type, code, event.flags) { return nil }
         var release: Bool
