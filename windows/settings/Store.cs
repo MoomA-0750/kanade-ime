@@ -40,6 +40,9 @@ public sealed class Store
     /// <summary>聞き続けるモードで、これだけ話さなければ終える（秒。0 なら終えない）</summary>
     public int ContinuousIdleSeconds { get; set; } = 60;
     public bool Learning { get; set; } = true;
+    /// <summary>入力の記録（既定オフ）。残す日数・大きさ・制限するアプリは設定の画面では変えないので、読んだ値をそのまま書き戻す</summary>
+    public bool InputLog { get; set; }
+    public Dictionary<string, string> InputLogExtra { get; } = new();
     public bool LastJapanese { get; set; }
     public string VoiceFinal { get; set; } = VoiceModel.DefaultId;
     /// <summary>画面の文字の言語（auto・ja・en）</summary>
@@ -76,6 +79,8 @@ public sealed class Store
                 case "voice_commands": s.VoiceCommands = Bool(s.VoiceCommands); break;
                 case "continuous_idle_seconds": if (int.TryParse(value, out var idle) && idle is 0 or 30 or 60 or 120) s.ContinuousIdleSeconds = idle; break;
                 case "learning": s.Learning = Bool(s.Learning); break;
+                case "input_log": s.InputLog = Bool(s.InputLog); break;
+                case "input_log_days" or "input_log_max_mb" or "input_log_limited_apps": s.InputLogExtra[key] = value; break;
                 case "last_japanese": s.LastJapanese = Bool(s.LastJapanese); break;
                 case "ui_language": if (value is "auto" or "ja" or "en") s.UiLanguage = value; break;
                 case "voice_final": if (VoiceModel.All.Any(m => m.Id == value)) s.VoiceFinal = value; break;
@@ -126,6 +131,9 @@ public sealed class Store
             .AppendLine($"voice_final={VoiceFinal}")
             .AppendLine("# 選んだ変換を覚えて次から先に出す")
             .AppendLine($"learning={B(Learning)}")
+            .AppendLine("# 入力の記録（本人用。入力した文を、この PC の中の input-log に日ごとに残す）")
+            .AppendLine($"input_log={B(InputLog)}")
+            .Append(string.Concat(InputLogExtra.Select(kv => $"{kv.Key}={kv.Value}\n")))
             .AppendLine("# 画面に出す文字の言語（auto は Windows の表示言語に合わせる・ja・en）")
             .AppendLine($"ui_language={UiLanguage}")
             .AppendLine("# 前回の日本語のオン/オフ（エンジンが書く）")

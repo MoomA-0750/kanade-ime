@@ -37,6 +37,7 @@ DATA_DIR = os.environ.get("KANADE_DATA") or os.path.join(INSTALL_DIR, "data")
 SETTINGS_FILE = os.path.join(CONFIG_DIR, "settings.properties")
 DICTIONARY_FILE = os.path.join(CONFIG_DIR, "user_dictionary.txt")
 SNIPPETS_FILE = os.path.join(CONFIG_DIR, "snippets.txt")
+INPUT_LOG_DIR = os.path.join(CONFIG_DIR, "input-log")
 LOG_FILE = os.path.join(xdg("XDG_STATE_HOME", ".local/state"), "kanade", "engine.log")
 SOCKET_PATH = os.environ.get("KANADE_SOCKET") or os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "kanade-engine.sock")
 ENGINE = os.path.join(INSTALL_DIR, "bin", "kanade-engine")
@@ -194,6 +195,19 @@ def engine_request(command, argument=""):
     except OSError:
         return False, T("Kanade のエンジンが動いていません（Kanade で文字を1つ打つと起動します）",
                         "The Kanade engine is not running (typing one character with Kanade starts it)")
+
+
+def input_log_files():
+    try:
+        return [os.path.join(INPUT_LOG_DIR, n) for n in os.listdir(INPUT_LOG_DIR) if n.endswith(".jsonl")]
+    except OSError:
+        return []
+
+
+def input_log_stats():
+    """（日数, 合計バイト）"""
+    files = input_log_files()
+    return len(files), sum(os.path.getsize(f) for f in files if os.path.exists(f))
 
 
 # ---- 音声のモデル（desktop/…/VoiceModels.kt・windows/settings/VoiceModels.cs と同じ） ----
@@ -508,6 +522,33 @@ class SettingsWindow(Adw.ApplicationWindow):
         def response(_d, r):
             if r == "clear":
                 self.run_in_background(lambda: engine_request("clear-learning"), lambda res: self.toast(res[1]))
+
+        dialog.connect("response", response)
+        dialog.present(self)
+
+    def confirm_clear_input_log(self):
+        dialog = Adw.AlertDialog(heading=T("入力の記録を全部消しますか？", "Delete the whole input log?"),
+                                 body=T("この PC に残した記録を全部消します。元に戻せません", "All recorded lines on this PC will be deleted. This cannot be undone"))
+        dialog.add_response("cancel", T("やめる", "Cancel"))
+        dialog.add_response("clear", T("消す", "Delete"))
+        dialog.set_response_appearance("clear", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_close_response("cancel")
+
+        def work():
+            ok, message = engine_request("clear-input-log")
+            if not ok and not os.path.exists(SOCKET_PATH):  # エンジンが動いていなければ、ファイルを直接消す
+                for f in input_log_files():
+                    os.remove(f)
+                return True, T("消しました", "Deleted")
+            return ok, message
+
+        def done(res):
+            self.toast(res[1])
+            self.rebuild()
+
+        def response(_d, r):
+            if r == "clear":
+                self.run_in_background(work, done)
 
         dialog.connect("response", response)
         dialog.present(self)
@@ -859,6 +900,25 @@ class SettingsWindow(Adw.ApplicationWindow):
         row = Adw.ActionRow(title=T("書き出す", "Export"), subtitle=T("Android・Windows・Linux・Mac の Kanade で読み込める形で書き出します", "Writes a file that Kanade on Android, Windows, Linux and Mac can import"))
         button = Gtk.Button(label=T("保存先を選ぶ…", "Choose where…"), valign=Gtk.Align.CENTER)
         button.connect("clicked", lambda _b: self.export_android())
+        row.add_suffix(button)
+        g.add(row)
+        page.add(g)
+
+        g = group(T("入力の記録", "Input log"),
+                  T("どんな入力・変換・切り替えをしたかを、この PC の中だけに軽く残します（Kanade を良くするため）。パスワードの欄は除き、外へは送りません",
+                    "Keeps a light record on this PC of what you typed, converted and switched, to improve Kanade later. Password fields are skipped and nothing leaves this PC"))
+        g.add(switch_row(T("入力を記録する", "Record input"), T("オンにすると、確定ごとに1行を書きます", "When on, one line is written for each commit"), "input_log"))
+        n, size = input_log_stats()
+        row = Adw.ActionRow(title=T("記録を開く", "Open the input log"),
+                            subtitle=T(f"{n} 日分、{size / 1024 / 1024:.1f} MB（{INPUT_LOG_DIR}）", f"{n} days, {size / 1024 / 1024:.1f} MB ({INPUT_LOG_DIR})"),
+                            activatable=True)
+        row.add_suffix(Gtk.Image.new_from_icon_name("adw-external-link-symbolic"))
+        row.connect("activated", lambda _r: self.open_path(INPUT_LOG_DIR))
+        g.add(row)
+        row = Adw.ActionRow(title=T("全部消す", "Delete everything"), subtitle=T("元に戻せません", "This cannot be undone"))
+        button = Gtk.Button(label=T("消す…", "Delete…"), valign=Gtk.Align.CENTER)
+        button.add_css_class("destructive-action")
+        button.connect("clicked", lambda _b: self.confirm_clear_input_log())
         row.add_suffix(button)
         g.add(row)
         page.add(g)

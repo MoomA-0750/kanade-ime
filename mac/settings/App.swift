@@ -150,6 +150,7 @@ struct ContentView: View {
 struct InputPage: View {
     @Bindable var settings: SettingsFile
     @State private var confirmClear = false
+    @State private var confirmClearLog = false
     @State private var message: String?
 
     var body: some View {
@@ -268,6 +269,30 @@ struct InputPage: View {
                     Text(T("学習した変換をすべて消します（ユーザー辞書は消えません）", "Deletes everything learned (your user dictionary is kept)"))
                 }
             }
+            Section {
+                Toggle(isOn: settings.bool("input_log")) {
+                    Text(T("入力を記録する", "Record input"))
+                    Text(T("どんな入力・変換・切り替えをしたかを、この Mac の中だけに軽く残します（Kanade を良くするため）。パスワードの欄は除き、外へは送りません",
+                           "Keeps a light record on this Mac of what you typed, converted and switched, to improve Kanade later. Password fields are skipped and nothing leaves this Mac"))
+                }
+                LabeledContent {
+                    Button(T("開く", "Open")) {
+                        let dir = support.appendingPathComponent("input-log")
+                        if FileManager.default.fileExists(atPath: dir.path) { NSWorkspace.shared.open(dir) } else { message = T("まだありません", "Does not exist yet") }
+                    }
+                } label: {
+                    Text(T("記録のフォルダーを開く", "Open the input log folder"))
+                    Text(support.appendingPathComponent("input-log").path)
+                }
+                LabeledContent {
+                    Button(T("消す…", "Delete…"), role: .destructive) { confirmClearLog = true }
+                } label: {
+                    Text(T("入力の記録を全部消す", "Delete the whole input log"))
+                    Text(T("元に戻せません", "This cannot be undone"))
+                }
+            } header: {
+                Text(T("入力の記録", "Input log"))
+            }
             Section(T("表示", "Display")) {
                 Picker(selection: settings.string("ui_language")) {
                     Text(T("Mac に合わせる", "Same as the Mac")).tag("auto")
@@ -290,6 +315,24 @@ struct InputPage: View {
             }
         } message: {
             Text(T("元に戻せません。ユーザー辞書は残ります", "This cannot be undone. Your user dictionary is kept"))
+        }
+        .confirmationDialog(T("入力の記録を全部消しますか？", "Delete the whole input log?"), isPresented: $confirmClearLog) {
+            Button(T("消す", "Delete"), role: .destructive) {
+                Task.detached {
+                    var (ok, text) = engineRequest("clear-input-log", "")
+                    if !ok {  // エンジンが動いていなければ、ファイルを直接消す
+                        let dir = support.appendingPathComponent("input-log")
+                        if let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) {
+                            for f in files where f.pathExtension == "jsonl" { try? FileManager.default.removeItem(at: f) }
+                            (ok, text) = (true, T("消しました", "Deleted"))
+                        }
+                    }
+                    let shown = text
+                    await MainActor.run { message = shown }
+                }
+            }
+        } message: {
+            Text(T("この Mac に残した記録を全部消します。元に戻せません", "All recorded lines on this Mac will be deleted. This cannot be undone"))
         }
         .alert(message ?? "", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK") { message = nil }

@@ -693,3 +693,12 @@ SPEC.md の未決事項に本人が答えた。
 - Android の書き手は IME サービスの `onStartInput` で設定を見て付け外しする（設定の画面でオンにしたら、次の入力欄から効く）
 - Windows の InputScope は編集セッション（非同期・読み取り）で読む。`GUID_PROP_INPUTSCOPE` は SDK の lib に実体が無いので GUID を自分で持った。キー入力のときの見直しは 1 秒に 1 回。実際のアプリ（Chrome・Edge のパスワード欄など）での動きは未確認
 - fcitx5 の `fld` は空（種類を細かく見分ける材料が無い）。macOS も空
+
+## 2026-11-22 入力の記録 フェーズ4（見る・消す画面と設定）
+
+- Android: `ToolsScreen` のキー記録の下に「入力の記録」の節。スイッチ・残す期間（7〜365 日）・大きさの上限（10〜1000MB）・件数と容量・最近の 50 行・全部消す（確認のダイアログつき）。画面は `InputLogWriter(dir, startThread = false)` で読む・消す（書き手は IME サービスの中）。`:app:compileDebugKotlin` が通っただけで、画面を出しての確認はまだ
+- デスクトップは「スイッチ・フォルダーを開く・全部消す」の3つだけ（Android のような最近の行・期間・上限の画面は置かない。期間と上限は `settings.properties` で変える）。全部消すはエンジンの `clear-input-log`。エンジンが動いていなければ画面がファイルを直接消す
+- 置いた場所: Linux GTK・Qt は「バックアップ」ページの「ファイル」の上、Windows・macOS は「入力」ページの「学習」の下
+- Windows の設定の画面は設定ファイルを全部書き直すので、`input_log` を足し、`input_log_days`・`input_log_max_mb`・`input_log_limited_apps` は読んだ値をそのまま書き戻す（そうしないと保存のたびに消える）
+- 確かめた範囲: Kotlin の試験（core・desktop）と app のコンパイル、Windows は to-fu で設定の画面が組めた、macOS は ssh mac で型検査、GTK は構文のみ。Qt の QML は組んでいない（既存の部品の並べ方に合わせただけ）
+

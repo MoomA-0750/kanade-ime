@@ -154,6 +154,7 @@
 - 13-6（仮）記録は待たずに待ち行列に入れ、別のスレッドがまとめて追記する。あふれたら捨てて `dropped` に件数を残す。`input_log_days`（既定 90）より古い日と、合計 `input_log_max_mb`（既定 200）を超えた分は古い日から消す。1日 20MB を超えたらその日は書かない
 - 13-7（仮）設定の画面から全部消せる（`clear-input-log`）
 - 13-8（仮）フロントの送り方: fcitx5・macOS・Windows TSF は `focus 1` の直後と、入力中に変わったと分かったときに `field` を送る（fcitx5 は `Password`・`Sensitive`、macOS は `IsSecureEventInputEnabled()`、Windows は InputScope。Windows は読めなければ secret、キー入力のとき 1 秒に 1 回見直す）。Android は `onStartInput` で `FieldKind.fromAndroid` を使い、書き手は `filesDir/input-log` に、`onFinishInput` で flush。`src` は物理キー `hw`・画面の QWERTY `soft`・フリック `flick`・グライド `glide`・音声 `voice`
+- 13-9（仮）設定の画面から見る・消す。Android は「ツール」の入力の記録の節（スイッチ・残す期間・大きさの上限・件数と容量・最近の 50 行・確認つきの全部消す）。Windows・Linux（GTK・Qt）・macOS はスイッチ・記録のフォルダーを開く・確認つきの全部消す（エンジンの `clear-input-log`、エンジンが止まっていれば画面がファイルを消す）。確かめ方: 各画面でオンにして打ち、フォルダーに今日の `.jsonl` ができ、「全部消す」で空になる（まだ実機では見ていない）
 - 確かめ方: core の `InputLogWriterTest`・`InputLogEngineTest`・`FieldKindTest`、desktop の `EngineHostTest`・`InputLogAppTest`。各 OS のパスワード欄で打って、その日のファイルの行が増えないことを見る（手順。フロントが `field` を送るようになってから）
 
 ## 予定（作ると決めたもの）

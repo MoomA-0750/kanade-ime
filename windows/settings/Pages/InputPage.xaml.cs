@@ -25,6 +25,7 @@ public sealed partial class InputPage : Page
         CtrlSpace.IsOn = store.Toggles.Contains("CTRL_SPACE");
         F13.IsOn = store.Toggles.Contains("F13");
         Learning.IsOn = store.Learning;
+        InputLogSwitch.IsOn = store.InputLog;
         DisplayLanguage.SelectedItem = DisplayLanguage.Items.OfType<ComboBoxItem>().First(i => (string)i.Tag == store.UiLanguage);
         loading = false;
     }
@@ -48,6 +49,7 @@ public sealed partial class InputPage : Page
         if (CtrlSpace.IsOn) store.Toggles.Add("CTRL_SPACE");
         if (F13.IsOn) store.Toggles.Add("F13");
         store.Learning = Learning.IsOn;
+        store.InputLog = InputLogSwitch.IsOn;
         store.Save();
     }
 
@@ -72,6 +74,38 @@ public sealed partial class InputPage : Page
         };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
         var (ok, message) = await Engine.RequestAsync("clear-learning");
+        Message.Severity = ok ? InfoBarSeverity.Success : InfoBarSeverity.Error;
+        Message.Message = message;
+        Message.IsOpen = true;
+    }
+
+    private static string InputLogDir => Path.Combine(Store.Dir, "input-log");
+
+    private void OnOpenInputLog(object sender, RoutedEventArgs e)
+    {
+        Directory.CreateDirectory(InputLogDir);
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"\"{InputLogDir}\"") { UseShellExecute = true });
+    }
+
+    private async void OnClearInputLog(object sender, RoutedEventArgs e)
+    {
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = Lang.T("入力の記録を全部消しますか？", "Delete the whole input log?"),
+            Content = Lang.T("この PC に残した記録を全部消します。元に戻せません", "All recorded lines on this PC will be deleted. This cannot be undone"),
+            PrimaryButtonText = Lang.T("消す", "Delete"),
+            CloseButtonText = Lang.T("やめる", "Cancel"),
+            DefaultButton = ContentDialogButton.Close,
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        var (ok, message) = await Engine.RequestAsync("clear-input-log");
+        // エンジンが動いていなければ、ファイルを直接消す
+        if (!ok && Directory.Exists(InputLogDir))
+        {
+            foreach (var f in Directory.GetFiles(InputLogDir, "*.jsonl")) File.Delete(f);
+            (ok, message) = (true, Lang.T("消しました", "Deleted"));
+        }
         Message.Severity = ok ? InfoBarSeverity.Success : InfoBarSeverity.Error;
         Message.Message = message;
         Message.IsOpen = true;

@@ -24,6 +24,47 @@ PrefPage {
     }
 
     PrefGroup {
+        title: Pal.t("入力の記録", "Input log")
+        description: Pal.t("どんな入力・変換・切り替えをしたかを、この PC の中だけに軽く残します（Kanade を良くするため）。パスワードの欄は除き、外へは送りません",
+                           "Keeps a light record on this PC of what you typed, converted and switched, to improve Kanade later. Password fields are skipped and nothing leaves this PC")
+        SwitchRow {
+            key: "input_log"
+            title: Pal.t("入力を記録する", "Record input")
+            subtitle: Pal.t("オンにすると、確定ごとに1行を書きます", "When on, one line is written for each commit")
+        }
+        PrefRow {
+            clickable: true
+            title: Pal.t("記録を開く", "Open the input log")
+            subtitle: Store.configDir + "/input-log"
+            onClicked: {
+                if (!Desktop.exists(Store.configDir + "/input-log")) ApplicationWindow.window.toast(Pal.t("まだありません", "Does not exist yet"))
+                else Desktop.open(Store.configDir + "/input-log")
+            }
+            Icon { name: "open"; color: Pal.fg; opacity: 0.7 }
+        }
+        PrefRow {
+            title: Pal.t("全部消す", "Delete everything")
+            subtitle: Pal.t("元に戻せません", "This cannot be undone")
+            KButton { kind: "destructive"; text: Pal.t("消す…", "Delete…"); onClicked: confirmLog.open() }
+        }
+    }
+
+    KDialog {
+        id: confirmLog
+        parent: Overlay.overlay
+        heading: Pal.t("入力の記録を全部消しますか？", "Delete the whole input log?")
+        body: Pal.t("この PC に残した記録を全部消します。元に戻せません", "All recorded lines on this PC will be deleted. This cannot be undone")
+        buttons: [
+            KButton { text: Pal.t("やめる", "Cancel"); onClicked: confirmLog.close() },
+            KButton {
+                kind: "destructive"
+                text: Pal.t("消す", "Delete")
+                onClicked: { confirmLog.close(); Engine.request("clear-input-log") }
+            }
+        ]
+    }
+
+    PrefGroup {
         title: Pal.t("ファイル", "Files")
         Repeater {
             model: [[Pal.t("設定のフォルダーを開く", "Open the settings folder"), Store.configDir],

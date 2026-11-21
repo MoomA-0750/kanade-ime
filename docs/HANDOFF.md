@@ -1,4 +1,4 @@
-# 引き継ぎ（今の状態、2026-11-22 夜・フェーズ3 が済んだ）
+# 引き継ぎ（今の状態、2026-11-22 夜・フェーズ4 が済んだ）
 
 ## 目的
 Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は「入力の記録」（本人用に、どういう入力・変換のやり直し・言語の切り替えがあったかを端末の中だけに軽く集める。パスワード欄は除く）。要望は `docs/INPUT-LOG-REQUEST.md`、設計は `docs/INPUT-LOG.md`（design-planner の案C で仮決定）。
@@ -9,14 +9,14 @@ Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は�
 
 - フェーズ3（フロント）: Android（KanadeSettings の設定4つと SettingsBackup の除外、IME サービスの `logField`・`logSource`（hw・soft・flick・glide）・`logVoice`・`logVoiceCommand`・flush・書き手の付け外し。commit aa00e93・3bac61d）、fcitx5（`field` 送信。podman で組めた）、macOS（`IsSecureEventInputEnabled`・bundle id。ssh mac で型検査が通った）、Windows TSF（InputScope を編集セッションで読む。to-fu で DLL が組めた）。決めた細かい点は decisions.md 2026-11-22「フェーズ3」。Android は `:app:compileDebugKotlin` が通っただけで、実機・エミュレータでは動かしていない。Windows・fcitx5・macOS も組めるところまで（実際の入力欄での動きは未確認）
 
+- フェーズ4（画面）: Android の「入力の記録」の節（ToolsScreens.kt）、GTK・Qt（バックアップページ）、Windows・macOS（入力ページ）にスイッチ・フォルダーを開く・全部消す。SPEC 13-9、decisions.md 2026-11-22「フェーズ4」。Windows は to-fu で組め、macOS は型検査、Kotlin の試験と app のコンパイルは通る。Qt は組んでいない、GTK は構文だけ。どれも画面を出しての確認はまだ
+
 ## 残り（フェーズ）
-4. 見る・消す画面と設定（Android の設定の画面、各 PC の設定の画面）。`InputLogWriter.stats()`・`tail(n)`・`clearAll()` がある
 5. 組んで確かめ（Kotlin の試験、podman で fcitx5、ssh mac で swiftc、to-fu で DLL）、引き継ぎ
 
 ## 次のセッションが最初にやること
-1. このファイル・`docs/INPUT-LOG.md` の 3・5・SPEC の 13 節を読む
-2. フェーズ4 を作る: Android の設定の画面（`settings/ToolsScreens.kt` のキー記録の隣。スイッチ・件数と大きさ・最近の行・全部消す。`InputLogWriter.stats()`・`tail(n)`・`clearAll()`。Android の書き手は Service の中なので、画面側は `InputLogWriter(dir, startThread=false)` で読む・消す）、各 PC の設定の画面（スイッチ・フォルダーを開く・全部消す。admin の `clear-input-log`）
-3. 文字列は `app/src/main/res/values*/strings.xml`（既存のキー記録の文字列 `app_tools_key_log*` にならう）。画面は android-m3-expressive スキルに従う
+1. このファイル・SPEC の 13 節を読む
+2. フェーズ5: Qt の設定を podman で組む（`linux/settings/qt`）、エミュレータで Android の画面を出して撮る（android-m3-expressive の手順）、実際に打ってログが増えることと全部消すを確かめる。出た不具合を直す。change-reviewer で個人の内容を扱う部分（フェーズ2〜4）を見る
 
 ## 本人の判断待ち
 - 入力の記録の仮決定7つ（INPUT-LOG.md の 7。既定オフのスイッチ／ターミナルは確定と切り替えだけ／カーソルの前 32 文字／90 日・200MB／記録中の印なし／Android の書き出しなし／デスクトップの学習は変えない）

@@ -111,6 +111,22 @@
                 <Button Content="{local:L Ja='消す', En='Clear'}" Click="OnClearLearning" />
             </tk:SettingsCard>
 
+            <TextBlock Text="{local:L Ja='入力の記録', En='Input log'}" Style="{StaticResource SectionHeader}" />
+            <tk:SettingsCard Header="{local:L Ja='入力を記録する', En='Record input'}"
+                             Description="{local:L Ja='どんな入力・変換・切り替えをしたかを、この PC の中だけに軽く残します（Kanade を良くするため）。パスワードの欄は除き、外へは送りません', En='Keeps a light record on this PC of what you typed, converted and switched, to improve Kanade later. Password fields are skipped and nothing leaves this PC'}">
+                <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE9D9;" /></tk:SettingsCard.HeaderIcon>
+                <ToggleSwitch x:Name="InputLogSwitch" Toggled="OnChanged" OnContent="{local:L Ja='オン', En='On'}" OffContent="{local:L Ja='オフ', En='Off'}" />
+            </tk:SettingsCard>
+            <tk:SettingsCard x:Name="InputLogFolder" Header="{local:L Ja='記録のフォルダーを開く', En='Open the input log folder'}">
+                <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8B7;" /></tk:SettingsCard.HeaderIcon>
+                <Button Content="{local:L Ja='開く', En='Open'}" Click="OnOpenInputLog" />
+            </tk:SettingsCard>
+            <tk:SettingsCard Header="{local:L Ja='入力の記録を全部消す', En='Delete the whole input log'}"
+                             Description="{local:L Ja='元に戻せません', En='This cannot be undone'}">
+                <tk:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE74D;" /></tk:SettingsCard.HeaderIcon>
+                <Button Content="{local:L Ja='消す…', En='Delete…'}" Click="OnClearInputLog" />
+            </tk:SettingsCard>
+
             <TextBlock Text="{local:L Ja='表示', En='Display'}" Style="{StaticResource SectionHeader}" />
             <tk:SettingsCard Header="{local:L Ja='表示の言語（Language）', En='Language（表示の言語）'}"
                              Description="{local:L Ja='設定の画面・タスクバーのメニューなどの言語です', En='The language of this window, the taskbar menu and other messages'}">
