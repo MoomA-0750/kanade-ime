@@ -49,3 +49,7 @@ Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は�
 
 ## 資料
 - docs/CONTINUOUS-PC.md（設計）、SPEC.md（8-3・8-11・8-13・8-15・11-3・12-2）、docs/decisions.md（2026-11-20・21）、docs/WINDOWS-PROTOCOL.md、STATUS.md、Vault の Human/Projects/Kanade.md
+
+## 追記（2026-11-21、公開の状況）
+- 本人の了承を受け、4442358（メニューバーの項目の幅固定まで）を origin/main へ push した。それより後の commit（聞き続けるモード・a618716 まで）は未 push
+- Release と tap は止めている。本人が確かめた pkg 0006 は cramshell から消え、Mac の dist にあるのは別セッションの 0101（聞き続けるモード入り、本人は未確認）だけ。どれを出すかを確認一覧に積んだ（A: 0101 を出して残りも push、B: 4442358 で組み直し、C: 試してから）。本人が選んだら `scripts/mac-release.sh`（dist/ に pkg と .version を置いて使う。tap は ../homebrew-tap）
