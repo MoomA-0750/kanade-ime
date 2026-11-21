@@ -7,7 +7,7 @@ import org.json.JSONObject
 
 /**
  * 設定の書き出し・読み込み。設定（SharedPreferences の「kanade」）と、ユーザー辞書・スニペットを1つの JSON にまとめる。
- * 学習した変換・クリップボードの履歴・キー記録・音声モデルは入れない（大きい・その端末での記録のため）。
+ * 学習した変換・クリップボードの履歴・キー記録・入力の記録（スイッチと上限も）・音声モデルは入れない（大きい・その端末での記録のため）。
  * 読み込むと、今の設定・辞書・スニペットはファイルの中身に置き換わる
  */
 object SettingsBackup {
@@ -19,7 +19,7 @@ object SettingsBackup {
     private val FILES = listOf("user_dictionary.txt", "snippets.txt", "spoken_symbols.txt")
 
     /** 端末ごとの印で、書き出さず・読み込みでも今の値を残すもの（学習を消した時刻。変わると IME が学習を消すため） */
-    private val LOCAL_KEYS = setOf("learning_reset_at")
+    private val LOCAL_KEYS = setOf("learning_reset_at", "input_log", "input_log_days", "input_log_max_mb", "input_log_limited_apps")
 
     fun suggestedName(): String {
         val date = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.ROOT).format(java.util.Date())
@@ -73,7 +73,12 @@ object SettingsBackup {
         // Windows・Linux・macOS の書き出し（source が desktop）は Android 版の項目の一部しか持たないので、ファイルに無い項目は今のまま残す
         val fromDesktop = root.optString("source") == "desktop"
         val editor = if (fromDesktop) shared.edit() else shared.edit().clear()
-        if (!fromDesktop) for ((key, value) in keep) if (value is Long) editor.putLong(key, value)
+        if (!fromDesktop) for ((key, value) in keep) when (value) {
+            is Long -> editor.putLong(key, value)
+            is Boolean -> editor.putBoolean(key, value)
+            is Int -> editor.putInt(key, value)
+            is String -> editor.putString(key, value)
+        }
         var count = 0
         for (key in prefs.keys()) {
             if (key in LOCAL_KEYS) continue

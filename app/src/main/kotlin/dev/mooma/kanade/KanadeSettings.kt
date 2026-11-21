@@ -32,6 +32,24 @@ class KanadeSettings(context: Context) {
         get() = prefs.getBoolean(KEY_KEYLOG, true)
         set(value) = prefs.edit().putBoolean(KEY_KEYLOG, value).apply()
 
+    /** 入力の記録（docs/INPUT-LOG.md）。既定はオフ。設定の書き出し・読み込みには入れない（SettingsBackup の LOCAL_KEYS） */
+    var inputLog: Boolean
+        get() = prefs.getBoolean(KEY_INPUT_LOG, false)
+        set(value) = prefs.edit().putBoolean(KEY_INPUT_LOG, value).apply()
+
+    var inputLogDays: Int
+        get() = prefs.getInt(KEY_INPUT_LOG_DAYS, 90).coerceIn(1, 3650)
+        set(value) = prefs.edit().putInt(KEY_INPUT_LOG_DAYS, value).apply()
+
+    var inputLogMaxMb: Int
+        get() = prefs.getInt(KEY_INPUT_LOG_MAX_MB, 200).coerceIn(1, 100_000)
+        set(value) = prefs.edit().putInt(KEY_INPUT_LOG_MAX_MB, value).apply()
+
+    /** 確定と切り替えだけ残すアプリ（名前に含まれていれば当たる。コンマ区切り） */
+    var inputLogLimitedApps: String
+        get() = prefs.getString(KEY_INPUT_LOG_LIMITED, null) ?: dev.mooma.kanade.core.log.LogField.DEFAULT_LIMITED_APPS
+        set(value) = prefs.edit().putString(KEY_INPUT_LOG_LIMITED, value).apply()
+
     var liveConversion: Boolean
         get() = prefs.getBoolean(KEY_LIVE, true)
         set(value) = prefs.edit().putBoolean(KEY_LIVE, value).apply()
@@ -324,6 +342,10 @@ class KanadeSettings(context: Context) {
         const val KEY_TRIGGERS = "toggle_triggers"
         const val KEY_FULL_WIDTH = "full_width_symbols"
         const val KEY_KEYLOG = "key_log"
+        const val KEY_INPUT_LOG = "input_log"
+        const val KEY_INPUT_LOG_DAYS = "input_log_days"
+        const val KEY_INPUT_LOG_MAX_MB = "input_log_max_mb"
+        const val KEY_INPUT_LOG_LIMITED = "input_log_limited_apps"
         const val KEY_LAST_MODE = "last_japanese"
         const val KEY_LIVE = "live_conversion"
         const val KEY_PREDICTION = "prediction"
