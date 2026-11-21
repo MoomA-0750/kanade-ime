@@ -22,11 +22,12 @@ Kotlin 側は `desktop/src/main/kotlin/dev/mooma/kanade/desktop/`（`Protocol.kt
 | `ctx	<左の文>	<右の文>` | 入力を始める前の、カーソルの前後の文（zenz の文脈）。入力中でなければ受け取る |
 | `reset` | アプリが入力中の文字を終わらせた（OnCompositionTerminated）。エンジンは入力を捨てる |
 | `focus	<1\|0>` | フォーカスを得た/失った。得たら、エンジンはこの DLL を「いまの相手」にして `mode` を返す |
+| `field	<normal\|secret\|nolearn>	<app>	<fld>` | 今の入力欄の種類（入力の記録のため）。`focus 1` の直後に送り、入力中に変わったと分かったときにも送る。`app` は Windows は exe 名・fcitx5 は program・macOS は bundle id（分からなければ空）、`fld` は `url`・`email` などに丸めたもの（なければ空）。エンジンは相手ごとに種類を持ち、`focus` を受けたら「分からない」に戻して、`field` が届くまで何も記録しない（古いフロントは送らないので記録されない）。`normal` 以外では出来事を作らない。読めなかったときは `secret` を送る。見るもの: Windows は InputScope（`IS_PASSWORD`・`IS_NUMERIC_PASSWORD`・`IS_NUMERIC_PIN`・`IS_ALPHANUMERIC_PIN`・`IS_ALPHANUMERIC_PIN_SET`）、fcitx5 は `capabilityFlags()` の `Password`・`Sensitive`、macOS は `IsSecureEventInputEnabled()`。形は docs/INPUT-LOG.md の 3 |
 | `caret	<left>	<top>	<right>	<bottom>` | （前の版の DLL だけ）入力中の文字の画面上の位置。今は候補の窓を DLL が描くので送らない |
 | `select	<番号>` | 候補の窓で候補をクリックした（数字キーと同じ）。結果はエンジンから id 0 で届く |
 | `mode	<1\|0>` | 言語バーなど、キー以外で日本語のオン/オフが変わった |
 | `menu	<項目>` | タスクバーの入力の表示の右クリックのメニューで選んだ（`settings`・`user-dictionary`・`snippets`・`import-android`・`log`）。エンジンが画面を開く |
-| `admin	<id>	<頼みごと>	<引数>` | 設定の画面（windows/settings）から。`import-android <json>`・`export-android <json>`・`clear-learning`。返事は `admin	<id>	<1\|0>	<文>` |
+| `admin	<id>	<頼みごと>	<引数>` | 設定の画面（windows/settings）から。`import-android <json>`・`export-android <json>`・`clear-learning`・`clear-input-log`（入力の記録を全部消す）。返事は `admin	<id>	<1\|0>	<文>` |
 | `voice	<down\|toggle>	<ja\|en>`・`voice	up`・`voice	cancel`・`voice	blur` | （fcitx5 のアドオンと macOS の入力方式）入力方式に関わらない音声入力。録音キーを押した（`down`。`ja` は Kanade のとき、`en` はほかの入力方式のときで英語のモデル）・離した（`up`）をそのまま送る。押し方の判定はエンジン: 0.3 秒以上押していたら押している間だけ録音して離したら文字にし、それより短ければ聞き続けるモード（黙るたびにそこまでを `commit` で id 0 で返す。もう一度 `down` で終える）。`toggle` は押すたびに聞き続けるモードを始める・終えるキー。`cancel` は Esc（録音を捨てる。聞き続けるモードなら話している途中を捨てて終える）。`blur` は録音を始めた入力欄から離れた（聞き続けるモードを終える）。Windows の DLL は F12・Esc を `key` で送り、`focus` で入力欄の移動が分かるので、これは使わない |
 | `voice	<start\|stop\|cancel\|cue>	…` | 古いフロントのための形（押し方をフロントが決める）。`start ja\|en [hold\|tap\|none]` で押している間の録音を始め、`stop` で文字にする。`cue tap\|hold` は始めの音。新しいフロントは使わない |
 | `bye` | 切る |

@@ -678,3 +678,9 @@ SPEC.md の未決事項に本人が答えた。
 - 理由: 読み・文節・zenz の前後を知っているのはエンジンだけ。InputEngine は Android とデスクトップで同じなので全部の版で揃う。`field` が届かなければ記録しないので、古いフロントや判定漏れは取らない側に倒れる
 - やめた案: 今の KeyLog を広げる（Android だけ・同期で書く・変換の情報が無い）、各フロントで記録（読みを知らない）、全部のキーを生で残す（量・再現がずれる・漏れたときの被害）、SQLite（デスクトップに JDBC）、配る物に本人用の印（公開に出る道がある）
 - 仮決定（本人に確かめる）: 既定オフの設定スイッチ／ターミナルとパスワード管理アプリは確定と切り替えだけ／カーソルの前 32 文字を残す／90 日・200MB／記録中の印なし／Android の書き出しなし／デスクトップの nolearn の学習は今回変えない
+
+## 2026-11-22 入力の記録のフェーズ2（エンジン）で決めたこと
+
+- 作ったもの: core の log/（InputEvent・JsonLine・InputLogWriter・FieldKind/LogField）、InputEngine の `recorder`・`logField`・`logVoice`・`logVoiceCommand`・`flushLog`、EngineHost の `field` 行（相手ごとに持つ。`focus` で「分からない」に戻す）、DesktopStore の設定4つ、DesktopApp の書き手の付け外しと `clear-input-log`、VoiceSession の voice・voice_cmd。
+- 実装で決めたこと（仮、戻せる）: ① 直接入力の語は、空白までの一続き全体が鍵に見えるときは中の語も捨てる（`$` などの記号で語が分かれて見逃すのを防ぐため）。② 確定の直後の Backspace は、入力中でないときだけ数える（5 秒以内・ほかのキーが来るまで）。③ 入力欄に入ったときの始めのモードの切り替えは `switch` の `by` を `focus` にする（キーの切り替えは `key`）。④ `commit` の `how` は enter・select・typing・other・focus・mode・prediction・emoji・snippet。変換中に文字を打って確定したとき（typing）は、その文字を次の確定のキーの並びに回す。⑤ `start` の `front` はデスクトップでは `desktop` 固定（フロントの種類は hello でしか分からないため、フェーズ3で必要なら足す）。⑥ ターミナル・パスワード管理アプリの標準の一覧は `LogField.DEFAULT_LIMITED_APPS`（名前に含まれていれば当たる）。
+- 戻し方: 設定 `input_log` を false にすれば書き手が外れる。全部消すのは admin の `clear-input-log`。
