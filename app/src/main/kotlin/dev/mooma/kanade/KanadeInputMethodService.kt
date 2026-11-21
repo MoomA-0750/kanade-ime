@@ -97,6 +97,52 @@ class KanadeInputMethodService : InputMethodService() {
     /** 今の折り目（なければ null）。画面キーボードを折り目で分ける・折り目まで伸ばすのに使う */
     private var hinge: Hinge? = null
 
+    /** 入力の記録の書き手（設定の input_log がオンのあいだだけ。docs/INPUT-LOG.md） */
+    private var logWriter: dev.mooma.kanade.core.log.InputLogWriter? = null
+
+    /** 設定に合わせて、入力の記録の書き手を付け外しする（入力欄に入るたびに見る） */
+    private fun syncInputLog() {
+        if (settings.inputLog && logWriter == null) {
+            val w = dev.mooma.kanade.core.log.InputLogWriter(
+                java.io.File(filesDir, "input-log"), { settings.inputLogDays }, { settings.inputLogMaxMb * 1024L * 1024L },
+            )
+            w.header = {
+                dev.mooma.kanade.core.log.InputEvent(
+                    System.currentTimeMillis(), "start",
+                    mapOf(
+                        "v" to 1, "os" to "android", "front" to "android",
+                        "build" to runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull().orEmpty(),
+                        "zenz" to (zenz != null), "zenz_mode" to settings.zenzMode, "live" to settings.liveConversion,
+                    ),
+                )
+            }
+            logWriter = w
+            engine.recorder = w::record
+        } else if (!settings.inputLog && logWriter != null) {
+            stopInputLog()
+        }
+    }
+
+    private fun stopInputLog() {
+        val w = logWriter ?: return
+        engine.flushLog()
+        engine.recorder = null
+        engine.logField = dev.mooma.kanade.core.log.LogField()
+        w.close()
+        logWriter = null
+    }
+
+    /** 入力のもと（hw・soft・flick・glide）を [src] にして [block] を実行する */
+    private inline fun <T> withSource(src: String, block: () -> T): T {
+        val old = engine.logSource
+        engine.logSource = src
+        try {
+            return block()
+        } finally {
+            engine.logSource = old
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         settings = KanadeSettings(this)
@@ -162,6 +208,7 @@ class KanadeInputMethodService : InputMethodService() {
         clipOverlay?.hide()
         modeIndicator?.dismiss()
         zenzThread.shutdownNow()
+        stopInputLog()
         super.onDestroy()
     }
 
@@ -262,7 +309,7 @@ class KanadeInputMethodService : InputMethodService() {
 
     /** フリック配列のキーでしてもらうこと */
     private val flickActions = object : FlickKeyboardView.Actions {
-        override fun text(s: String) {
+        override fun text(s: String) = withSource(if (settings.softKeyboardLayout == "FLICK") "flick" else "soft") {
             for (c in s) {
                 if (handle(KeyInput.Text(c))) continue
                 // 直接入力（英字・数字）では IME が使わないので、そのまま入れる（絵文字の検索中は検索へ）
@@ -754,7 +801,7 @@ class KanadeInputMethodService : InputMethodService() {
         val word = words.first()
         if (japanese) {
             // 読みとして入れる（そのあとはふつうに Space で変換する）
-            for (c in word) handle(KeyInput.Text(c))
+            withSource("glide") { for (c in word) handle(KeyInput.Text(c)) }
             lastGlide = GlideResult(words, word, true, "")
             glideLearning.record(word)
             saveGlideLearning()
@@ -961,7 +1008,9 @@ class KanadeInputMethodService : InputMethodService() {
      * （Android の入力欄は Shift＋矢印の選択などを修飾キーの押下で見る。アプリのショートカットもこれで物理キーボードと同じに効く）。
      * IME で使わなかったキーは、そのままアプリへ送る
      */
-    private fun softKey(keyCode: Int, meta: Int) {
+    private fun softKey(keyCode: Int, meta: Int) = withSource(if (settings.softKeyboardLayout == "FLICK") "flick" else "soft") { softKeyInner(keyCode, meta) }
+
+    private fun softKeyInner(keyCode: Int, meta: Int) {
         val now = android.os.SystemClock.uptimeMillis()
         fun event(action: Int, code: Int, m: Int) = KeyEvent(
             now, now, action, code, 0, m, android.view.KeyCharacterMap.VIRTUAL_KEYBOARD, 0,
@@ -999,7 +1048,9 @@ class KanadeInputMethodService : InputMethodService() {
     override fun onCreateCandidatesView(): View = CandidateBar(this, ::onCandidateTapped).also { bar = it }
 
     /** 候補の窓で候補を指で選んだ */
-    private fun onCandidateTapped(index: Int) {
+    private fun onCandidateTapped(index: Int) = withSource("soft") { onCandidateTappedInner(index) }
+
+    private fun onCandidateTappedInner(index: Int) {
         if (lastVoice != null) {
             main.post { if (!replaceVoice(index)) handle(KeyInput.SelectCandidate(index)) }
             return
@@ -1053,6 +1104,15 @@ class KanadeInputMethodService : InputMethodService() {
         // 入力欄が替わったら、入力中の状態を必ず捨てる。ブラウザ（WebView）などは欄を移っても onFinishInput を呼ばず
         // restarting=true で始め直すことがあり、前の欄の入力中の文字が残って新しい欄に入り、括弧の中のカーソルの位置もずれていた
         engine.reset()
+        // 入力の記録: 入力欄の種類を知らせる（パスワード・認証コード・学習しない欄では記録されない）
+        syncInputLog()
+        engine.logField = if (attribute == null) dev.mooma.kanade.core.log.LogField() else {
+            val kind = if (secureField) dev.mooma.kanade.core.log.FieldKind.SECRET
+            else dev.mooma.kanade.core.log.FieldKind.fromAndroid(attribute.inputType, attribute.imeOptions, attribute.hintText)
+            dev.mooma.kanade.core.log.LogField.of(
+                kind, attribute.packageName.orEmpty(), dev.mooma.kanade.core.log.FieldKind.fldOf(attribute.inputType), settings.inputLogLimitedApps,
+            )
+        }
         lastGlide = null
         hideBar()
         updateStatusIcon()
@@ -1114,6 +1174,10 @@ class KanadeInputMethodService : InputMethodService() {
         voiceSegments.clear()
         voiceInField = false
         engine.reset()
+        // 入力の記録: 溜まっているものを書き、入力欄の種類は「分からない」に戻す
+        engine.flushLog()
+        engine.logField = dev.mooma.kanade.core.log.LogField()
+        logWriter?.flush()
         hideBar()
         super.onFinishInput()
     }
@@ -1136,10 +1200,10 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean =
-        handleKeyDown(event) || super.onKeyDown(keyCode, event)
+        withSource("hw") { handleKeyDown(event) } || super.onKeyDown(keyCode, event)
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean =
-        handleKeyUp(event) || super.onKeyUp(keyCode, event)
+        withSource("hw") { handleKeyUp(event) } || super.onKeyUp(keyCode, event)
 
     /** キーを IME で使ったら true（物理キーボードと画面キーボードで共通） */
     private fun handleKeyDown(event: KeyEvent): Boolean {
@@ -1732,12 +1796,18 @@ class KanadeInputMethodService : InputMethodService() {
     }
 
     /** 直前に音声で入れた文（直後の Backspace・「取り消して」で丸ごと消す）と、候補の窓に出す選び直しの候補 */
+    /** 入力の記録の `voice` に付ける、いま認識している音声の情報（hold・listen、モデル、音声の長さ） */
+    private var voiceLogMode = "hold"
+    private var voiceLogModel = ""
+    private var voiceLogAudioMs = 0L
+
     private class VoiceResult(var text: String, val alternatives: List<String>)
     private var lastVoice: VoiceResult? = null
 
     /** 音声の文を確定して入れる。[alternatives]（確定の文と整える前の文）が2つ以上なら候補の窓に出して選び直せるようにする */
     private fun commitVoice(text: String, alternatives: List<String> = emptyList()) {
         currentInputConnection?.commitText(text, 1)
+        engine.logVoice(voiceLogMode, voiceLogModel, text, voiceLogAudioMs)
         lastCommitAt = android.os.SystemClock.uptimeMillis()
         engine.leftContext = (engine.leftContext + text).takeLast(InputEngine.MAX_CONTEXT)
         val alts = alternatives.filter { it.isNotEmpty() }.distinct()
@@ -1798,6 +1868,7 @@ class KanadeInputMethodService : InputMethodService() {
     private fun runVoiceCommand(c: VoiceCommand) {
         showIndicatorText(getString(R.string.ime_voice_command, getString(voiceCommandLabel(c))), 1500)
         log("voice: command $c")
+        engine.logVoiceCommand(c.name.lowercase())
         val ic = currentInputConnection
         when (c) {
             VoiceCommand.SEND -> {
@@ -1907,6 +1978,9 @@ class KanadeInputMethodService : InputMethodService() {
         val generation = inputGeneration
         val partialAtStart = partialText
         val rate = WhisperModel.SAMPLE_RATE
+        voiceLogMode = if (continuousMode) "listen" else "hold"
+        voiceLogAudioMs = pcm.size * 1000L / rate
+        voiceLogModel = ""
         // 聞き続けるモードのひと区切りは、もとから前後に間がある。短ければコマンドかもしれない
         val commandCandidate = continuousMode && settings.voiceCommands &&
             PauseSplitter.split(pcm, rate, VoiceCommand.PAUSE_MS, VoiceCommand.MIN_SPEECH_MS)
@@ -1938,6 +2012,7 @@ class KanadeInputMethodService : InputMethodService() {
                 if (!continuousMode) modeIndicator?.dismiss()
                 if (!stillHere()) return@post
                 val ms = (System.nanoTime() - started) / 1_000_000
+                voiceLogModel = engineName
                 // 確定の文が作れなければ、話している途中に出していた文を使う
                 val final = text?.let { spoken(it) } ?: partialAtStart
                 log("voice: $engineName ${ms}ms ${final ?: "（認識できなかった）"}（認識そのまま: $text）")
@@ -1974,6 +2049,7 @@ class KanadeInputMethodService : InputMethodService() {
                 main.post {
                     modeIndicator?.dismiss()
                     if (!stillHere()) return@post
+                    voiceLogModel = model.id
                     log("voice: ${model.id} ${(System.nanoTime() - started) / 1_000_000}ms $parts")
                     if (settings.voiceSounds) earcons.play(if (parts.any { it is String && spoken(it).isNotEmpty() }) VoiceEarcon.Kind.DONE_TEXT else VoiceEarcon.Kind.DONE_EMPTY)
                     val typing = engine.isComposing
