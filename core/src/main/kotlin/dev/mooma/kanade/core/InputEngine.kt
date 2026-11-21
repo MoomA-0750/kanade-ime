@@ -2,6 +2,9 @@ package dev.mooma.kanade.core
 
 import dev.mooma.kanade.core.dict.EmojiShortcodes
 import dev.mooma.kanade.core.dict.Snippets
+import dev.mooma.kanade.core.log.FieldKind
+import dev.mooma.kanade.core.log.InputEvent
+import dev.mooma.kanade.core.log.LogField
 
 /** Android のキーイベントから独立した入力。どの物理キーがどれになるかは IME 側が決める */
 sealed interface KeyInput {
@@ -386,6 +389,7 @@ class InputEngine(
     private fun textBeforeCaret() = units.take(caret).joinToString("") { it.text } + romaji.pending
 
     fun handle(input: KeyInput): EngineResult {
+        if (recording) logInput(input)
         val result = when {
             input is KeyInput.SetJapanese -> setMode(input.on)
             input == KeyInput.ToggleJapanese -> setMode(!japanese)
@@ -461,6 +465,7 @@ class InputEngine(
     /** 予測の候補を確定する */
     private fun commitPrediction(index: Int): EngineResult {
         val text = predictions[index]
+        logCommit(text, "prediction", composingReading, null)
         reset()
         leftContext = (leftContext + text).takeLast(MAX_CONTEXT)
         return EngineResult(listOf(ImeCommand.Commit(text), ImeCommand.HideCandidates), consumed = true)
@@ -577,6 +582,240 @@ class InputEngine(
     /** 確定した表記の読みを覚えるか（学習しないよう求める入力欄では false） */
     var rememberReadings = true
 
+    // ---- 入力の記録（docs/INPUT-LOG.md）。[recorder] が無いか、入力欄が [FieldKind.NORMAL] でなければ何もしない ----
+
+    /** 出来事の受け口（`InputLogWriter.record`）。null なら記録しない */
+    var recorder: ((InputEvent) -> Unit)? = null
+
+    /** 今の入力欄の種類とアプリ。フロントが知らせるまで [FieldKind.UNKNOWN]（記録しない） */
+    var logField: LogField = LogField()
+        set(value) {
+            if (value != field) {
+                flushLog()
+                if (value.app != field.app || value.kind != field.kind) logRecent.clear()
+            }
+            field = value
+        }
+
+    /** 入力のもと: hw・soft・flick・glide・voice */
+    var logSource: String = "hw"
+
+    /** 日本語⇔英字の切り替えのきっかけ（`switch` の `by`） */
+    var logBy: String = "key"
+
+    /** 今の時刻（ms。試験で差し替える） */
+    var clock: () -> Long = System::currentTimeMillis
+
+    private val recording: Boolean get() = recorder != null && logField.kind == FieldKind.NORMAL
+
+    private var logSeq = 0L
+    private val logKeys = StringBuilder()
+    private var logLastToken = ""
+    private var logCarry = ""
+    private var logStart = 0L
+    private var logResize = 0
+
+    /** この入力欄で直前に入れた文（確定・直接入力・音声。`switch` の `before`） */
+    private val logRecent = StringBuilder()
+    private val directWord = StringBuilder()
+    private val directRun = StringBuilder()
+    private val directWords = mutableListOf<Pair<String, String>>()
+
+    /** 確定の直後に Backspace で消した数を数える対象の `commit` の seq（なければ -1）と、確定の時刻・最後の Backspace の時刻 */
+    private var fixRef = -1L
+    private var fixCommitT = 0L
+    private var fixLastT = 0L
+    private var fixBs = 0
+
+    private var zenzTop: String? = null
+    private var zenzReading = ""
+
+    private fun emit(ev: String, fields: Map<String, Any?>) {
+        val r = recorder ?: return
+        val m = LinkedHashMap<String, Any?>()
+        m["seq"] = ++logSeq
+        m["app"] = logField.app
+        m["src"] = logSource
+        if (logField.fld.isNotEmpty()) m["fld"] = logField.fld
+        m.putAll(fields)
+        r(InputEvent(clock(), ev, m))
+    }
+
+    private fun keyToken(input: KeyInput): String? = when (input) {
+        is KeyInput.Text -> if (input.char == '{') "{{" else input.char.toString()
+        KeyInput.Backspace -> "{BS}"
+        KeyInput.Enter -> "{ENT}"
+        KeyInput.Space -> "{SP}"
+        KeyInput.ShiftSpace -> "{SSP}"
+        KeyInput.Escape -> "{ESC}"
+        KeyInput.Tab -> "{TAB}"
+        KeyInput.Up -> "{U}"
+        KeyInput.Down -> "{D}"
+        KeyInput.Left -> "{L}"
+        KeyInput.Right -> "{R}"
+        KeyInput.Home -> "{HOME}"
+        KeyInput.End -> "{END}"
+        KeyInput.DeleteForward -> "{DEL}"
+        KeyInput.ShiftLeft -> "{SL}"
+        KeyInput.ShiftRight -> "{SR}"
+        is KeyInput.SelectCandidate -> "{#${input.index}}"
+        is KeyInput.ConvertWidth -> "{F${6 + input.target.ordinal}}"
+        is KeyInput.ReplaceLast -> input.text.replace("{", "{{")
+        KeyInput.Other -> "{OTH}"
+        is KeyInput.SetJapanese, KeyInput.ToggleJapanese -> null
+    }
+
+    /** 1つのキーを記録の用意に入れる（打鍵の経路でするのは、キーの並びに印を足すことだけ） */
+    private fun logInput(input: KeyInput) {
+        // 確定の直後の Backspace（入力中でなければ、確定した文を消している）を数える
+        if (input == KeyInput.Backspace && fixRef >= 0 && !isComposing && emojiQuery == null) {
+            val now = clock()
+            if (now - fixCommitT <= FIX_WINDOW_MS) {
+                fixBs++
+                fixLastT = now
+                return
+            }
+        }
+        flushFix()
+        if (!japanese || logField.limited) return
+        val token = keyToken(input) ?: return
+        if (logKeys.isEmpty()) logStart = clock()
+        if (logKeys.length < MAX_KEYS) logKeys.append(token)
+        logLastToken = token
+    }
+
+    private fun flushFix() {
+        if (fixBs > 0) emit("fix", mapOf("ref" to fixRef, "bs" to fixBs, "ms" to fixLastT - fixCommitT))
+        fixRef = -1
+        fixBs = 0
+    }
+
+    /** 溜めているもの（直接入力の語・確定の直後の Backspace）を書き出す（入力欄が替わる・閉じるとき） */
+    fun flushLog() {
+        if (recorder == null) return
+        flushDirectWord("flush")
+        flushFix()
+    }
+
+    private fun clearLogInput() {
+        logKeys.setLength(0)
+        logStart = 0
+        logResize = 0
+        zenzTop = null
+        if (logCarry.isNotEmpty()) {
+            logKeys.append(logCarry)
+            logStart = clock()
+            logCarry = ""
+        }
+    }
+
+    private fun remember32(text: String) {
+        logRecent.append(text)
+        if (logRecent.length > 64) logRecent.delete(0, logRecent.length - 64)
+    }
+
+    /**
+     * 日本語を確定した出来事。[how] はきっかけ、[reading] は読み、[liveConv] はライブ変換の文節（変換中なら null で、いまの [segs] を使う）。
+     * 入力中の状態は、このあと呼び出し側が捨てる前に呼ぶこと
+     */
+    private fun logCommit(text: String, how: String, reading: String, liveConv: Conversion?) {
+        if (!recording || text.isEmpty()) return
+        val limited = logField.limited
+        val typedLast = how == "typing"
+        var keys = logKeys.toString()
+        if (how == "typing" || how == "other" || how == "mode") keys = keys.removeSuffix(logLastToken)
+        if (typedLast) logCarry = logLastToken
+        val f = LinkedHashMap<String, Any?>()
+        f["how"] = how
+        f["text"] = text
+        if (reading.isNotEmpty()) f["reading"] = reading
+        if (!limited && keys.isNotEmpty()) f["keys"] = keys
+        f["ctx"] = leftContext.takeLast(CTX_LEN)
+        f["conv"] = segs.isNotEmpty()
+        val list: List<Map<String, Any?>>? = when {
+            segs.isNotEmpty() -> segs.map { mapOf("r" to it.reading, "s" to it.surface, "i" to it.selected, "moved" to it.userChosen) }
+            liveConv != null -> liveConv.segments.map { mapOf("r" to it.reading, "s" to it.surface, "i" to 0, "moved" to false) }
+            else -> null
+        }
+        if (list != null) f["segs"] = list
+        val dictTop = conversions.firstOrNull()?.text
+        if (dictTop != null) f["dict_top"] = dictTop
+        val zt = zenzTop?.takeIf { zenzReading == reading }
+        if (zt != null) f["zenz_top"] = zt
+        f["zenz"] = if (zt == null) "none" else if (zt == dictTop) "same" else "reranked"
+        f["resize"] = logResize
+        if (logStart > 0) f["ms"] = clock() - logStart
+        emit("commit", f)
+        remember32(text)
+        fixRef = logSeq
+        fixCommitT = clock()
+        fixBs = 0
+    }
+
+    private fun logCancel(how: String) {
+        if (!recording || logField.limited || !isComposing) return
+        val f = LinkedHashMap<String, Any?>()
+        f["reading"] = composingReading
+        if (logKeys.isNotEmpty()) f["keys"] = logKeys.toString()
+        f["how"] = how
+        emit("cancel", f)
+    }
+
+    private fun logSwitch(toJapanese: Boolean) {
+        if (!recording) return
+        emit("switch", mapOf("to" to if (toJapanese) "ja" else "en", "by" to logBy, "before" to logRecent.toString().takeLast(CTX_LEN)))
+    }
+
+    /** 直接入力（日本語オフ）で打った1文字。空白・句読点は語の区切り。空白までの一続きが鍵に見えたら、その中の語は全部捨てる */
+    private fun logDirectChar(c: Char) {
+        if (!recording || logField.limited) return
+        flushFix()
+        remember32(c.toString())
+        when {
+            c.isWhitespace() -> flushDirectWord("space")
+            c.isLetterOrDigit() || c == '_' || c == '-' || c == '\'' -> {
+                directWord.append(c)
+                if (directWord.length > MAX_KEYS) directWord.setLength(MAX_KEYS)
+                if (directRun.length < MAX_KEYS) directRun.append(c)
+            }
+            else -> {
+                closeDirectWord("punct")
+                if (directRun.length < MAX_KEYS) directRun.append(c)
+            }
+        }
+    }
+
+    private fun closeDirectWord(end: String) {
+        if (directWord.isEmpty()) return
+        if (directWords.size < 64) directWords += directWord.toString() to end
+        directWord.setLength(0)
+    }
+
+    /** 溜めた語を書き出す。空白までの一続き全体が鍵に見えるときは捨てる */
+    private fun flushDirectWord(end: String) {
+        closeDirectWord(end)
+        val words = directWords.toList()
+        val secret = FieldKind.looksLikeSecret(directRun.toString())
+        directWords.clear()
+        directRun.setLength(0)
+        if (words.isEmpty() || secret || !recording || logField.limited) return
+        for ((w, e) in words) if (!FieldKind.looksLikeSecret(w)) emit("direct", mapOf("text" to w, "end" to e))
+    }
+
+    /** 音声入力の結果（デスクトップは VoiceSession、Android は commitVoice から呼ぶ） */
+    fun logVoice(mode: String, model: String, text: String, audioMs: Long) {
+        if (!recording || text.isEmpty()) return
+        flushFix()
+        emit("voice", mapOf("mode" to mode, "model" to model, "text" to text, "audio_ms" to audioMs))
+        remember32(text)
+    }
+
+    /** 声のコマンド（送って・次へ・全部消して・止めて・取り消して） */
+    fun logVoiceCommand(cmd: String) {
+        if (!recording) return
+        emit("voice_cmd", mapOf("cmd" to cmd))
+    }
+
     private fun remember(surface: String, r: String, map: LinkedHashMap<String, String> = committedReadings) {
         if (!rememberReadings || surface.isEmpty() || r.isEmpty() || surface == r) return
         map.remove(surface)
@@ -587,15 +826,18 @@ class InputEngine(
 
     /** 入力欄が変わったなど、直接入力の打鍵の並びが途切れたとき */
     fun resetDirectTyped() {
+        flushDirectWord("field")
         directTyped.clear()
     }
 
     /** 日本語オフ: キーはアプリへそのまま渡し、スニペットのキーが打ち終わったときだけ置き換える */
     private fun handleDirect(input: KeyInput): EngineResult {
         if (input !is KeyInput.Text) {
+            flushDirectWord("key")
             directTyped.clear()
             return pass()
         }
+        logDirectChar(input.char)
         val prev = directTyped.lastOrNull()
         directTyped.append(input.char)
         if (directTyped.length > MAX_TYPED) directTyped.delete(0, directTyped.length - MAX_TYPED)
@@ -615,6 +857,8 @@ class InputEngine(
             return if (applySegmentRanking(sr, ranked)) conversionView() else emptyList()
         }
         if (isConverting) return emptyList()
+        zenzReading = reading
+        zenzTop = ranked.firstOrNull()
         candidates = (pinned + ranked).distinct()
         // カーソルが未確定文字列の途中にあるあいだは、かなで出しているので見た目は変わらない
         if (editingInside) return emptyList()
@@ -644,11 +888,13 @@ class InputEngine(
             ?: candidateSource?.convertWithPrefix(reading, text)?.takeIf { it.text == text }
 
     /** アプリ側の事情（入力欄の切り替えなど）や Enter で、いま出しているものを確定させる */
-    fun commitAll(): List<ImeCommand> {
+    fun commitAll(how: String = "focus"): List<ImeCommand> {
         if (emojiQuery != null) {
             // 見えているとおり（`:` と打った名前）を確定する
             val text = composingText
             val shown = emojiMatches.isNotEmpty()
+            logCommit(text, how, "", null)
+            clearLogInput()
             endEmoji()
             leftContext = (leftContext + text).takeLast(MAX_CONTEXT)
             return listOfNotNull(ImeCommand.Commit(text), ImeCommand.HideCandidates.takeIf { shown })
@@ -660,15 +906,18 @@ class InputEngine(
         val text = composingText
         val wasConverting = isConverting
         val wasPredicting = predictions.isNotEmpty()
+        var liveConv: Conversion? = null
         if (wasConverting) {
             val source = candidateSource
             for (seg in segs) if (seg.userChosen && seg.selected != 0) source?.learn(seg.reading, seg.surface)
             for (seg in segs) remember(seg.surface, seg.reading, segmentReadings)
         } else {
             // ライブ変換のまま確定したときは、その変換の文節を覚える
-            conversionOf(text)?.segments?.forEach { remember(it.surface, it.reading, segmentReadings) }
+            liveConv = conversionOf(text)
+            liveConv?.segments?.forEach { remember(it.surface, it.reading, segmentReadings) }
         }
         remember(text, reading)
+        logCommit(text, how, reading, if (wasConverting) null else liveConv)
         reset()
         leftContext = (leftContext + text).takeLast(MAX_CONTEXT)
         return listOfNotNull(ImeCommand.Commit(text), ImeCommand.HideCandidates.takeIf { wasConverting || wasPredicting })
@@ -697,12 +946,15 @@ class InputEngine(
         reconvertOriginal = null
         endEmoji()
         requestId++
+        clearLogInput()
     }
 
     private fun setMode(on: Boolean): EngineResult {
         val commands = mutableListOf<ImeCommand>()
-        if (!on || emojiQuery != null) commands += commitAll()
+        if (!on || emojiQuery != null) commands += commitAll("mode")
         if (japanese != on) {
+            flushDirectWord("switch")
+            logSwitch(on)
             japanese = on
             commands += ImeCommand.ModeChanged(on)
         }
@@ -771,14 +1023,15 @@ class InputEngine(
             }
             KeyInput.Enter -> {
                 if (predictionSelected in predictions.indices) return commitPrediction(predictionSelected)
-                return EngineResult(commitAll(), consumed = true)
+                return EngineResult(commitAll("enter"), consumed = true)
             }
             KeyInput.Tab -> {
-                if (predictions.isEmpty()) return EngineResult(commitAll(), consumed = false)
+                if (predictions.isEmpty()) return EngineResult(commitAll("other"), consumed = false)
                 predictionSelected = (predictionSelected + 1) % predictions.size
                 return EngineResult(listOf(ImeCommand.ShowCandidates(predictions, predictionSelected, prediction = true)), consumed = true)
             }
             KeyInput.Escape -> {
+                logCancel("esc")
                 reset()
                 return EngineResult(listOf(ImeCommand.SetComposing("")), consumed = true)
             }
@@ -797,7 +1050,7 @@ class InputEngine(
                 if (input.index in predictions.indices) return commitPrediction(input.index)
                 return EngineResult(emptyList(), consumed = true)
             }
-            KeyInput.Other -> return EngineResult(commitAll(), consumed = false)
+            KeyInput.Other -> return EngineResult(commitAll("other"), consumed = false)
             is KeyInput.SetJapanese, KeyInput.ToggleJapanese -> error("handled above")
         }
         if (!isComposing) {
@@ -852,7 +1105,7 @@ class InputEngine(
         fun choose(index: Int): EngineResult? {
             seg.selected = index
             seg.userChosen = true
-            if (segs.size == 1) return EngineResult(commitAll(), consumed = true)
+            if (segs.size == 1) return EngineResult(commitAll("select"), consumed = true)
             if (focus < segs.lastIndex) {
                 focus++
                 commands += requestSegmentRerank()
@@ -874,7 +1127,7 @@ class InputEngine(
                     return EngineResult(emptyList(), consumed = true)
                 } else {
                     // 変換中に文字を打ったら、いまの変換を確定して次の入力を始める
-                    commands += commitAll()
+                    commands += commitAll("typing")
                     typeChar(input.char)
                     expandSnippet()?.let { return EngineResult(commands + it, consumed = true) }
                     commands += refreshCandidates()
@@ -901,7 +1154,7 @@ class InputEngine(
             KeyInput.ShiftRight -> commands += resize(+1)
             // 変換中の Home・End・Delete は何もしない
             KeyInput.Home, KeyInput.End, KeyInput.DeleteForward -> {}
-            KeyInput.Enter -> return EngineResult(commitAll(), consumed = true)
+            KeyInput.Enter -> return EngineResult(commitAll("enter"), consumed = true)
             KeyInput.Escape -> reconvertOriginal?.let { original ->
                 // 再変換をやめたら、元の文字に戻す
                 reset()
@@ -922,7 +1175,7 @@ class InputEngine(
                 commands += ImeCommand.SetComposing(composingText)
                 return EngineResult(commands, consumed = true)
             }
-            KeyInput.Other, KeyInput.Tab -> return EngineResult(commitAll(), consumed = false)
+            KeyInput.Other, KeyInput.Tab -> return EngineResult(commitAll("other"), consumed = false)
             // 変換中は置き換えない（確定してから、ふつうに打ち直してもらう）
             is KeyInput.ReplaceLast -> return EngineResult(emptyList(), consumed = true)
             is KeyInput.SetJapanese, KeyInput.ToggleJapanese -> error("handled above")
@@ -969,6 +1222,7 @@ class InputEngine(
         val oldLen = segs[focus].reading.length
         val newLen = (oldLen + delta).coerceIn(1, all.length - start)
         if (newLen == oldLen) return emptyList()
+        logResize++
         val head = all.substring(start, start + newLen)
         val rest = all.substring(start + newLen)
         while (segs.size > focus) segs.removeAt(segs.lastIndex)
@@ -1020,6 +1274,7 @@ class InputEngine(
         val r = reading
         if (r == candidatesFor) return emptyList()
         candidatesFor = r
+        zenzTop = null
         conversions = if (r.isEmpty()) emptyList() else source.convert(r, settings.candidateCount)
         pinned = if (r.isEmpty()) emptyList() else source.pinned(r)
         val fromDictionary = conversions.map { it.text }.ifEmpty { if (r.isEmpty()) emptyList() else listOf(r) }
@@ -1035,6 +1290,8 @@ class InputEngine(
         if (top != null && top.corrected) return emptyList()
         rerankCache[RerankKey(leftContext, r, fromDictionary, rightContext)]?.let { cached ->
             candidates = (pinned + cached).distinct()
+            zenzReading = r
+            zenzTop = cached.firstOrNull()
             return emptyList()
         }
         return listOf(rerankRequest(leftContext, r, fromDictionary, sentence = true))
@@ -1090,6 +1347,8 @@ class InputEngine(
         emojiRecent.add(0, e)
         while (emojiRecent.size > MAX_RECENT_EMOJI) emojiRecent.removeAt(emojiRecent.lastIndex)
         leftContext = (leftContext + e).takeLast(MAX_CONTEXT)
+        logCommit(e, "emoji", "", null)
+        clearLogInput()
         directTyped.clear()
         return EngineResult(listOf(ImeCommand.Commit(e), ImeCommand.HideCandidates), consumed = true)
     }
@@ -1215,7 +1474,7 @@ class InputEngine(
                 val commands = replayEmoji()
                 EngineResult(commands.ifEmpty { listOf(ImeCommand.SetComposing("")) }, consumed = true)
             }
-            KeyInput.Other -> EngineResult(commitAll(), consumed = false)
+            KeyInput.Other -> EngineResult(commitAll("other"), consumed = false)
             else -> replayThen(input)
         }
     }
@@ -1244,7 +1503,7 @@ class InputEngine(
         caret = units.size
         val commands = mutableListOf<ImeCommand>()
         candidatesFor = null
-        if (isComposing) commands += commitAll() else reset()
+        if (isComposing) commands += commitAll("snippet") else reset()
         commands += ImeCommand.Commit(output)
         leftContext = (leftContext + output).takeLast(MAX_CONTEXT)
         return commands
@@ -1382,6 +1641,11 @@ class InputEngine(
 
         /** 直接入力で覚えておく打鍵の数（スニペットのキーの長さの上限） */
         private const val MAX_TYPED = 64
+
+        /** 入力の記録: キーの並びの上限・カーソルの前の文の長さ・確定の直後の Backspace を `fix` とみなす時間 */
+        private const val MAX_KEYS = 256
+        private const val CTX_LEN = 32
+        private const val FIX_WINDOW_MS = 5000L
 
         private val PUNCTUATION = mapOf(
             '-' to "ー", ',' to "、", '.' to "。", '[' to "「", ']' to "」", '/' to "・", '~' to "〜",
