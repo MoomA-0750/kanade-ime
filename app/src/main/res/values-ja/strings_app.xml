@@ -67,6 +67,20 @@
     <string name="app_tools_reload">読み直す</string>
     <string name="app_tools_clear">消す</string>
     <string name="app_tools_key_log_empty">（まだありません）</string>
+    <string name="app_tools_input_log">入力の記録</string>
+    <string name="app_tools_input_log_description">どんな入力・変換・切り替えをしたかを、この端末の中だけに軽く残します（Kanade を良くするため）。パスワードや認証コードの欄は除きます。外へは送りません。</string>
+    <string name="app_tools_input_log_enable">入力を記録する</string>
+    <string name="app_tools_input_log_days">残す期間</string>
+    <string name="app_tools_input_log_days_value">%1$d 日</string>
+    <string name="app_tools_input_log_max">大きさの上限</string>
+    <string name="app_tools_input_log_max_value">%1$d MB</string>
+    <string name="app_tools_input_log_stats">%1$d 日分のファイル、%2$s</string>
+    <string name="app_tools_input_log_recent">最近の行</string>
+    <string name="app_tools_input_log_clear_all">全部消す</string>
+    <string name="app_tools_input_log_clear_title">入力の記録を全部消しますか？</string>
+    <string name="app_tools_input_log_clear_body">この端末に残した記録を全部消します。元には戻せません。</string>
+    <string name="app_tools_input_log_clear_confirm">消す</string>
+    <string name="app_tools_input_log_cancel">やめる</string>
     <string name="app_usage_not_found">（使い方が見つかりません）</string>
 
     <!-- 変換の試験の結果 -->

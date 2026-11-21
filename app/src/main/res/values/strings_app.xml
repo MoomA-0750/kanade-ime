@@ -67,6 +67,20 @@
     <string name="app_tools_reload">Reload</string>
     <string name="app_tools_clear">Clear</string>
     <string name="app_tools_key_log_empty">(Nothing yet)</string>
+    <string name="app_tools_input_log">Input log</string>
+    <string name="app_tools_input_log_description">Keeps a light record on this device of what you typed, converted and switched, to improve Kanade later. Password and one-time-code fields are skipped. Nothing leaves the device.</string>
+    <string name="app_tools_input_log_enable">Record input</string>
+    <string name="app_tools_input_log_days">Keep for</string>
+    <string name="app_tools_input_log_days_value">%1$d days</string>
+    <string name="app_tools_input_log_max">Size limit</string>
+    <string name="app_tools_input_log_max_value">%1$d MB</string>
+    <string name="app_tools_input_log_stats">%1$d days of files, %2$s</string>
+    <string name="app_tools_input_log_recent">Recent lines</string>
+    <string name="app_tools_input_log_clear_all">Delete everything</string>
+    <string name="app_tools_input_log_clear_title">Delete the whole input log?</string>
+    <string name="app_tools_input_log_clear_body">All recorded lines on this device will be deleted. This can\'t be undone.</string>
+    <string name="app_tools_input_log_clear_confirm">Delete</string>
+    <string name="app_tools_input_log_cancel">Cancel</string>
     <string name="app_usage_not_found">(Usage guide not found)</string>
 
     <!-- Conversion bench results -->

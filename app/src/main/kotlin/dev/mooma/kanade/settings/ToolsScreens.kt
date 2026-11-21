@@ -15,12 +15,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import dev.mooma.kanade.ConversionBench
 import dev.mooma.kanade.KeyLog
 import dev.mooma.kanade.R
+import dev.mooma.kanade.core.log.InputLogWriter
 import kasane.KasaneSpace
 
 /** 試し打ち・変換の試験・キー記録 */
@@ -101,6 +104,56 @@ fun ColumnScope.ToolsScreen() {
                     .horizontalScroll(rememberScrollState()),
             ) {
                 Text(log.ifEmpty { empty }, fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 15.sp)
+            }
+        }
+    }
+
+    Section(stringResource(R.string.app_tools_input_log), stringResource(R.string.app_tools_input_log_description)) {
+        // 書き手は IME サービスの中。ここは読む・消すだけ（書くスレッドは起こさない）
+        val reader = remember { InputLogWriter(java.io.File(context.filesDir, "input-log"), startThread = false) }
+        var on by rememberPref({ settings.inputLog }, { settings.inputLog = it })
+        SwitchRow(stringResource(R.string.app_tools_input_log_enable), on, { on = it })
+        var days by rememberPref({ settings.inputLogDays }, { settings.inputLogDays = it })
+        SliderRow(stringResource(R.string.app_tools_input_log_days), days, 7..365, 1, { days = it }) { context.getString(R.string.app_tools_input_log_days_value, it) }
+        var maxMb by rememberPref({ settings.inputLogMaxMb }, { settings.inputLogMaxMb = it })
+        SliderRow(stringResource(R.string.app_tools_input_log_max), maxMb, 10..1000, 10, { maxMb = it }) { context.getString(R.string.app_tools_input_log_max_value, it) }
+        var version by remember { mutableIntStateOf(0) }
+        val stats = remember(version) { reader.stats() }
+        val recent = remember(version) { reader.tail(50).joinToString("\n") }
+        Text(
+            stringResource(R.string.app_tools_input_log_stats, stats.first, android.text.format.Formatter.formatShortFileSize(context, stats.second)),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        var confirm by remember { mutableStateOf(false) }
+        Row(horizontalArrangement = Arrangement.spacedBy(KasaneSpace.s2)) {
+            OutlinedButton(onClick = { version++ }) { Text(stringResource(R.string.app_tools_reload)) }
+            OutlinedButton(onClick = { confirm = true }) { Text(stringResource(R.string.app_tools_input_log_clear_all)) }
+        }
+        if (confirm) {
+            AlertDialog(
+                onDismissRequest = { confirm = false },
+                title = { Text(stringResource(R.string.app_tools_input_log_clear_title)) },
+                text = { Text(stringResource(R.string.app_tools_input_log_clear_body)) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        reader.clearAll()
+                        confirm = false
+                        version++
+                    }) { Text(stringResource(R.string.app_tools_input_log_clear_confirm)) }
+                },
+                dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.app_tools_input_log_cancel)) } },
+            )
+        }
+        Text(stringResource(R.string.app_tools_input_log_recent), style = MaterialTheme.typography.titleSmallEmphasized)
+        val empty = stringResource(R.string.app_tools_key_log_empty)
+        SelectionContainer {
+            Column(
+                Modifier
+                    .heightIn(max = 300.dp)
+                    .verticalScroll(rememberScrollState())
+                    .horizontalScroll(rememberScrollState()),
+            ) {
+                Text(recent.ifEmpty { empty }, fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 15.sp)
             }
         }
     }
