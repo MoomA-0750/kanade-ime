@@ -132,9 +132,12 @@ public:
         if (!ensureConnected()) return;
         if (wantJapanese_) {
             send({"focus", "1"});
+            sendField(ic, true);
             send({"mode", "1"});
             wantJapanese_ = false;
         }
+        // 入力欄の種類が途中で変わったら（パスワード欄に入ったなど）知らせる
+        if (!release) sendField(ic, false);
         int code = k.vk ? k.vk : static_cast<int>(k.ch);
         bool repeat = !release && down_.count(code);
         if (!release) down_.insert(code);
@@ -167,6 +170,7 @@ public:
         wantJapanese_ = true;
         if (!ensureConnected()) return;
         send({"focus", "1"});
+        sendField(ic, true);
         if (wantJapanese_) {
             send({"mode", "1"});
             wantJapanese_ = false;
@@ -340,10 +344,25 @@ private:
     void disconnect() {
         io_.reset();
         voiceState_ = "off";
+        lastField_.clear();
         if (fd_ >= 0) close(fd_);
         fd_ = -1;
         composing_ = false;
         if (auto *ic = current_.get()) clearPanel(ic);
+    }
+
+    // 入力の記録のため、今の入力欄の種類（パスワード・機微な欄は secret）とアプリ名を知らせる。force でなければ変わったときだけ
+    void sendField(fcitx::InputContext *ic, bool force) {
+        auto flags = ic->capabilityFlags();
+        bool secret = flags.test(fcitx::CapabilityFlag::Password) || flags.test(fcitx::CapabilityFlag::Sensitive);
+        std::string app = ic->program();
+        for (auto &c : app) {
+            if (c == '\t' || c == '\n' || c == '\r') c = ' ';
+        }
+        std::string key = std::string(secret ? "secret" : "normal") + "\t" + app;
+        if (!force && key == lastField_) return;
+        lastField_ = key;
+        send({"field", secret ? "secret" : "normal", app, ""});
     }
 
     void send(const Fields &fields) {
@@ -670,6 +689,7 @@ private:
     bool composing_ = false;
     bool japanese_ = true;
     bool wantJapanese_ = false;
+    std::string lastField_;
     // KANADE_DEBUG=1 で fcitx5 を起こすと、届いたキーを記録に出す
     bool debug_ = std::getenv("KANADE_DEBUG") != nullptr;
     Clock::time_point launched_{};
