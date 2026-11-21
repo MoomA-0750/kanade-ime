@@ -75,6 +75,9 @@ public:
 
 private:
     bool Connect();
+    // 入力の記録のため、入力欄の種類（InputScope。読めなければ secret）と exe 名を field 行で知らせる。
+    // 編集セッションで読むので届くのは少し遅れる（その間エンジンは記録しない）。force でなければ、前回の送信から 1 秒以上あとで、変わったときだけ
+    void SendField(ITfContext* context, bool force);
     std::vector<std::string> KeyFields(WPARAM wParam, LPARAM lParam, bool down);
     bool ProcessKey(ITfContext* context, const std::vector<std::string>& fields, bool down, Reply* reply);
     BOOL TestKey(ITfContext* context, WPARAM wParam, LPARAM lParam, bool down);
@@ -135,6 +138,8 @@ private:
     PendingKey pending_;
     // 処理したキーの通し番号（エンジンから自分から届いた入力中の文字が古いかを見る）
     unsigned long long keySeq_ = 0;
+    std::string fieldSent_;       // 最後に送った field 行の中身（空なら未送信。focus 1 のたびに空に戻す）
+    ULONGLONG fieldTick_ = 0;     // 最後に field を読みに行った時刻（GetTickCount64）
 
     LONG refs_ = 1;
     ComPtr<ITfThreadMgr> threadMgr_;

@@ -4,6 +4,9 @@
 #include "EngineLauncher.h"
 #include "Globals.h"
 #include "Log.h"
+#include "Protocol.h"
+
+#include <inputscope.h>
 
 namespace kanade {
 
@@ -218,7 +221,10 @@ STDMETHODIMP TextService::Deactivate() {
 bool TextService::Connect() {
     if (!engine_) return false;
     EngineClient::State state = engine_->EnsureConnected();
-    if (state == EngineClient::State::NewlyConnected) engine_->Send({"focus", "1"});
+    if (state == EngineClient::State::NewlyConnected) {
+        engine_->Send({"focus", "1"});
+        fieldSent_.clear();  // 次のキーで field を送る
+    }
     if (state == EngineClient::State::Failed) MaybeLaunchEngine();
     return state != EngineClient::State::Failed;
 }
@@ -241,12 +247,25 @@ STDMETHODIMP TextService::OnSetFocus(ITfDocumentMgr* focus, ITfDocumentMgr*) {
         session->Release();
         if (engine_) engine_->Send({"reset"});
     }
-    if (engine_ && engine_->connected()) engine_->Send({"focus", focus ? "1" : "0"});
+    if (engine_ && engine_->connected()) {
+        engine_->Send({"focus", focus ? "1" : "0"});
+        if (focus) {
+            fieldSent_.clear();
+            ComPtr<ITfContext> top;
+            if (SUCCEEDED(focus->GetTop(&top)) && top) SendField(top.Get(), true);
+        }
+    }
     return S_OK;
 }
 
 STDMETHODIMP TextService::OnSetThreadFocus() {
-    if (Connect()) engine_->Send({"focus", "1"});
+    if (Connect()) {
+        engine_->Send({"focus", "1"});
+        fieldSent_.clear();
+        ComPtr<ITfDocumentMgr> doc;
+        ComPtr<ITfContext> top;
+        if (threadMgr_ && SUCCEEDED(threadMgr_->GetFocus(&doc)) && doc && SUCCEEDED(doc->GetTop(&top)) && top) SendField(top.Get(), true);
+    }
     return S_OK;
 }
 
@@ -345,7 +364,79 @@ void TextService::DropPending(ITfContext* context) {
     pending_ = {};
 }
 
+// GUID_PROP_INPUTSCOPE（SDK の lib に実体が無いので自分で持つ）
+static const GUID kPropInputScope = {0x1713dd5a, 0x68e7, 0x4a5b, {0x9a, 0xf6, 0x59, 0x2a, 0x59, 0x5c, 0x77, 0x8d}};
+
+void TextService::SendField(ITfContext* context, bool force) {
+    if (!context || !engine_ || !engine_->connected()) return;
+    ULONGLONG now = GetTickCount64();
+    if (!force && !fieldSent_.empty() && now - fieldTick_ < 1000) return;
+    fieldTick_ = now;
+    // アプリの exe 名（小文字）
+    wchar_t path[MAX_PATH] = {};
+    DWORD n = GetModuleFileNameW(nullptr, path, MAX_PATH);
+    std::wstring exe(path, n);
+    size_t slash = exe.find_last_of(L"\\/");
+    if (slash != std::wstring::npos) exe = exe.substr(slash + 1);
+    for (auto& c : exe) c = static_cast<wchar_t>(towlower(c));
+    std::string app = ToUtf8(exe);
+    ComPtr<ITfContext> ctx(context);
+    ComPtr<ITfTextInputProcessorEx> self(this);
+    auto* session = new EditSession([this, self, ctx, app](TfEditCookie ec) {
+        // 読めなければ secret（記録しない側に倒す）。InputScope が付いていない欄は normal
+        std::string kind = "secret", fld;
+        ComPtr<ITfRange> range;
+        ComPtr<ITfProperty> prop;
+        if (SUCCEEDED(ctx->GetStart(ec, &range)) && range && SUCCEEDED(ctx->GetProperty(kPropInputScope, &prop)) && prop) {
+            VARIANT var;
+            VariantInit(&var);
+            if (SUCCEEDED(prop->GetValue(ec, range.Get(), &var))) {
+                if (var.vt == VT_UNKNOWN && var.punkVal) {
+                    ComPtr<ITfInputScope> scope;
+                    if (SUCCEEDED(var.punkVal->QueryInterface(IID_ITfInputScope, reinterpret_cast<void**>(scope.GetAddressOf())))) {
+                        InputScope* scopes = nullptr;
+                        UINT count = 0;
+                        if (SUCCEEDED(scope->GetInputScopes(&scopes, &count))) {
+                            kind = "normal";
+                            for (UINT i = 0; i < count; i++) {
+                                switch (scopes[i]) {
+                                    case IS_PASSWORD:
+                                    case IS_NUMERIC_PASSWORD:
+                                    case IS_NUMERIC_PIN:
+                                    case IS_ALPHANUMERIC_PIN:
+                                    case IS_ALPHANUMERIC_PIN_SET:
+                                        kind = "secret";
+                                        break;
+                                    case IS_URL: fld = "url"; break;
+                                    case IS_EMAIL_SMTPEMAILADDRESS: fld = "email"; break;
+                                    case IS_SEARCH: fld = "search"; break;
+                                    default: break;
+                                }
+                            }
+                            if (scopes) CoTaskMemFree(scopes);
+                        }
+                    }
+                } else if (var.vt == VT_EMPTY) {
+                    kind = "normal";
+                }
+            }
+            VariantClear(&var);
+        }
+        std::string key = kind + "\t" + app + "\t" + fld;
+        if (key != fieldSent_ && engine_ && engine_->connected()) {
+            fieldSent_ = key;
+            engine_->Send({"field", kind, app, fld});
+        }
+        return S_OK;
+    });
+    HRESULT hr;
+    context->RequestEditSession(clientId_, session, TF_ES_ASYNCDONTCARE | TF_ES_READ, &hr);
+    session->Release();
+}
+
 BOOL TextService::TestKey(ITfContext* context, WPARAM wParam, LPARAM lParam, bool down) {
+    // 入力欄の種類が途中で変わったか（パスワード欄に入ったなど）、1 秒に 1 回だけ見る
+    if (down) SendField(context, false);
     KeyId id = MakeKeyId(wParam, lParam, down);
     // 同じキーをもう一度聞かれた（OnKeyDown の前に2回）ときは、取っておいた答えを返す
     if (pending_.valid && pending_.id == id) return TRUE;
