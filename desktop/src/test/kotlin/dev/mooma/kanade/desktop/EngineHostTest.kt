@@ -310,4 +310,24 @@ class EngineHostTest {
         val c = events.single { it.ev == "commit" }
         assertEquals(null, c.fields["keys"])
     }
+
+    @Test
+    fun inputLogRecordsVoiceOnlyInNormalField() {
+        val events = mutableListOf<dev.mooma.kanade.core.log.InputEvent>()
+        val host = EngineHost(InputEngine().apply { recorder = { events += it } }, voice = FakeVoice())
+        val d = FakeDll.inProcess(host).apply { hello("fcitx5") }
+        d.focus()
+        d.field("secret", "com.example")
+        d.send("voice", "start", "ja")
+        d.send("voice", "stop")
+        assertTrue(events.isEmpty(), events.toString())
+        d.focus()
+        d.field("normal", "com.example")
+        d.send("voice", "start", "ja")
+        d.send("voice", "stop")
+        val v = events.single { it.ev == "voice" }
+        assertEquals("hold", v.fields["mode"])
+        assertEquals("voice", v.fields["src"])
+        assertEquals("こんにちは。", v.fields["text"])
+    }
 }

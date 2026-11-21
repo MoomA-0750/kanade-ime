@@ -57,7 +57,7 @@ internal class VoiceSession(
     private var nextSeq = 0
     private var nextDeliver = 0
     private val results = TreeMap<Int, Result>()
-    private class Result(val generation: Int, val text: String?, val fallback: String?, val candidate: Boolean)
+    private class Result(val generation: Int, val text: String?, val fallback: String?, val candidate: Boolean, val audioMs: Long = 0)
 
     /** Kanade で打っている途中に届いて、まだ入れられない文 */
     private val pending = StringBuilder()
@@ -270,6 +270,7 @@ internal class VoiceSession(
                 if (text.isNullOrEmpty() || target == null) return@synchronized
                 // 認識しているあいだに打ち始めていたら、その文字を先に確定する
                 val commands = host.runCommands(engine.commitAll()) + ImeCommand.Commit(text)
+                engine.logVoice("hold", voice.modelName(english), text, clock() - downAt)
                 if (!english) addContext(text)
                 lastVoice = text
                 target.send(host.replyLines(commands))
@@ -339,9 +340,10 @@ internal class VoiceSession(
         val fallback = partial
         partial = null
         val candidate = commandsEnabled && !english && VoiceCommand.isCandidate(pcm, WhisperModel.SAMPLE_RATE)
+        val audioMs = pcm.size * 1000L / WhisperModel.SAMPLE_RATE
         voice.recognize(pcm, english) { text ->
             synchronized(lock) {
-                results[seq] = Result(gen, text, fallback, candidate)
+                results[seq] = Result(gen, text, fallback, candidate, audioMs)
                 while (results.isNotEmpty() && results.firstKey() == nextDeliver) {
                     val r = results.remove(nextDeliver)!!
                     nextDeliver++
@@ -361,6 +363,7 @@ internal class VoiceSession(
         val text = (r.text ?: r.fallback)?.takeIf { it.isNotEmpty() } ?: return
         gotText = true
         lastVoice = text
+        engine.logVoice("listen", voice.modelName(english), text, r.audioMs)
         // 打っている途中の文字を上書きしないよう、それが確定するまで待つ（前に待たせた文があれば、その後ろに並べる）
         pending.append(text)
         val target = client ?: return
@@ -389,6 +392,7 @@ internal class VoiceSession(
             VoiceCommand.UNDO -> Ui.t("取り消し", "Undo")
             VoiceCommand.CLEAR -> Ui.t("全部消す", "Clear")
         }
+        engine.logVoiceCommand(c.name.lowercase())
         host.indicate("🎤 $label", 1500)
         host.log("voice: command $c")
         when (c) {

@@ -806,7 +806,7 @@ class InputEngine(
     fun logVoice(mode: String, model: String, text: String, audioMs: Long) {
         if (!recording || text.isEmpty()) return
         flushFix()
-        emit("voice", mapOf("mode" to mode, "model" to model, "text" to text, "audio_ms" to audioMs))
+        emit("voice", mapOf("src" to "voice", "mode" to mode, "model" to model, "text" to text, "audio_ms" to audioMs))
         remember32(text)
     }
 

@@ -30,6 +30,9 @@ interface VoiceService {
 
     /** ひと区切りの音を文字にする（聞き続けるモード）。呼んだ順に、裏のスレッドから [onText] を返す。文字にできなければ null */
     fun recognize(pcm: FloatArray, english: Boolean, onText: (String?) -> Unit) = onText(null)
+
+    /** いま使う確定の文のモデルの名前（入力の記録に残す） */
+    fun modelName(english: Boolean): String = ""
 }
 
 /**
@@ -63,6 +66,8 @@ class DesktopVoice(
 
     /** 英語の口述に使うモデル（設定の voice_final_en） */
     @Volatile var finalModelEn: VoiceFinal = VoiceFinal.DEFAULT_EN
+
+    override fun modelName(english: Boolean) = (if (english) finalModelEn else finalModel).id
 
     /** いまの録音を英語で文字にするか（[start] で決める） */
     @Volatile private var english = false
