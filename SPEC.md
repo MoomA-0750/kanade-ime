@@ -153,6 +153,7 @@
 - 13-5（仮）ターミナル・パスワード管理アプリ（設定 `input_log_limited_apps`）では `commit` と `switch` だけ残し、キー・取り消し・英字の語は残さない
 - 13-6（仮）記録は待たずに待ち行列に入れ、別のスレッドがまとめて追記する。あふれたら捨てて `dropped` に件数を残す。`input_log_days`（既定 90）より古い日と、合計 `input_log_max_mb`（既定 200）を超えた分は古い日から消す。1日 20MB を超えたらその日は書かない
 - 13-7（仮）設定の画面から全部消せる（`clear-input-log`）
+- 13-8（仮）フロントの送り方: fcitx5・macOS・Windows TSF は `focus 1` の直後と、入力中に変わったと分かったときに `field` を送る（fcitx5 は `Password`・`Sensitive`、macOS は `IsSecureEventInputEnabled()`、Windows は InputScope。Windows は読めなければ secret、キー入力のとき 1 秒に 1 回見直す）。Android は `onStartInput` で `FieldKind.fromAndroid` を使い、書き手は `filesDir/input-log` に、`onFinishInput` で flush。`src` は物理キー `hw`・画面の QWERTY `soft`・フリック `flick`・グライド `glide`・音声 `voice`
 - 確かめ方: core の `InputLogWriterTest`・`InputLogEngineTest`・`FieldKindTest`、desktop の `EngineHostTest`・`InputLogAppTest`。各 OS のパスワード欄で打って、その日のファイルの行が増えないことを見る（手順。フロントが `field` を送るようになってから）
 
 ## 予定（作ると決めたもの）

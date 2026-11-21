@@ -684,3 +684,12 @@ SPEC.md の未決事項に本人が答えた。
 - 作ったもの: core の log/（InputEvent・JsonLine・InputLogWriter・FieldKind/LogField）、InputEngine の `recorder`・`logField`・`logVoice`・`logVoiceCommand`・`flushLog`、EngineHost の `field` 行（相手ごとに持つ。`focus` で「分からない」に戻す）、DesktopStore の設定4つ、DesktopApp の書き手の付け外しと `clear-input-log`、VoiceSession の voice・voice_cmd。
 - 実装で決めたこと（仮、戻せる）: ① 直接入力の語は、空白までの一続き全体が鍵に見えるときは中の語も捨てる（`$` などの記号で語が分かれて見逃すのを防ぐため）。② 確定の直後の Backspace は、入力中でないときだけ数える（5 秒以内・ほかのキーが来るまで）。③ 入力欄に入ったときの始めのモードの切り替えは `switch` の `by` を `focus` にする（キーの切り替えは `key`）。④ `commit` の `how` は enter・select・typing・other・focus・mode・prediction・emoji・snippet。変換中に文字を打って確定したとき（typing）は、その文字を次の確定のキーの並びに回す。⑤ `start` の `front` はデスクトップでは `desktop` 固定（フロントの種類は hello でしか分からないため、フェーズ3で必要なら足す）。⑥ ターミナル・パスワード管理アプリの標準の一覧は `LogField.DEFAULT_LIMITED_APPS`（名前に含まれていれば当たる）。
 - 戻し方: 設定 `input_log` を false にすれば書き手が外れる。全部消すのは admin の `clear-input-log`。
+
+
+## 2026-11-22 入力の記録 フェーズ3（フロント）
+
+- Android の `input_log`・`input_log_days`・`input_log_max_mb`・`input_log_limited_apps` は SettingsBackup の `LOCAL_KEYS` に入れ、書き出さず、読み込みで置き換えられても今の値を残す。このために、読み込みの「残す」処理を Long だけから Boolean・Int・String にも広げた（戻すには LOCAL_KEYS から外す）
+- Android の `src` は `withSource` で包んで付ける。候補の帯を指で選ぶのは `soft`。グライドで読みを入れる間は `glide`。聞き続けるモードの音声は `voice` の `mode` が `listen`、押している間は `hold`
+- Android の書き手は IME サービスの `onStartInput` で設定を見て付け外しする（設定の画面でオンにしたら、次の入力欄から効く）
+- Windows の InputScope は編集セッション（非同期・読み取り）で読む。`GUID_PROP_INPUTSCOPE` は SDK の lib に実体が無いので GUID を自分で持った。キー入力のときの見直しは 1 秒に 1 回。実際のアプリ（Chrome・Edge のパスワード欄など）での動きは未確認
+- fcitx5 の `fld` は空（種類を細かく見分ける材料が無い）。macOS も空
