@@ -5,6 +5,8 @@ import dev.mooma.kanade.core.convert.DictionaryCandidateSource
 import dev.mooma.kanade.core.dict.LearningHistory
 import dev.mooma.kanade.core.dict.Snippets
 import dev.mooma.kanade.core.dict.UserDictionary
+import dev.mooma.kanade.core.log.InputEvent
+import dev.mooma.kanade.core.log.InputLogWriter
 import java.io.File
 import kotlin.concurrent.thread
 
@@ -20,7 +22,10 @@ class DesktopApp(
     private val zenz: ZenzReranker? = null,
 ) {
     private var known = emptyList<Long>()
-    private var settings = DesktopSettings()
+    @Volatile private var settings = DesktopSettings()
+
+    /** 入力の記録の書き手（設定の input_log がオンのあいだだけ） */
+    private var logWriter: InputLogWriter? = null
 
     fun start() {
         store.ensureFiles()
@@ -70,7 +75,44 @@ class DesktopApp(
         host.macSwitchKeys = s.macSwitchKeys
         host.remoteApps = s.remoteApps
         host.voiceKeys = s.voiceHoldKeys to s.voiceToggleKey
+        host.inputLogLimitedApps = s.inputLogLimitedApps
+        applyInputLog(s)
         log(if (first) "設定を読んだ" else "設定を読み直した")
+    }
+
+    /** 設定に合わせて、入力の記録の書き手を付け外しする */
+    @Synchronized
+    private fun applyInputLog(s: DesktopSettings) {
+        if (s.inputLog && logWriter == null) {
+            val w = InputLogWriter(store.inputLogDir, { settings.inputLogDays }, { settings.inputLogMaxMb * 1024L * 1024L })
+            w.header = {
+                val os = if (Os.isWindows) "windows" else if (Os.isMac) "mac" else "linux"
+                InputEvent(
+                    System.currentTimeMillis(), "start",
+                    mapOf(
+                        "v" to 1, "os" to os, "front" to "desktop", "build" to (System.getProperty("kanade.build") ?: ""),
+                        "zenz" to (zenz != null), "zenz_mode" to settings.zenzMode, "live" to settings.liveConversion,
+                    ),
+                )
+            }
+            logWriter = w
+            host.locked { host.engine.recorder = w::record }
+            log("入力の記録を始めた: ${store.inputLogDir}")
+        } else if (!s.inputLog && logWriter != null) {
+            stopInputLog()
+            log("入力の記録をやめた")
+        }
+    }
+
+    @Synchronized
+    private fun stopInputLog() {
+        val w = logWriter ?: return
+        host.locked {
+            host.engine.flushLog()
+            host.engine.recorder = null
+        }
+        w.close()
+        logWriter = null
     }
 
     /** 学習と、前回の日本語のオン/オフを保存する（変わったときだけ） */
@@ -81,6 +123,8 @@ class DesktopApp(
             if (l != null) source.learningChanged = false
             l to host.engine.japanese
         }
+        host.locked { host.engine.flushLog() }
+        logWriter?.flush()
         if (learning != null) store.write(store.learningFile, learning)
         if (japanese != settings.lastJapanese) {
             settings = settings.copy(lastJapanese = japanese)
@@ -139,6 +183,11 @@ class DesktopApp(
             }
             save()
             true to Ui.t("覚えたものを消しました", "Cleared the learned conversions")
+        }
+        "clear-input-log" -> {
+            // 書き手が動いていなくても、ファイルは消す
+            val n = logWriter?.clearAll() ?: InputLogWriter(store.inputLogDir, startThread = false).clearAll()
+            true to Ui.t("入力の記録を消しました（$n 日分）", "Cleared the input log ($n days)")
         }
         else -> false to Ui.t("知らない頼みごとです: $command", "Unknown request: $command")
     }

@@ -1,6 +1,7 @@
 package dev.mooma.kanade.desktop
 
 import dev.mooma.kanade.core.EngineSettings
+import dev.mooma.kanade.core.log.LogField
 import org.json.JSONObject
 import java.io.File
 import java.util.Properties
@@ -48,6 +49,14 @@ data class DesktopSettings(
     val voiceHoldKeys: String = "F12,Alt_R",
     /** Linux 版の、押すたびに録音を始める・終える録音キー（fcitx5 のキーの名前。空なら使わない） */
     val voiceToggleKey: String = "Control+Alt+space",
+    /** 入力の記録（docs/INPUT-LOG.md）。端末の中だけに、確定・切り替え・直接入力の語などを日ごとのファイルに書く。既定はオフ。Android の書き出しには入れない */
+    val inputLog: Boolean = false,
+    /** 入力の記録を残す日数 */
+    val inputLogDays: Int = 90,
+    /** 入力の記録の合計の容量の上限（MB） */
+    val inputLogMaxMb: Int = 200,
+    /** 入力の記録で、確定と切り替えだけ残すアプリ（名前に含まれていれば当たる。ターミナル・パスワード管理アプリなど） */
+    val inputLogLimitedApps: String = LogField.DEFAULT_LIMITED_APPS,
 ) {
     fun engineSettings() = EngineSettings(
         fullWidthSymbols = fullWidthSymbols, liveConversion = liveConversion, punctuation = punctuation, pairBrackets = pairBrackets,
@@ -65,6 +74,9 @@ class DesktopStore(val dir: File = defaultDir()) {
     val userDictionaryFile = File(dir, "user_dictionary.txt")
     val snippetsFile = File(dir, "snippets.txt")
     val learningFile = File(dir, "learning.txt")
+
+    /** 入力の記録の置き場（日ごとの YYYY-MM-DD.jsonl） */
+    val inputLogDir = File(dir, "input-log")
 
     /** 初めてのときに例を書いておく（Android 版の初めの中身と同じ） */
     fun ensureFiles() {
@@ -106,6 +118,10 @@ class DesktopStore(val dir: File = defaultDir()) {
             voiceFinalEn = p.getProperty(KEY_VOICE_FINAL_EN)?.trim()?.takeIf { id -> VoiceFinal.entries.any { it.id == id && it.english } } ?: d.voiceFinalEn,
             voiceHoldKeys = p.getProperty(KEY_VOICE_HOLD)?.let(::keyList) ?: d.voiceHoldKeys,
             voiceToggleKey = p.getProperty(KEY_VOICE_TOGGLE)?.let(::keyList) ?: d.voiceToggleKey,
+            inputLog = bool(KEY_INPUT_LOG, d.inputLog),
+            inputLogDays = p.getProperty(KEY_INPUT_LOG_DAYS)?.trim()?.toIntOrNull()?.takeIf { it in 1..3650 } ?: d.inputLogDays,
+            inputLogMaxMb = p.getProperty(KEY_INPUT_LOG_MAX_MB)?.trim()?.toIntOrNull()?.takeIf { it in 1..100_000 } ?: d.inputLogMaxMb,
+            inputLogLimitedApps = p.getProperty(KEY_INPUT_LOG_LIMITED)?.trim() ?: d.inputLogLimitedApps,
         )
     }
 
@@ -155,6 +171,13 @@ class DesktopStore(val dir: File = defaultDir()) {
             appendLine("$KEY_VOICE_HOLD=${s.voiceHoldKeys}")
             appendLine("# Linux 版: 押すたびに録音を始める・終えるキー（例 Control+Alt+space。空なら使わない）。録音中の Esc で取り消す")
             appendLine("$KEY_VOICE_TOGGLE=${s.voiceToggleKey}")
+            appendLine("# 入力の記録（確定・取り消し・日英の切り替え・音声入力などを、この端末の input-log/ に日ごとのファイルで残す。外へは送らない。パスワード欄は残さない）")
+            appendLine("$KEY_INPUT_LOG=${s.inputLog}")
+            appendLine("# 入力の記録を残す日数と、合計の容量の上限（MB）。超えた分は古い日から消す")
+            appendLine("$KEY_INPUT_LOG_DAYS=${s.inputLogDays}")
+            appendLine("$KEY_INPUT_LOG_MAX_MB=${s.inputLogMaxMb}")
+            appendLine("# 入力の記録で、確定と日英の切り替えだけ残すアプリ（名前に含まれていれば当たる。カンマ区切り）")
+            appendLine("$KEY_INPUT_LOG_LIMITED=${s.inputLogLimitedApps}")
             appendLine("# 前回の日本語のオン/オフ（エンジンが書く）")
             appendLine("$KEY_LAST_MODE=${s.lastJapanese}")
         }
@@ -321,6 +344,10 @@ class DesktopStore(val dir: File = defaultDir()) {
         const val KEY_VOICE_FINAL_EN = "voice_final_en"
         const val KEY_VOICE_HOLD = "voice_hold_keys"
         const val KEY_VOICE_TOGGLE = "voice_toggle_key"
+        const val KEY_INPUT_LOG = "input_log"
+        const val KEY_INPUT_LOG_DAYS = "input_log_days"
+        const val KEY_INPUT_LOG_MAX_MB = "input_log_max_mb"
+        const val KEY_INPUT_LOG_LIMITED = "input_log_limited_apps"
 
         /** キーの名前の並びをそろえる（空白を除く。fcitx5 のキーの名前に使わない文字は捨てる） */
         fun keyList(value: String): String =
