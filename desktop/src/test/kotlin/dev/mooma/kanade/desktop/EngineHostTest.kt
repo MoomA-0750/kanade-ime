@@ -250,4 +250,64 @@ class EngineHostTest {
         d.send("focus", "1")
         assertTrue(!host.engine.japanese)
     }
+
+    private fun loggingHost(events: MutableList<dev.mooma.kanade.core.log.InputEvent>) = EngineHost(
+        InputEngine().apply { recorder = { events += it } },
+    )
+
+    @Test
+    fun inputLogWaitsForFieldLine() {
+        val events = mutableListOf<dev.mooma.kanade.core.log.InputEvent>()
+        val d = FakeDll.inProcess(loggingHost(events)).apply { hello() }
+        d.focus()
+        d.type("{Henkan}ka{Enter}")
+        // focus 1 だけでは分からないので記録しない
+        assertTrue(events.none { it.ev == "commit" }, events.toString())
+        d.field("normal", "com.example", "email")
+        d.type("ki{Enter}")
+        val c = events.single { it.ev == "commit" }
+        assertEquals("com.example", c.fields["app"])
+        assertEquals("email", c.fields["fld"])
+        assertEquals("き", c.fields["text"])
+    }
+
+    @Test
+    fun inputLogSkipsSecretField() {
+        val events = mutableListOf<dev.mooma.kanade.core.log.InputEvent>()
+        val d = FakeDll.inProcess(loggingHost(events)).apply { hello() }
+        d.focus()
+        d.field("secret", "com.example")
+        d.type("{Henkan}ka{Enter}")
+        assertTrue(events.isEmpty(), events.toString())
+        // 次の入力欄（focus 1）では、また分からないところから
+        d.focus()
+        d.field("normal", "com.example")
+        d.type("ki{Enter}")
+        assertEquals(1, events.count { it.ev == "commit" })
+    }
+
+    @Test
+    fun inputLogFieldIsPerClient() {
+        val events = mutableListOf<dev.mooma.kanade.core.log.InputEvent>()
+        val host = loggingHost(events)
+        val a = FakeDll.inProcess(host, 1).apply { hello() }
+        val b = FakeDll.inProcess(host, 2).apply { hello() }
+        a.focus(); a.field("normal", "app.a")
+        b.focus(); b.field("secret", "app.b")
+        b.type("{Henkan}ka{Enter}")
+        assertTrue(events.isEmpty())
+        a.type("ki{Enter}")
+        assertEquals("app.a", events.single { it.ev == "commit" }.fields["app"])
+    }
+
+    @Test
+    fun inputLogLimitedAppFromHost() {
+        val events = mutableListOf<dev.mooma.kanade.core.log.InputEvent>()
+        val host = loggingHost(events)
+        val d = FakeDll.inProcess(host).apply { hello() }
+        d.focus(); d.field("normal", "org.gnome.Terminal")
+        d.type("{Henkan}ka{Enter}")
+        val c = events.single { it.ev == "commit" }
+        assertEquals(null, c.fields["keys"])
+    }
 }

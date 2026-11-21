@@ -54,6 +54,12 @@ class FakeDll(private val out: (String) -> Unit) {
 
     fun commitAll() = request("commitall")
 
+    /** 入力欄に入った（focus 1）。入力の記録は、field が届くまで何も書かない */
+    fun focus(on: Boolean = true) = out(Protocol.encode("focus", if (on) 1 else 0))
+
+    /** 入力欄の種類を知らせる（normal・secret・nolearn） */
+    fun field(kind: String, app: String = "", fld: String = "") = out(Protocol.encode("field", kind, app, fld))
+
     /** 候補の窓で候補をクリックした */
     fun select(index: Int) = out(Protocol.encode("select", index))
 

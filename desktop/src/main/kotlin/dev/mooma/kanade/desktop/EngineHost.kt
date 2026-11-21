@@ -4,6 +4,8 @@ import dev.mooma.kanade.core.voice.VoiceEarcon
 import dev.mooma.kanade.core.ImeCommand
 import dev.mooma.kanade.core.InputEngine
 import dev.mooma.kanade.core.KeyInput
+import dev.mooma.kanade.core.log.FieldKind
+import dev.mooma.kanade.core.log.LogField
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -124,15 +126,27 @@ class EngineHost(
                     voicePending(client).takeIf { it.isNotEmpty() }?.let { client.send(reply(0, it, false)) }
                 }
             }
+            // 入力欄の種類（入力の記録のため）。focus 1 のあとと、入力中に変わったと分かったときに送ってくる。
+            // 届くまでは「分からない」で、何も記録しない。field <normal|secret|nolearn> <app> <fld>
+            "field" -> synchronized(lock) {
+                val field = LogField.of(FieldKind.parse(f.getOrNull(1)), f.getOrElse(2) { "" }, f.getOrElse(3) { "" }, inputLogLimitedApps)
+                fields[client] = field
+                if (active === client) engine.logField = field
+            }
             "focus" -> synchronized(lock) {
                 // 入力欄が替わったら、聞き続けるモードは終える
                 voiceSession?.blur()
+                // 入力欄の種類は、field が届くまで分からない（記録しない）
+                fields[client] = LogField()
+                if (active === client) engine.logField = LogField() else engine.flushLog()
                 if (f.getOrNull(1) == "1") {
                     activate(client)
                     // 入力欄に入るたびに、設定の始めのモード（日本語・英字）にそろえる（LAST は前のまま）
                     val want = when (startMode) { "JAPANESE" -> true; "ENGLISH" -> false; else -> null }
                     if (want != null && engine.japanese != want) {
-                        client.send(reply(0, run(engine.handle(KeyInput.SetJapanese(want)).commands), false))
+                        engine.logBy = "focus"
+                        val switched = try { engine.handle(KeyInput.SetJapanese(want)).commands } finally { engine.logBy = "key" }
+                        client.send(reply(0, run(switched), false))
                     } else {
                         client.send(reply(0, listOf(ImeCommand.ModeChanged(engine.japanese)), false))
                     }
@@ -189,6 +203,7 @@ class EngineHost(
 
     fun disconnected(client: Client) = synchronized(lock) {
         fcitxClients.remove(client)
+        fields.remove(client)
         voiceSession?.disconnected(client)
         if (active === client) {
             engine.reset()
@@ -200,8 +215,15 @@ class EngineHost(
         if (active !== client) {
             if (engine.isComposing) engine.reset()
             active = client
+            engine.logField = fields[client] ?: LogField()
         }
     }
+
+    /** DLL ごとの、いまの入力欄の種類（入力の記録。`field` 行で届く） */
+    private val fields = HashMap<Client, LogField>()
+
+    /** 入力の記録で、確定と切り替えだけ残すアプリ（設定の input_log_limited_apps。名前に含まれていれば当たる） */
+    @Volatile var inputLogLimitedApps: String = LogField.DEFAULT_LIMITED_APPS
 
     private fun parseKey(f: List<String>, at: Int) = WinKey(
         down = f[at] == "d",
