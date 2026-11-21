@@ -283,7 +283,15 @@ class EngineHost(
             fcitxClients.forEach { it.send(voiceKeysLines()) }
         }
 
-    private fun voiceKeysLines() = listOf(Protocol.encode("c", "0", "voicekeys", voiceKeys.first, voiceKeys.second, macSwitchKeys), Protocol.encode("done", 0, 0))
+    /** macOS の版: キーを素通しにするアプリ（リモートデスクトップなど）の bundle id（カンマ区切り。標準の分に足す）。設定の remote_apps */
+    var remoteApps: String = ""
+        set(value) = synchronized(lock) {
+            if (field == value) return
+            field = value
+            fcitxClients.forEach { it.send(voiceKeysLines()) }
+        }
+
+    private fun voiceKeysLines() = listOf(Protocol.encode("c", "0", "voicekeys", voiceKeys.first, voiceKeys.second, macSwitchKeys, remoteApps), Protocol.encode("done", 0, 0))
 
     /** 録音キー（Windows の DLL から F12 がキーとして届く）: 長押しは押している間だけ録音、短く押すと聞き続けるモード */
     private fun voiceKey(client: Client, id: Int, key: WinKey): List<String> {

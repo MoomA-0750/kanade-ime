@@ -126,7 +126,7 @@ final class VoiceInput: CommandTarget {
     /** Control+Space と 🌐 キー（ほかのキーと一緒でなく単独で押して離したとき）を、エンジンの Ctrl+Space（日本語⇔英字）として渡す。使ったら true */
     private func switchKey(_ type: CGEventType, _ code: Int, _ flags: CGEventFlags) -> Bool {
         let link = EngineLink.shared
-        guard takeSwitchKeys, link.target != nil, link.connected else { return false }
+        guard takeSwitchKeys, link.target != nil, link.connected, !RemoteApps.isFrontmost else { return false }
         func toggle() {
             let k = (vk: VK.space, ch: 0x20, mods: 2)
             for phase in ["d", "u"] {

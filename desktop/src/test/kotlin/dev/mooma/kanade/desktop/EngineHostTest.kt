@@ -198,7 +198,7 @@ class EngineHostTest {
         val host = EngineHost(InputEngine(), voice = voice)
         val d = FakeDll.inProcess(host).apply { hello("fcitx5") }
         // つないだら録音キーが届く
-        assertTrue(d.received.any { it == listOf("voicekeys", "F12,Alt_R", "Control+Alt+space", "KANADE") })
+        assertTrue(d.received.any { it == listOf("voicekeys", "F12,Alt_R", "Control+Alt+space", "KANADE", "") })
         // 英字（keyboard-us）のときに録音キー → 英語のモデルで、確定が届く
         d.send("voice", "start", "en")
         assertTrue(voice.recording)
@@ -221,10 +221,10 @@ class EngineHostTest {
         assertEquals("Hello world.かこんにちは。", d.toString())
         // 設定で録音キーを替えたら、すぐ届く
         host.voiceKeys = "F9" to ""
-        assertTrue(d.received.any { it == listOf("voicekeys", "F9", "", "KANADE") })
+        assertTrue(d.received.any { it == listOf("voicekeys", "F9", "", "KANADE", "") })
         // macOS の Control+Space・🌐 を macOS に任せる設定も、録音キーと一緒に届く
         host.macSwitchKeys = "MACOS"
-        assertTrue(d.received.any { it == listOf("voicekeys", "F9", "", "MACOS") })
+        assertTrue(d.received.any { it == listOf("voicekeys", "F9", "", "MACOS", "") })
     }
 
     @Test

@@ -68,6 +68,7 @@ class DesktopApp(
         host.voiceCommands = s.voiceCommands
         host.continuousIdleSeconds = s.continuousIdleSeconds
         host.macSwitchKeys = s.macSwitchKeys
+        host.remoteApps = s.remoteApps
         host.voiceKeys = s.voiceHoldKeys to s.voiceToggleKey
         log(if (first) "設定を読んだ" else "設定を読み直した")
     }

@@ -27,7 +27,7 @@ final class SettingsFile {
     private var lines: [String] = []
     static let defaults: [String: String] = [
         "full_width_symbols": "true", "live_conversion": "true", "zenz_mode": "CORRECT", "punctuation": "、。", "pair_brackets": "true", "emoji_shortcodes": "true", "emoji_prefix": ":", "emoji_prefix_twice": "false",
-        "spoken_punctuation": "true", "voice_sounds": "true", "voice_commands": "true", "continuous_idle_seconds": "60", "voice_final": "parakeet", "learning": "true", "ui_language": "auto", "key_style": "MAC", "start_mode": "LAST", "mac_switch_keys": "KANADE",
+        "spoken_punctuation": "true", "voice_sounds": "true", "voice_commands": "true", "continuous_idle_seconds": "60", "voice_final": "parakeet", "learning": "true", "ui_language": "auto", "key_style": "MAC", "start_mode": "LAST", "mac_switch_keys": "KANADE", "remote_apps": "",
         "voice_final_en": "parakeet-en", "voice_hold_keys": "F12,Alt_R", "voice_toggle_key": "Control+Alt+space",
     ]
     var values: [String: String] = [:]

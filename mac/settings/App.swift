@@ -4,10 +4,10 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 enum Page: String, CaseIterable, Identifiable {
-    case input, voice, dictionary, snippets, backup, usage, attention
+    case input, voice, dictionary, snippets, backup, usage, about, attention
     var id: String { rawValue }
     /** サイドバーにいつも並ぶページ（attention は確かめてほしいことがあるときだけ上に出る） */
-    static let main: [Page] = [.input, .voice, .dictionary, .snippets, .backup, .usage]
+    static let main: [Page] = [.input, .voice, .dictionary, .snippets, .backup, .usage, .about]
     var title: String {
         switch self {
         case .attention: T("確かめてほしいこと", "Needs your attention")
@@ -17,6 +17,7 @@ enum Page: String, CaseIterable, Identifiable {
         case .snippets: T("スニペット", "Snippets")
         case .backup: T("設定の保存と読み込み", "Backup and restore")
         case .usage: T("使い方", "How to use")
+        case .about: T("バージョン情報", "About")
         }
     }
     var symbol: String {
@@ -27,6 +28,7 @@ enum Page: String, CaseIterable, Identifiable {
         case .snippets: "text.badge.plus"
         case .backup: "arrow.up.arrow.down"
         case .usage: "questionmark.circle"
+        case .about: "info.circle"
         case .attention: "exclamationmark.triangle.fill"
         }
     }
@@ -127,6 +129,7 @@ struct ContentView: View {
                 case .snippets: PairPage(snippets: true)
                 case .backup: BackupPage()
                 case .usage: UsagePage()
+                case .about: AboutPage()
                 case .attention: AttentionPage()
                 }
             }
@@ -181,6 +184,15 @@ struct InputPage: View {
                     Text(T("Control+Space・🌐 キー", "Control+Space and the globe key"))
                     Text(T("日本語と英字の切り替えを Kanade の中で行います。macOS の入力ソースの切り替えが遅れるときに便利です。「macOS に任せる」にすると、これらのキーは macOS の入力ソースの切り替えに使われます（かな・英数キーは、どちらでも Kanade が受けます）",
                            "Switches between Japanese and English inside Kanade, which avoids the delay of macOS input source switching. With \"Leave them to macOS\" these keys switch macOS input sources (the Kana and Eisu keys are always handled by Kanade)"))
+                }
+                LabeledContent {
+                    TextField("", text: settings.string("remote_apps"), prompt: Text("com.example.app, …"))
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 320)
+                } label: {
+                    Text(T("キーを通すアプリ（足す分）", "Apps that get the keys untouched (extra)"))
+                    Text(T("リモートデスクトップなどが手前にあるあいだは、Kanade はキーを取らずに向こう側へ通します。Moonlight・Parsec・Jump Desktop・Windows App・画面共有・TeamViewer・AnyDesk・仮想マシンなどは最初から入っています。ほかのアプリは bundle id をカンマで区切って足します",
+                           "While a remote desktop app is in front, Kanade passes keys through to the remote host. Moonlight, Parsec, Jump Desktop, Windows App, Screen Sharing, TeamViewer, AnyDesk and virtual machine apps are built in. Add other apps by bundle ID, separated by commas"))
                 }
                 Toggle(isOn: settings.bool("full_width_symbols")) {
                     Text(T("数字・記号を全角にする", "Full-width numbers and symbols"))
@@ -757,8 +769,8 @@ struct UsagePage: View {
     var body: some View {
         Form {
             section(T("打つ", "Typing"), [
-                T("入力メニューの「Kanade ひらがな」で日本語、「Kanade 英字」で英字。Control+Space・地球儀キー・かな／英数キーでも切り替わります",
-                  "Kanade Hiragana in the input menu types Japanese, Kanade English types letters. Control+Space, the Globe key and the Kana/Eisu keys also switch"),
+                T("日本語と英字は、Control+Space・地球儀キー・かな／英数キーで切り替わります（メニューバーの「あ」「A」の項目からも切り替えられます）",
+                  "Switch between Japanese and English with Control+Space, the Globe key or the Kana/Eisu keys (you can also use the あ/A item in the menu bar)"),
                 T("ローマ字で打つと、打つたびに変換した結果が出ます（ライブ変換）。Return で確定",
                   "Type in romaji and the converted text appears as you type (live conversion). Return commits"),
                 T("Space で変換し、候補の窓から Space・↑↓・数字・クリックで選びます。←→ で文節を移り、Shift+←→ で区切りを変えます",
@@ -787,5 +799,52 @@ struct UsagePage: View {
         Section(title) {
             ForEach(items, id: \.self) { Text($0) }
         }
+    }
+}
+
+
+/** バージョン情報。入っている Kanade の版（pkg の版と同じ 年.月.日.時分）と、組んだ日時・場所 */
+struct AboutPage: View {
+    private let stamp: String? = {
+        let url = support.appendingPathComponent("engine/VERSION")
+        return (try? String(contentsOf: url, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }()
+
+    private var version: String {
+        guard let s = stamp, s.count >= 12, s.allSatisfy(\.isNumber) else { return T("不明（入力方式がまだ一度も起動していません）", "Unknown (the input method has not run yet)") }
+        let c = Array(s)
+        return "\(String(c[0..<4])).\(Int(String(c[4..<6]))!).\(Int(String(c[6..<8]))!).\(String(c[8..<12]))"
+    }
+
+    private var built: String? {
+        guard let s = stamp, s.count >= 14, s.allSatisfy(\.isNumber) else { return nil }
+        let c = Array(s)
+        return "\(String(c[0..<4]))-\(String(c[4..<6]))-\(String(c[6..<8])) \(String(c[8..<10])):\(String(c[10..<12])):\(String(c[12..<14]))"
+    }
+
+    private var os: String { ProcessInfo.processInfo.operatingSystemVersionString }
+    private var arch: String {
+        #if arch(arm64)
+        "Apple silicon"
+        #else
+        "Intel"
+        #endif
+    }
+
+    var body: some View {
+        Form {
+            Section("Kanade") {
+                LabeledContent(T("バージョン", "Version")) { Text(version).textSelection(.enabled) }
+                if let built { LabeledContent(T("組んだ日時", "Built")) { Text(built).textSelection(.enabled) } }
+                LabeledContent("macOS") { Text("\(os)（\(arch)）").textSelection(.enabled) }
+            }
+            Section(T("場所", "Locations")) {
+                LabeledContent(T("設定・辞書・学習", "Settings, dictionary, learning")) { Text(support.path).textSelection(.enabled) }
+                LabeledContent(T("記録", "Logs")) { Text("~/Library/Logs/Kanade").textSelection(.enabled) }
+                Link("GitHub", destination: URL(string: "https://github.com/MoomA-0750/kanade-ime")!)
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle(Page.about.title)
     }
 }

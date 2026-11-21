@@ -47,6 +47,8 @@ final class KanadeInputController: IMKInputController, CommandTarget {
 
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard let event else { return false }
+        // リモートデスクトップなどが手前にあるときは、キーを全部そのまま通す（向こう側のホストへ届ける）
+        if RemoteApps.isFrontmost { return false }
         EngineLink.shared.target = self
         var k: WinKey
         var release = false
