@@ -10,7 +10,7 @@ Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は�
 - フェーズ3（フロント）: Android（KanadeSettings の設定4つと SettingsBackup の除外、IME サービスの `logField`・`logSource`（hw・soft・flick・glide）・`logVoice`・`logVoiceCommand`・flush・書き手の付け外し。commit aa00e93・3bac61d）、fcitx5（`field` 送信。podman で組めた）、macOS（`IsSecureEventInputEnabled`・bundle id。ssh mac で型検査が通った）、Windows TSF（InputScope を編集セッションで読む。to-fu で DLL が組めた）。決めた細かい点は decisions.md 2026-11-22「フェーズ3」。Android は `:app:compileDebugKotlin` が通っただけで、実機・エミュレータでは動かしていない。Windows・fcitx5・macOS も組めるところまで（実際の入力欄での動きは未確認）
 
 - フェーズ4（画面）: Android の「入力の記録」の節（ToolsScreens.kt）、GTK・Qt（バックアップページ）、Windows・macOS（入力ページ）にスイッチ・フォルダーを開く・全部消す。SPEC 13-9、decisions.md 2026-11-22「フェーズ4」。Windows は to-fu で組め、macOS は型検査、Kotlin の試験と app のコンパイルは通る。Qt は組んでいない、GTK は構文だけ。どれも画面を出しての確認はまだ
-- macOS の録音キー・Control+Space の素通し（リモートアプリが手前のとき）: a993083・25c6f32 で入れ、pkg 2026.11.22.0048 を cramshell の ~/Downloads に置いた（公証・staple 済み）。本人の実機確認（Moonlight で録音キーと Control+Space が向こうへ届くか・設定の「バージョン情報」）が待ち。0101 は Release・tap 済み。以降の Release は本人の「出して」が要る
+- macOS の録音キー・Control+Space の素通し（リモートアプリが手前のとき）: a993083・25c6f32 で入れ、pkg 2026.11.22.0048 を cramshell の ~/Downloads に置いた（公証・staple 済み）。本人が確認済み（Moonlight が手前のとき録音キーも Control+Space も向こうへ届く）。0101 は Release・tap 済み。以降の Release は本人の「出して」が要る
 
 ## 残り（フェーズ）
 5. 組んで確かめ（Kotlin の試験、podman で fcitx5、ssh mac で swiftc、to-fu で DLL）、引き継ぎ
@@ -30,7 +30,7 @@ Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は�
 - Windows の DLL: `scripts/win.sh tsf` → `win.sh reg`。終わったら `win.sh start` で普段の起動に戻す
 - `passwordless-sudo on` は使わない。push は本人の直接の確認のあと
 - 未 commit のまま: linux/settings/__pycache__ の .pyc と .claude/（このセッションの作業ではない）
-- 未 push: 4442358 より後の commit 全部（フェーズ2 の commit を含む）
+- push 済み（2026-11-22、本人の了承。bd2fd0f まで）
 
 ## 資料
 - docs/INPUT-LOG.md（設計）、docs/INPUT-LOG-REQUEST.md（要望）、SPEC.md、docs/WINDOWS-PROTOCOL.md、docs/decisions.md、STATUS.md、Vault の Human/Projects/Kanade.md
