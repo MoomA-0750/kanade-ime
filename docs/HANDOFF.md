@@ -1,7 +1,7 @@
 # 引き継ぎ（今の状態、2026-11-22 夜・フェーズ4 が済んだ）
 
 ## 目的
-Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は「入力の記録」（本人用に、どういう入力・変換のやり直し・言語の切り替えがあったかを端末の中だけに軽く集める。パスワード欄は除く）。要望は `docs/INPUT-LOG-REQUEST.md`、設計は `docs/INPUT-LOG.md`（design-planner の案C で仮決定）。
+Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は「入力の記録」（本人用に、どういう入力・変換のやり直し・言語の切り替えがあったかを端末の中だけに軽く集める。パスワード欄は除く）。要望は `docs/INPUT-LOG-REQUEST.md`、設計は `docs/INPUT-LOG.md`（design-planner の案C。Q1〜Q7 は 2026-11-22 に本人が決定）。
 
 ## できたこと
 - フェーズ1（設計）: `docs/INPUT-LOG.md`、`docs/decisions.md` 2026-11-22「入力の記録」（8fb2b4b）
@@ -19,7 +19,6 @@ Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は�
 2. フェーズ5: Qt の設定を podman で組む（`linux/settings/qt`）、エミュレータで Android の画面を出して撮る（android-m3-expressive の手順）、実際に打ってログが増えることと全部消すを確かめる。出た不具合を直す。change-reviewer で個人の内容を扱う部分（フェーズ2〜4）を見る
 
 ## 本人の判断待ち
-- 入力の記録の仮決定7つ（INPUT-LOG.md の 7。既定オフのスイッチ／ターミナルは確定と切り替えだけ／カーソルの前 32 文字／90 日・200MB／記録中の印なし／Android の書き出しなし／デスクトップの学習は変えない）
 - 前からのもの: 聞き続けるモードの仮決定5つ・レビューの判断4つ・cramshell で pkg 2026.11.21.0101 を試した結果・push・Release・tap を出してよいか（前の引き継ぎの全文は git の 8fb2b4b の docs/HANDOFF.md。to-fu・cramshell での試し方もそこにある）
 - フェーズ2 は個人の内容を扱う（打った文を残す）ので、push の前に change-reviewer で見ておくのがよい（まだ回していない）
 
