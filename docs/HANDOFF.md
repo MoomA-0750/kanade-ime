@@ -20,6 +20,7 @@ Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は�
 2. フェーズ5: Qt の設定を podman で組む（`linux/settings/qt`）、エミュレータで Android の画面を出して撮る（android-m3-expressive の手順）、実際に打ってログが増えることと全部消すを確かめる。出た不具合を直す。change-reviewer で個人の内容を扱う部分（フェーズ2〜4）を見る
 
 ## 本人の判断待ち
+- 日英の切り替え不要（Meltype 型）の設計（docs/MIXED-INPUT.md、2026-11-23）の 14 点。実装はまだしていない
 - 前からのもの: 聞き続けるモードの仮決定5つ・レビューの判断4つ・cramshell で pkg 2026.11.21.0101 を試した結果・push・Release・tap を出してよいか（前の引き継ぎの全文は git の 8fb2b4b の docs/HANDOFF.md。to-fu・cramshell での試し方もそこにある）
 - フェーズ2 は個人の内容を扱う（打った文を残す）ので、push の前に change-reviewer で見ておくのがよい（まだ回していない）
 
@@ -33,4 +34,5 @@ Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は�
 - push 済み（2026-11-22、本人の了承。bd2fd0f まで）
 
 ## 資料
+- docs/MIXED-INPUT.md（日英混在の設計メモ。実装なし。Meltype の調査・方式比較・フェーズ・評価・決めてほしい14点）
 - docs/INPUT-LOG.md（設計）、docs/INPUT-LOG-REQUEST.md（要望）、SPEC.md、docs/WINDOWS-PROTOCOL.md、docs/decisions.md、STATUS.md、Vault の Human/Projects/Kanade.md
