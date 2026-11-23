@@ -1,9 +1,15 @@
-# 引き継ぎ（今の状態、2026-11-22 夜・フェーズ4 が済んだ）
+# 引き継ぎ（今の状態、2026-11-24・入力の記録フェーズ4 済み／日英混在の設計済み／Rust 書き直しの計画が決定済み）
 
 ## 目的
 Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は「入力の記録」（本人用に、どういう入力・変換のやり直し・言語の切り替えがあったかを端末の中だけに軽く集める。パスワード欄は除く）。要望は `docs/INPUT-LOG-REQUEST.md`、設計は `docs/INPUT-LOG.md`（design-planner の案C。Q1〜Q7 は 2026-11-22 に本人が決定）。
 
-## できたこと
+## 2026-11-23 に増えたこと（設計と計画のみ。コードは変えていない）
+- 日英の切り替え不要（Meltype 型）の設計メモ: `docs/MIXED-INPUT.md`。推しは B1（判定してから変換・自前・既定オフ）。本人の14点（同メモ 10）は**まだ未回答**（確認一覧に残っている）。SPEC 未決事項に1行だけ足した
+- Rust コアの書き直し計画: `docs/REWRITE-PLAN.md`。6 章の12点は**本人が全部推奨どおりで確定**（decisions.md 2026-11-23）。Rust は実験→関門A（共通試験の一致と速さ）のあと本命、デスクトップのエンジン→Android の順、ソケットは維持、Android は UniFFI、Meltype は**クリーンルームで MIT のまま（Meltype のソース・評価セットは読まない・使わない）**
+- 決定 8〜10（SPEC の番号振り直しと分離、設定の一覧とマージ、確定の見直し）は、実施するときに同じ commit で SPEC を直す。SPEC 本文はまだ変えていない
+- 日英混在の P0・P1 は Kotlin で先に（決定 5）。ただし P0 を始める前に14点のうち既定・キー・Space などを本人に決めてもらう
+
+## できたこと（入力の記録など、前からのもの）
 - フェーズ1（設計）: `docs/INPUT-LOG.md`、`docs/decisions.md` 2026-11-22「入力の記録」（8fb2b4b）
 - フェーズ2（エンジン）: core の log/（InputEvent・JsonLine・InputLogWriter・FieldKind/LogField）、InputEngine の `recorder`・`logField`・`logVoice`・`flushLog` など、EngineHost の `field` 行、DesktopStore の設定4つ、DesktopApp の書き手の付け外しと `clear-input-log`、VoiceSession、WINDOWS-PROTOCOL.md、SPEC.md 13 節（全部「仮」）。`./gradlew :core:test :desktop:test` は通る。実装で決めた細かい点は decisions.md 2026-11-22「フェーズ2」。commit は a99372e〜a2b3138
 
@@ -16,7 +22,7 @@ Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は�
 5. 組んで確かめ（Kotlin の試験、podman で fcitx5、ssh mac で swiftc、to-fu で DLL）、引き継ぎ
 
 ## 次のセッションが最初にやること
-0. CLAUDE.md のとおり、まず DeX のキー表（docs/DEX-KEYS.md）。その次が Rust 計画のフェーズ 0（docs/REWRITE-PLAN.md 5.4。Kotlin に `dictool golden record` を足し、testdata/golden/ に共通試験を作る。形と一致の基準は Fable 審査点）。入力の記録のフェーズ5 は前からの残りで、並べる順は本人に確かめる
+0. CLAUDE.md のとおり、まず DeX のキー表（docs/DEX-KEYS.md。Fold 7 実機が要るかもしれない。作り終えたらキー記録を既定でオフ）。その次が Rust 計画のフェーズ 0（docs/REWRITE-PLAN.md 5.4。Kotlin に `dictool golden record` を足し、testdata/golden/ に共通試験を作り、基準値（速さ・正解数）を測って decisions へ。形と一致の基準は Fable 審査点、作業は Sonnet）。入力の記録のフェーズ5（下）との順番は本人に確かめる
 1. このファイル・SPEC の 13 節を読む
 2. フェーズ5: Qt の設定を podman で組む（`linux/settings/qt`）、エミュレータで Android の画面を出して撮る（android-m3-expressive の手順）、実際に打ってログが増えることと全部消すを確かめる。出た不具合を直す。change-reviewer で個人の内容を扱う部分（フェーズ2〜4）を見る
 
@@ -33,7 +39,8 @@ Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は�
 - Windows の DLL: `scripts/win.sh tsf` → `win.sh reg`。終わったら `win.sh start` で普段の起動に戻す
 - `passwordless-sudo on` は使わない。push は本人の直接の確認のあと
 - 未 commit のまま: linux/settings/__pycache__ の .pyc と .claude/（このセッションの作業ではない）
-- push 済み（2026-11-22、本人の了承。bd2fd0f まで）
+- push 済み（2026-11-22、本人の了承。bd2fd0f まで）。それ以降の commit（MIXED-INPUT・REWRITE-PLAN・決定の記録）は未 push。push は本人の確認のあと
+- 裏で動かしている作業は無い
 
 ## 資料
 - docs/REWRITE-PLAN.md（Rust 書き直しの計画案。要件・資産と負債・仕様の見直し提案・クレート構成・移行の関門・フェーズ）
