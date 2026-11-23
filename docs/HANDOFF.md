@@ -16,11 +16,12 @@ Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は�
 5. 組んで確かめ（Kotlin の試験、podman で fcitx5、ssh mac で swiftc、to-fu で DLL）、引き継ぎ
 
 ## 次のセッションが最初にやること
+0. CLAUDE.md のとおり、まず DeX のキー表（docs/DEX-KEYS.md）。その次が Rust 計画のフェーズ 0（docs/REWRITE-PLAN.md 5.4。Kotlin に `dictool golden record` を足し、testdata/golden/ に共通試験を作る。形と一致の基準は Fable 審査点）。入力の記録のフェーズ5 は前からの残りで、並べる順は本人に確かめる
 1. このファイル・SPEC の 13 節を読む
 2. フェーズ5: Qt の設定を podman で組む（`linux/settings/qt`）、エミュレータで Android の画面を出して撮る（android-m3-expressive の手順）、実際に打ってログが増えることと全部消すを確かめる。出た不具合を直す。change-reviewer で個人の内容を扱う部分（フェーズ2〜4）を見る
 
 ## 本人の判断待ち
-- Rust コアへの書き直しの計画（docs/REWRITE-PLAN.md、2026-11-23）の 6 章の12点。特に「実験か本命か」と「Meltype のソースを読むか（戻せない）」。実装はまだしていない
+- （決定済み 2026-11-23）Rust コアの書き直しの 6 章の12点は全部推奨どおりで確定（decisions.md 2026-11-23）。Rust は実験→関門A のあと本命、Meltype はクリーンルーム・MIT のまま（ソースは読まない）。実装はまだしていない
 - 日英の切り替え不要（Meltype 型）の設計（docs/MIXED-INPUT.md、2026-11-23）の 14 点。実装はまだしていない
 - 前からのもの: 聞き続けるモードの仮決定5つ・レビューの判断4つ・cramshell で pkg 2026.11.21.0101 を試した結果・push・Release・tap を出してよいか（前の引き継ぎの全文は git の 8fb2b4b の docs/HANDOFF.md。to-fu・cramshell での試し方もそこにある）
 - フェーズ2 は個人の内容を扱う（打った文を残す）ので、push の前に change-reviewer で見ておくのがよい（まだ回していない）
