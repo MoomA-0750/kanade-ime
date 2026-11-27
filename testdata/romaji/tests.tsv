@@ -1,0 +1,77 @@
+# kanade romaji v1
+# source lines:testdata/romaji/inputs-tests.txt
+I	(	(=(		
+I	:	:=:		
+I	:)	:=:|)=)	|	
+I	::	:=:|:=:	|	
+I	;	;=;		
+I	[	[=[		
+I	[-]	[=[|-=-|]=]	||	
+I	:+1:	:=:|+=+|1=1|:=:	|||	
+I	:10	:=:|1=1|0=0	||	
+I	10	1=1|0=0	|	
+I	123	1=1|2=2|3=3	||	
+I	[a]	[=[|あ=a|]=]	||	
+I	a	あ=a		
+I	aB3$kLm9xQ 	あ=a|b=b|3=3|$=$|k=k|l=l|m=m|9=9|x=x|q=q| = 	|b|||k|l|m||x|q|	
+I	abc	あ=a|b=b	|b|c	c=c
+I	[a]i	[=[|あ=a|]=]|い=i	|||	
+I	a,i.	あ=a|,=,|い=i|.=.	|||	
+I	aiu	あ=a|い=i|う=u	||	
+I	:arigatou	:=:|あ=a|り=ri|が=ga|と=to|う=u	||r||g||t||	
+I	chotto	ちょ=cho|っ=t|と=to	c|ch||t|t|	
+I	de	で=de	d|	
+I	e	え=e		
+I	fairu	ふぁ=fa|い=i|る=ru	f|||r|	
+I	hai,sou.	は=ha|い=i|,=,|そ=so|う=u|.=.	h||||s|||	
+I	hash	は=ha	h||s|sh	sh=sh
+I	hashi	は=ha|し=shi	h||s|sh|	
+I	hasi	は=ha|し=si	h||s|	
+I	:heart	:=:|へ=he|あ=a|r=r	|h|||r|t	t=t
+I	hello 	へ=he|っ=l|ぉ=lo| = 	h||l|l||	
+I	hennkannwotasikameru	へ=he|ん=nn|か=ka|ん=nn|を=wo|た=ta|し=si|か=ka|め=me|る=ru	h||n||k||n||w||t||s||k||m||r|	
+I	hoge	ほ=ho|げ=ge	h||g|	
+I	hon	ほ=ho	h||n	ん=n
+I	i	い=i		
+I	k		k	k=k
+I	ka	か=ka	k|	
+I	kan	か=ka	k||n	ん=n
+I	kana	か=ka|な=na	k||n|	
+I	ki-	き=ki|-=-	k||	
+I	ki-bo	き=ki|-=-|ぼ=bo	k|||b|	
+I	kidou	き=ki|ど=do|う=u	k||d||	
+I	kin'en	き=ki|ん=n'|え=e	k||n|||n	ん=n
+I	konnnichiha	こ=ko|ん=nn|に=ni|ち=chi|は=ha	k||n||n||c|ch||h|	
+I	konnya	こ=ko|ん=nn|や=ya	k||n||y|	
+I	ky		k|ky	ky=ky
+I	kyak	きゃ=kya	k|ky||k	k=k
+I	kyatto	きゃ=kya|っ=t|と=to	k|ky||t|t|	
+I	kyouha	きょ=kyo|う=u|は=ha	k|ky|||h|	
+I	matcha	ま=ma|っ=t|ちゃ=cha	m||t|c|ch|	
+I	n		n	ん=n
+I	nihongo	に=ni|ほ=ho|ん=n|ご=go	n||h||n|g|	
+I	ok 	お=o|k=k| = 	|k|	
+I	push to GitHub 	ぷ=pu|s=s|h=h| = |と=to| = |ぎ=gi|てゅ=thu|b=b| = 	p||s|sh||t|||g||t|th||b|	
+I	ra	ら=ra	r|	
+I	rei:	れ=re|い=i|:=:	r|||	
+I	:ro	:=:|ろ=ro	|r|	
+I	::rock	:=:|:=:|ろ=ro|c=c	||r||c|k	k=k
+I	:rock	:=:|ろ=ro|c=c	|r||c|k	k=k
+I	:rocket	:=:|ろ=ro|c=c|け=ke	|r||c|k||t	t=t
+I	:rocket:	:=:|ろ=ro|c=c|け=ke|t=t|:=:	|r||c|k||t|	
+I	;rocket	;=;|ろ=ro|c=c|け=ke	|r||c|k||t	t=t
+I	:rocketx	:=:|ろ=ro|c=c|け=ke|t=t	|r||c|k||t|x	x=x
+I	sa	さ=sa	s|	
+I	sanpo	さ=sa|ん=n|ぽ=po	s||n|p|	
+I	shinbun	し=shi|ん=n|ぶ=bu	s|sh||n|b||n	ん=n
+I	shoki	しょ=sho|き=ki	s|sh||k|	
+I	siyasinn	し=si|や=ya|し=si|ん=nn	s||y||s||n|	
+I	:smile	:=:|s=s|み=mi|ぇ=le	|s|m||l|	
+I	sudo 	す=su|ど=do| = 	s||d||	
+I	:sushi	:=:|す=su|し=shi	|s||s|sh|	
+I	t:	t=t|:=:	t|	
+I	thi-mu	てぃ=thi|-=-|む=mu	t|th|||m|	
+I	tta	っ=t|た=ta	t|t|	
+I	tuduku	つ=tu|づ=du|く=ku	t||d||k|	
+I	x		x	x=x
+I	xaltuxya	ぁ=xa|っ=ltu|ゃ=xya	x||l|lt||x|xy|	

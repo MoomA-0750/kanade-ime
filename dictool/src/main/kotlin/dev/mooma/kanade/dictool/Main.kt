@@ -73,6 +73,13 @@ fun main(args: Array<String>) {
         "assets" -> assets(File(args[1]), File(args[2]))
         "build" -> build(File(args[1]), File(args[2]))
         "golden" -> goldenCommand(args.drop(1))
+        // Rust 書き直しのフェーズ 1 の物差し（RustCompare.kt、docs/RUST-PHASE1.md）
+        "nbest-dump" -> nbestDump(File(args[1]), File(args[2]), args[3], args.getOrNull(4))
+        "reverse-dump" -> reverseDump(File(args[1]), File(args[2]), args[3], args.getOrNull(4))
+        "ksym-dump" -> ksymDump(File(args[1]), File(args[2]))
+        "romaji-dump" -> romajiDump(File(args[1]), args[2], args.getOrNull(3))
+        "romaji-table-dump" -> romajiTableDump(File(args[1]))
+        "width-dump" -> widthDump(File(args[1]), args[2].toLong(), args[3].toInt())
         "eval" -> evaluate(File(args[1]), File(args[2]))
         "convert" -> convert(File(args[1]), args.drop(2))
         "profile" -> profileTry(File(args[1]), File(args[2]), File(args[3]), args[4].split('|'), args.drop(5))
@@ -98,6 +105,8 @@ fun main(args: Array<String>) {
                   build <mozcDir> <outDir>      system.kdic と connection.kcon を書く
                   eval <outDir> <evaluation.tsv> Mozc の評価セットで1位一致率などを測る
                   convert <outDir> <かな...>     変換を試す
+                  nbest-dump <辞書> <出力> <tsv:列|lines:ファイル|random:種:数> [名前]  辞書だけの N-best を記録する（Rust との比較用）
+                  reverse-dump・ksym-dump・romaji-dump・romaji-table-dump・width-dump  同じく Rust との比較用（scripts/rust-phase1-dump.sh）
                   eval-glide <assetsDir> [ずれ]  グライドの読み取りを、人の指に近い軌跡で測る（ずれは狙いのずれ。キーの幅に対する割合）
                   tune-glide <assetsDir> [ずれ]  グライドの重みを探す
                   eval-tap <assetsDir> [ずれ]      タップの補いで、打ち間違えの文字がどれだけ減るかを測る（ずれはキーの大きさに対する割合）

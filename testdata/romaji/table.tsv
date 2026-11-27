@@ -1,0 +1,485 @@
+# kanade romaji-table v1
+E	a	あ
+E	ba	ば
+E	be	べ
+E	bi	び
+E	bo	ぼ
+E	bu	ぶ
+E	bya	びゃ
+E	bye	びぇ
+E	byi	びぃ
+E	byo	びょ
+E	byu	びゅ
+E	ca	か
+E	ce	せ
+E	cha	ちゃ
+E	che	ちぇ
+E	chi	ち
+E	cho	ちょ
+E	chu	ちゅ
+E	ci	し
+E	co	こ
+E	cu	く
+E	cya	ちゃ
+E	cye	ちぇ
+E	cyi	ちぃ
+E	cyo	ちょ
+E	cyu	ちゅ
+E	da	だ
+E	de	で
+E	dha	でゃ
+E	dhe	でぇ
+E	dhi	でぃ
+E	dho	でょ
+E	dhu	でゅ
+E	di	ぢ
+E	do	ど
+E	du	づ
+E	dwu	どぅ
+E	dya	ぢゃ
+E	dye	ぢぇ
+E	dyi	ぢぃ
+E	dyo	ぢょ
+E	dyu	ぢゅ
+E	e	え
+E	fa	ふぁ
+E	fe	ふぇ
+E	fi	ふぃ
+E	fo	ふぉ
+E	fu	ふ
+E	fya	ふゃ
+E	fye	ふぇ
+E	fyi	ふぃ
+E	fyo	ふょ
+E	fyu	ふゅ
+E	ga	が
+E	ge	げ
+E	gi	ぎ
+E	go	ご
+E	gu	ぐ
+E	gwa	ぐぁ
+E	gya	ぎゃ
+E	gye	ぎぇ
+E	gyi	ぎぃ
+E	gyo	ぎょ
+E	gyu	ぎゅ
+E	ha	は
+E	he	へ
+E	hi	ひ
+E	ho	ほ
+E	hu	ふ
+E	hya	ひゃ
+E	hye	ひぇ
+E	hyi	ひぃ
+E	hyo	ひょ
+E	hyu	ひゅ
+E	i	い
+E	ja	じゃ
+E	je	じぇ
+E	ji	じ
+E	jo	じょ
+E	ju	じゅ
+E	jya	じゃ
+E	jye	じぇ
+E	jyi	じぃ
+E	jyo	じょ
+E	jyu	じゅ
+E	ka	か
+E	ke	け
+E	ki	き
+E	ko	こ
+E	ku	く
+E	kwa	くぁ
+E	kya	きゃ
+E	kye	きぇ
+E	kyi	きぃ
+E	kyo	きょ
+E	kyu	きゅ
+E	la	ぁ
+E	le	ぇ
+E	li	ぃ
+E	lka	ゕ
+E	lke	ゖ
+E	lo	ぉ
+E	ltsu	っ
+E	ltu	っ
+E	lu	ぅ
+E	lwa	ゎ
+E	lya	ゃ
+E	lyo	ょ
+E	lyu	ゅ
+E	ma	ま
+E	me	め
+E	mi	み
+E	mo	も
+E	mu	む
+E	mya	みゃ
+E	mye	みぇ
+E	myi	みぃ
+E	myo	みょ
+E	myu	みゅ
+E	n'	ん
+E	na	な
+E	ne	ね
+E	ni	に
+E	nn	ん
+E	no	の
+E	nu	ぬ
+E	nya	にゃ
+E	nye	にぇ
+E	nyi	にぃ
+E	nyo	にょ
+E	nyu	にゅ
+E	o	お
+E	pa	ぱ
+E	pe	ぺ
+E	pi	ぴ
+E	po	ぽ
+E	pu	ぷ
+E	pya	ぴゃ
+E	pye	ぴぇ
+E	pyi	ぴぃ
+E	pyo	ぴょ
+E	pyu	ぴゅ
+E	qa	くぁ
+E	qe	くぇ
+E	qi	くぃ
+E	qo	くぉ
+E	qu	く
+E	ra	ら
+E	re	れ
+E	ri	り
+E	ro	ろ
+E	ru	る
+E	rya	りゃ
+E	rye	りぇ
+E	ryi	りぃ
+E	ryo	りょ
+E	ryu	りゅ
+E	sa	さ
+E	se	せ
+E	sha	しゃ
+E	she	しぇ
+E	shi	し
+E	sho	しょ
+E	shu	しゅ
+E	si	し
+E	so	そ
+E	su	す
+E	sya	しゃ
+E	sye	しぇ
+E	syi	しぃ
+E	syo	しょ
+E	syu	しゅ
+E	ta	た
+E	te	て
+E	tha	てゃ
+E	the	てぇ
+E	thi	てぃ
+E	tho	てょ
+E	thu	てゅ
+E	ti	ち
+E	to	と
+E	tsa	つぁ
+E	tse	つぇ
+E	tsi	つぃ
+E	tso	つぉ
+E	tsu	つ
+E	tu	つ
+E	twu	とぅ
+E	tya	ちゃ
+E	tye	ちぇ
+E	tyi	ちぃ
+E	tyo	ちょ
+E	tyu	ちゅ
+E	u	う
+E	va	ゔぁ
+E	ve	ゔぇ
+E	vi	ゔぃ
+E	vo	ゔぉ
+E	vu	ゔ
+E	vya	ゔゃ
+E	vye	ゔぇ
+E	vyi	ゔぃ
+E	vyo	ゔょ
+E	vyu	ゔゅ
+E	wa	わ
+E	we	うぇ
+E	wha	うぁ
+E	whe	うぇ
+E	whi	うぃ
+E	who	うぉ
+E	whu	う
+E	wi	うぃ
+E	wo	を
+E	wu	う
+E	xa	ぁ
+E	xe	ぇ
+E	xi	ぃ
+E	xka	ゕ
+E	xke	ゖ
+E	xn	ん
+E	xo	ぉ
+E	xtsu	っ
+E	xtu	っ
+E	xu	ぅ
+E	xwa	ゎ
+E	xya	ゃ
+E	xyo	ょ
+E	xyu	ゅ
+E	ya	や
+E	ye	いぇ
+E	yi	い
+E	yo	よ
+E	yu	ゆ
+E	za	ざ
+E	ze	ぜ
+E	zi	じ
+E	zo	ぞ
+E	zu	ず
+E	zya	じゃ
+E	zye	じぇ
+E	zyi	じぃ
+E	zyo	じょ
+E	zyu	じゅ
+X	b
+X	by
+X	c
+X	ch
+X	cy
+X	d
+X	dh
+X	dw
+X	dy
+X	f
+X	fy
+X	g
+X	gw
+X	gy
+X	h
+X	hy
+X	j
+X	jy
+X	k
+X	kw
+X	ky
+X	l
+X	lk
+X	lt
+X	lts
+X	lw
+X	ly
+X	m
+X	my
+X	n
+X	ny
+X	p
+X	py
+X	q
+X	r
+X	ry
+X	s
+X	sh
+X	sy
+X	t
+X	th
+X	ts
+X	tw
+X	ty
+X	v
+X	vy
+X	w
+X	wh
+X	x
+X	xk
+X	xt
+X	xts
+X	xw
+X	xy
+X	y
+X	z
+X	zy
+V	ぁ	la
+V	あ	a
+V	ぃ	li
+V	い	i
+V	いぇ	ye
+V	ぅ	lu
+V	う	u
+V	うぁ	wha
+V	うぃ	wi
+V	うぇ	we
+V	うぉ	who
+V	ぇ	le
+V	え	e
+V	ぉ	lo
+V	お	o
+V	か	ka
+V	が	ga
+V	き	ki
+V	きぃ	kyi
+V	きぇ	kye
+V	きゃ	kya
+V	きゅ	kyu
+V	きょ	kyo
+V	ぎ	gi
+V	ぎぃ	gyi
+V	ぎぇ	gye
+V	ぎゃ	gya
+V	ぎゅ	gyu
+V	ぎょ	gyo
+V	く	ku
+V	くぁ	qa
+V	くぃ	qi
+V	くぇ	qe
+V	くぉ	qo
+V	ぐ	gu
+V	ぐぁ	gwa
+V	け	ke
+V	げ	ge
+V	こ	ko
+V	ご	go
+V	さ	sa
+V	ざ	za
+V	し	si
+V	しぃ	syi
+V	しぇ	sye
+V	しゃ	sya
+V	しゅ	syu
+V	しょ	syo
+V	じ	zi
+V	じぃ	zyi
+V	じぇ	je
+V	じゃ	ja
+V	じゅ	ju
+V	じょ	jo
+V	す	su
+V	ず	zu
+V	せ	se
+V	ぜ	ze
+V	そ	so
+V	ぞ	zo
+V	た	ta
+V	だ	da
+V	ち	ti
+V	ちぃ	tyi
+V	ちぇ	tye
+V	ちゃ	tya
+V	ちゅ	tyu
+V	ちょ	tyo
+V	ぢ	di
+V	ぢぃ	dyi
+V	ぢぇ	dye
+V	ぢゃ	dya
+V	ぢゅ	dyu
+V	ぢょ	dyo
+V	っ	xtu
+V	つ	tu
+V	つぁ	tsa
+V	つぃ	tsi
+V	つぇ	tse
+V	つぉ	tso
+V	づ	du
+V	て	te
+V	てぃ	thi
+V	てぇ	the
+V	てゃ	tha
+V	てゅ	thu
+V	てょ	tho
+V	で	de
+V	でぃ	dhi
+V	でぇ	dhe
+V	でゃ	dha
+V	でゅ	dhu
+V	でょ	dho
+V	と	to
+V	とぅ	twu
+V	ど	do
+V	どぅ	dwu
+V	な	na
+V	に	ni
+V	にぃ	nyi
+V	にぇ	nye
+V	にゃ	nya
+V	にゅ	nyu
+V	にょ	nyo
+V	ぬ	nu
+V	ね	ne
+V	の	no
+V	は	ha
+V	ば	ba
+V	ぱ	pa
+V	ひ	hi
+V	ひぃ	hyi
+V	ひぇ	hye
+V	ひゃ	hya
+V	ひゅ	hyu
+V	ひょ	hyo
+V	び	bi
+V	びぃ	byi
+V	びぇ	bye
+V	びゃ	bya
+V	びゅ	byu
+V	びょ	byo
+V	ぴ	pi
+V	ぴぃ	pyi
+V	ぴぇ	pye
+V	ぴゃ	pya
+V	ぴゅ	pyu
+V	ぴょ	pyo
+V	ふ	hu
+V	ふぁ	fa
+V	ふぃ	fi
+V	ふぇ	fe
+V	ふぉ	fo
+V	ふゃ	fya
+V	ふゅ	fyu
+V	ふょ	fyo
+V	ぶ	bu
+V	ぷ	pu
+V	へ	he
+V	べ	be
+V	ぺ	pe
+V	ほ	ho
+V	ぼ	bo
+V	ぽ	po
+V	ま	ma
+V	み	mi
+V	みぃ	myi
+V	みぇ	mye
+V	みゃ	mya
+V	みゅ	myu
+V	みょ	myo
+V	む	mu
+V	め	me
+V	も	mo
+V	ゃ	xya
+V	や	ya
+V	ゅ	xyu
+V	ゆ	yu
+V	ょ	xyo
+V	よ	yo
+V	ら	ra
+V	り	ri
+V	りぃ	ryi
+V	りぇ	rye
+V	りゃ	rya
+V	りゅ	ryu
+V	りょ	ryo
+V	る	ru
+V	れ	re
+V	ろ	ro
+V	ゎ	xwa
+V	わ	wa
+V	を	wo
+V	ん	xn
+V	ゔ	vu
+V	ゔぁ	va
+V	ゔぃ	vi
+V	ゔぇ	ve
+V	ゔぉ	vo
+V	ゔゃ	vya
+V	ゔゅ	vyu
+V	ゔょ	vyo
+V	ゕ	xka
+V	ゖ	xke
