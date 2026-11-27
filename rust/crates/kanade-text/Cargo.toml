@@ -1,0 +1,8 @@
+[package]
+name = "kanade-text"
+description = "ローマ字・かな・全角半角・括弧（Kotlin の RomajiConverter・RomajiTable・CharWidth・Brackets）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true

@@ -1,0 +1,12 @@
+[package]
+name = "kanade-convert"
+description = "ラティス・ビタビ・N-best の A*・接頭辞で探し直す処理（Kotlin の core/convert）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+kanade-dict.workspace = true
+kanade-text.workspace = true

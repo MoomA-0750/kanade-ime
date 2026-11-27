@@ -1,0 +1,12 @@
+[package]
+name = "kanade-dict"
+description = "kdic・kcon・ksym・kpos・reverse.kdic の読み書き（Kotlin の core/dict）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+kanade-text.workspace = true
+memmap2.workspace = true

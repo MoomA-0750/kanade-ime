@@ -1,0 +1,24 @@
+# Kanade の Rust のコア（docs/REWRITE-PLAN.md 4.1）。Gradle とは別に組む。フェーズ 1: 辞書・ローマ字・ラティス
+[workspace]
+resolver = "2"
+members = ["crates/kanade-text", "crates/kanade-dict", "crates/kanade-convert", "crates/kanade-tool"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+rust-version = "1.80"
+
+[workspace.dependencies]
+kanade-text = { path = "crates/kanade-text" }
+kanade-dict = { path = "crates/kanade-dict" }
+kanade-convert = { path = "crates/kanade-convert" }
+memmap2 = "0.9"
+sha2 = { version = "0.10", default-features = false }
+
+[profile.release]
+debug = 1
+
+[profile.test]
+opt-level = 2
