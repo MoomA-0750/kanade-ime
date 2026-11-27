@@ -780,3 +780,17 @@ Rust 版が「以上」を目指す物差し（`docs/REWRITE-PLAN.md` 5.3）。�
 - 未測定（実機が要る）: Fold 7 の辞書だけ・確かめて直すの速さ（docs/PLAN.md の 3.6ms・5.8ms/13.3ms を引き継ぐ）、M1 Air の熱（0.15 秒に1キーを 30 秒打って CPU 時間 4.8 秒）、Mac の常駐メモリ・起動。これらは ssh mac や Fold 7 が使えるときに測って足す
 - 評価の数字の「どの方式がエンジンの既定か」は、フェーズ 2 で Rust のエンジンを作るときに SPEC・コードから確かめて、同じ方式の行を基準にする
 - 評価の実行手順: 辞書の `.kgz` を `gunzip` で展開した作業用フォルダーを作り、`dictool eval-zenzai <辞書> <eval/*.tsv> <zenz.gguf> <libkanade_zenz.so>`。`:dictool:run` の作業フォルダーは dictool/ なので、パスは絶対で渡す
+
+## 2026-11-27 Rust 計画フェーズ 1（辞書・ローマ字・ラティス）
+
+- 本人の了承（取りまとめ役経由）: Opus で実装、実験として始める、push はしない。経過は `docs/RUST-PHASE1.md`
+- 結果: 辞書だけの N-best が Kotlin 版と 699/699 読みで一致（上位 10 件の表記・順番・コストに加え、語の区切りと文節も）。接頭辞で探し直す処理・同じ読みの語・予測の語・逆引き・表・ローマ字・全角半角・括弧も全件一致。許した違いは無い
+- 比べ方: Kotlin に dictool のコマンド（`nbest-dump` など、`RustCompare.kt`）を足して `testdata/nbest`・`testdata/romaji` に記録し、Rust の `kanade-tool` が同じ形の行を作って文字列で比べる。辞書は入れず、記録の頭の sha256 で同じ辞書かを確かめる。辞書が無ければ件数を出して失敗にする（飛ばしにしない）
+  - 比べる範囲を上位 10 件の表記とコストより広げた（語の lid・rid・コストと文節）。同じ表記で語の区切りだけ違う経路を見逃さないため
+  - 記録の文字列は `\` で書く（片割れの代用対を `\uXXXX`）。Kotlin の Writer は片割れを `?` にしてしまい、比べられないため
+  - でたらめな読み（種を固定）は Kotlin の側だけで作り、記録に読みを書く（Rust は乱数を写さない）
+- 決めたこと: A* の待ち行列は `java.util.PriorityQueue` の手順を写す（`kanade-convert/src/java_pq.rs`）。試しに Rust の `BinaryHeap`（同点は入れた順）にすると、でたらめな読み 400 のうち 6 件で上位 10 件の順が変わった。計画の不確かな点「同じコストの経路の並びは Kotlin の実装順に依存するか」は「依存する」。Rust が本命になった後（関門A の後）は Rust の側を正しい答えにするので、そのときに同点の決め方を素直なもの（例: 表記の順）へ変えてよい
+- 決めたこと: 文字列は Rust でも UTF-16 の単位（`Vec<u16>`）で持つ。kdic の並び・二分探索・ラティスの位置・代用対の片割れの未知語を、Kotlin の String と同じにするため。外に出すときだけ `String` にする
+- 決めたこと: 依存は memmap2 と sha2 だけ（どちらも MIT/Apache-2.0）。`rust/deny.toml` に許すライセンスを書いた（cargo-deny はこの PC に入れていないので、`cargo metadata` で確かめた）
+- 写していないもの: `typoCorrections`（Kotlin は HashMap の反復の順に安定な並べ替えをかけるので、同点の順が Java の HashMap の作りに依存する）、`DictionaryCandidateSource` の組み立て、ユーザー辞書の書式・学習・日付・絵文字のショートコード。フェーズ 2 で写す
+- 速さ（この PC、辞書だけの変換 10 件の中央値）: daily で Kotlin 0.41ms・Rust 0.13ms、daily2 で 0.24ms・0.09ms。Kotlin は記録と同じ JVM で温めが少ない値

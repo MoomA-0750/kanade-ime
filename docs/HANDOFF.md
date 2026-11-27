@@ -1,4 +1,4 @@
-# 引き継ぎ（今の状態、2026-11-24・入力の記録フェーズ4 済み／日英混在の設計済み／Rust 書き直しの計画が決定済み）
+# 引き継ぎ（今の状態、2026-11-27・Rust 計画フェーズ 1 済み／入力の記録フェーズ4 済み／日英混在の設計済み）
 
 ## 目的
 Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は「入力の記録」（本人用に、どういう入力・変換のやり直し・言語の切り替えがあったかを端末の中だけに軽く集める。パスワード欄は除く）。要望は `docs/INPUT-LOG-REQUEST.md`、設計は `docs/INPUT-LOG.md`（design-planner の案C。Q1〜Q7 は 2026-11-22 に本人が決定）。
@@ -24,7 +24,7 @@ Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は�
 ## 次のセッションが最初にやること
 0. DeX のキー表（docs/DEX-KEYS.md）は本人の環境待ちで保留（今夜取れる見込み。**ファイルには触れない**。届いたら取り込み、キー記録を既定でオフにする）
 1. Rust 計画のフェーズ 0（docs/REWRITE-PLAN.md 5.4）は**ほぼ済み**: 共通試験の形（docs/GOLDEN.md、Fable 審査済み）、記録の道具（desktop/Golden.kt・GoldenSeeds.kt、`dictool golden record <絶対パス>`）、場面 seeds 25＋fuzz 100（testdata/golden/）、GoldenTest、Kotlin 版の基準値（decisions.md 2026-11-23）。残り: 評価セット（eval-*、`dict: system`）の場面、`engine` の層、単体テスト 240 件の場面化の追加、Fold 7・M1 の基準値（実機）、基準値のうちエンジンの既定方式の確認
-2. その次はフェーズ 1（辞書・ローマ字・ラティスの Rust 化。クレート text・dict・convert・tool。Opus 推奨）。始める前に本人に確認（実験として始める決定は済み）
+2. Rust 計画のフェーズ 1（辞書・ローマ字・ラティス）は**済み**（2026-11-27、`docs/RUST-PHASE1.md`）。`rust/` の workspace（kanade-text・kanade-dict・kanade-convert・kanade-tool）で、辞書だけの N-best が Kotlin 版と 699/699 読み一致。流し方は RUST-PHASE1.md。次はフェーズ 2（エンジンと zenz、関門A）で、作り始める前に Fable 審査点「エンジンの API と状態の型」。Opus 推奨。始めるかは本人に確認
 3. 入力の記録のフェーズ5（Qt を podman で組む、エミュレータで Android の画面、実際に打って確かめる、change-reviewer）は前からの残り。順番は本人に確認中
 4. 日英混在の P0・P1（Kotlin）は、MIXED-INPUT の14点の返事を待つ
 
@@ -42,9 +42,11 @@ Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は�
 - `passwordless-sudo on` は使わない。push は本人の直接の確認のあと
 - 未 commit のまま: linux/settings/__pycache__ の .pyc と .claude/（このセッションの作業ではない）
 - push 済み（2026-11-22、本人の了承。bd2fd0f まで）。それ以降の commit（MIXED-INPUT・REWRITE-PLAN・決定の記録）は未 push。push は本人の確認のあと
+- Rust の試験は辞書が要る: `scripts/rust-dict-prepare.sh "$(mktemp -d)"` で展開し、`KANADE_DICT_DIR` に指定して `cd rust && cargo test`（無いと件数つきで失敗する）
 - 裏で動かしている作業は無い
 
 ## 資料
+- docs/RUST-PHASE1.md（Rust フェーズ 1 の今の状態・流し方・不確かな点）
 - docs/REWRITE-PLAN.md（Rust 書き直しの計画案。要件・資産と負債・仕様の見直し提案・クレート構成・移行の関門・フェーズ）
 - docs/MIXED-INPUT.md（日英混在の設計メモ。実装なし。Meltype の調査・方式比較・フェーズ・評価・決めてほしい14点）
 - docs/INPUT-LOG.md（設計）、docs/INPUT-LOG-REQUEST.md（要望）、SPEC.md、docs/WINDOWS-PROTOCOL.md、docs/decisions.md、STATUS.md、Vault の Human/Projects/Kanade.md
