@@ -743,3 +743,14 @@ SPEC.md の未決事項に本人が答えた。
   12. Windows の音声の既定は今のまま whisper small（P-12。JRE が抜けて軽くなったら見直す）
 - 順番: CLAUDE.md の「次の作業はまず DeX のキー表（docs/DEX-KEYS.md）を作り、キー記録を既定でオフにする」は変えない。フェーズ 0 はそのあと
 - SPEC 本文はまだ変えない（8〜10 は実施するときに、同じ commit で SPEC を直す）
+
+## 2026-11-23 共通試験（golden）の形を Fable の審査で直した（Rust 計画フェーズ 0）
+
+- `docs/GOLDEN.md`（形）の最初の案を fable-reviewer に見せ、次を直した
+  - 規範を `send`（実際に送る行）・`out`（返った行）・`req`（エンジンが出した言語モデルの依頼）にし、`in`（KeyScript）と `view`（FakeDll の画面）は人が読む参考にした。Rust 版が KeyScript・FakeDll・id の数え方を写さなくて済む（案の `in` だけだと、試験道具の癖が契約になるため）
+  - `lmreq` は後で足すと全場面が変わるので、`req` を今から記録する（`EngineHost.requestListener`。同じスレッドですぐ拾う）。答えを返すステップ（`rerank`・`predRank`）・`t`（時刻）・`log`・`layer` は形だけ予約
+  - 場面の頭を明文化（新しいエンジン・空の学習、前置きの行も記録、`settings`・`host` は全欄、`dict` は kind とハッシュ）。UTF-16 の単位、片割れの代用対は記録失敗
+  - 偽の辞書は `{読み2文字}`・`<読み>` の ASCII の印付きにして、変換されたことが見えるようにした（Kotlin の `uppercase()` に頼らない）
+  - 版の決まり（欄を足すだけなら据え置き、意味を変えたら上げて全件録り直し、知らないものは「未対応」で合格にしない）。飛ばした場面を出し、CI では飛ばしを失敗にする
+- 層は `host`（今のプロトコル）に加えて `engine`（`KeyInput`→`ImeCommand`）を決めた。Rust のフェーズ 2 の関門A はエンジン単体で、host の層は Rust 側ではフェーズ 3 のため。`engine` の層の記録はフェーズ 2 の前に足す（フェーズ 0 では形だけ）
+- 実装: `desktop/Golden.kt`・`GoldenSeeds.kt`、`dictool golden record <絶対パス>`（`:dictool:run` の作業フォルダーは dictool/ なので絶対パスで渡す）、`GoldenTest`（再生・`in` からの再現・記録が毎回同じ）。場面は seeds 25 件＋fuzz 100 件（`testdata/golden/`）

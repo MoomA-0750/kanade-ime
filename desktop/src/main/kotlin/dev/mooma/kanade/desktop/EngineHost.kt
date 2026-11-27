@@ -55,6 +55,9 @@ class EngineHost(
     /** 記録（エンジンの engine.log） */
     @Volatile var log: (String) -> Unit = {}
 
+    /** エンジンが出した言語モデルへの依頼を、同じスレッドですぐ知らせる（共通試験用。docs/GOLDEN.md） */
+    @Volatile internal var requestListener: ((ImeCommand) -> Unit)? = null
+
     /** 鳴らした効果音を知らせる（試験用） */
     @Volatile var earconListener: ((VoiceEarcon.Kind) -> Unit)? = null
 
@@ -350,10 +353,12 @@ class EngineHost(
     private fun run(commands: List<ImeCommand>): List<ImeCommand> = commands.filter { c ->
         when (c) {
             is ImeCommand.RequestRerank -> {
+                requestListener?.invoke(c)
                 requestRerank(c)
                 false
             }
             is ImeCommand.RequestPredictionRank -> {
+                requestListener?.invoke(c)
                 requestPredictionRank(c)
                 false
             }

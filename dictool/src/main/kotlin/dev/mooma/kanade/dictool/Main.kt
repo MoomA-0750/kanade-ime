@@ -72,6 +72,7 @@ fun main(args: Array<String>) {
         "fetch-sherpa" -> fetchSherpa(File(args[1]))
         "assets" -> assets(File(args[1]), File(args[2]))
         "build" -> build(File(args[1]), File(args[2]))
+        "golden" -> goldenCommand(args.drop(1))
         "eval" -> evaluate(File(args[1]), File(args[2]))
         "convert" -> convert(File(args[1]), args.drop(2))
         "profile" -> profileTry(File(args[1]), File(args[2]), File(args[3]), args[4].split('|'), args.drop(5))
@@ -1081,5 +1082,17 @@ fun evaluateTap(assets: File, aim: Float) {
             }
             println("$name ずれ $aim・重み $weight: 打ち間違え ${"%.1f".format(100.0 * errors / total)}%（$total 文字）")
         }
+    }
+}
+
+/** 共通試験（docs/GOLDEN.md）。`golden record <dir>` で場面を流して記録を作る */
+fun goldenCommand(args: List<String>) {
+    when (args.getOrNull(0)) {
+        "record" -> {
+            val dir = File(args.getOrElse(1) { "testdata/golden" })
+            dev.mooma.kanade.desktop.GoldenSeeds.record(dir)
+            println("記録した: ${dir.path}")
+        }
+        else -> error("使い方: golden record <dir>")
     }
 }
