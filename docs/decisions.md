@@ -754,3 +754,29 @@ SPEC.md の未決事項に本人が答えた。
   - 版の決まり（欄を足すだけなら据え置き、意味を変えたら上げて全件録り直し、知らないものは「未対応」で合格にしない）。飛ばした場面を出し、CI では飛ばしを失敗にする
 - 層は `host`（今のプロトコル）に加えて `engine`（`KeyInput`→`ImeCommand`）を決めた。Rust のフェーズ 2 の関門A はエンジン単体で、host の層は Rust 側ではフェーズ 3 のため。`engine` の層の記録はフェーズ 2 の前に足す（フェーズ 0 では形だけ）
 - 実装: `desktop/Golden.kt`・`GoldenSeeds.kt`、`dictool golden record <絶対パス>`（`:dictool:run` の作業フォルダーは dictool/ なので絶対パスで渡す）、`GoldenTest`（再生・`in` からの再現・記録が毎回同じ）。場面は seeds 25 件＋fuzz 100 件（`testdata/golden/`）
+
+## 2026-11-23 Rust 計画フェーズ 0 の基準値（Kotlin 版、この PC＝x86 Linux・6 コア）
+
+Rust 版が「以上」を目指す物差し（`docs/REWRITE-PLAN.md` 5.3）。評価は `dictool eval-zenzai`・`eval-context`（辞書は `app/build/generated/kanadeAssets` の `.kgz` を展開したもの、zenz は xsmall、`.cache/host-zenz/libkanade_zenz.so`）。手元の x86 は速さの参考にならない（Fold 7・M1 の値は別に測る）。
+
+| 物差し | Kotlin 版の値 |
+|---|---|
+| daily（102 文）辞書だけ | 78 |
+| daily 並べ替え10件 | 97（中央値 376ms） |
+| daily 直す L=1 / L=3 / L=5 | 95 / 95 / 95（67 / 92 / 92ms） |
+| daily 並べ替え＋直す L=1 | 95 |
+| daily 直す L=3＋辞書3件と試した文を並べ替え / L=1＋同 | 97 / 97 |
+| daily2（100 文）辞書だけ | 74 |
+| daily2 並べ替え10件 | 92 |
+| daily2 直す L=1 / L=3 / L=5 | 93 / 94 / 94 |
+| daily2 並べ替え＋直す L=1 | 94 |
+| daily2 直す L=3＋辞書3件と試した文 / L=1＋同 | 92 / 91 |
+| context（30 文）辞書だけ・文脈なし・文脈あり | 14・18・24 |
+| context-right（10 文）辞書だけ・文脈なし・文脈あり | 4・5・9 |
+| JVM のエンジン: 起動からソケットが出るまで | 約 0.6 秒（x86・辞書は gzip 展開済みの状態。zenz の読み込みは別） |
+| 同: 最初のキー列（日本語オンで「nihongo」＋Enter）の処理 | 76ms、その後の RSS 約 123MB |
+| 共通試験 | seeds 25 場面＋fuzz 100 場面が全部通る（GoldenTest） |
+
+- 未測定（実機が要る）: Fold 7 の辞書だけ・確かめて直すの速さ（docs/PLAN.md の 3.6ms・5.8ms/13.3ms を引き継ぐ）、M1 Air の熱（0.15 秒に1キーを 30 秒打って CPU 時間 4.8 秒）、Mac の常駐メモリ・起動。これらは ssh mac や Fold 7 が使えるときに測って足す
+- 評価の数字の「どの方式がエンジンの既定か」は、フェーズ 2 で Rust のエンジンを作るときに SPEC・コードから確かめて、同じ方式の行を基準にする
+- 評価の実行手順: 辞書の `.kgz` を `gunzip` で展開した作業用フォルダーを作り、`dictool eval-zenzai <辞書> <eval/*.tsv> <zenz.gguf> <libkanade_zenz.so>`。`:dictool:run` の作業フォルダーは dictool/ なので、パスは絶対で渡す

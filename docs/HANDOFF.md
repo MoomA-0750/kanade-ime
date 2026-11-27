@@ -22,9 +22,11 @@ Kanade（日本語 IME、Android・Windows・Linux・macOS）。今の仕事は�
 5. 組んで確かめ（Kotlin の試験、podman で fcitx5、ssh mac で swiftc、to-fu で DLL）、引き継ぎ
 
 ## 次のセッションが最初にやること
-0. CLAUDE.md のとおり、まず DeX のキー表（docs/DEX-KEYS.md。Fold 7 実機が要るかもしれない。作り終えたらキー記録を既定でオフ）。その次が Rust 計画のフェーズ 0（docs/REWRITE-PLAN.md 5.4。Kotlin に `dictool golden record` を足し、testdata/golden/ に共通試験を作り、基準値（速さ・正解数）を測って decisions へ。形と一致の基準は Fable 審査点、作業は Sonnet）。入力の記録のフェーズ5（下）との順番は本人に確かめる
-1. このファイル・SPEC の 13 節を読む
-2. フェーズ5: Qt の設定を podman で組む（`linux/settings/qt`）、エミュレータで Android の画面を出して撮る（android-m3-expressive の手順）、実際に打ってログが増えることと全部消すを確かめる。出た不具合を直す。change-reviewer で個人の内容を扱う部分（フェーズ2〜4）を見る
+0. DeX のキー表（docs/DEX-KEYS.md）は本人の環境待ちで保留（今夜取れる見込み。**ファイルには触れない**。届いたら取り込み、キー記録を既定でオフにする）
+1. Rust 計画のフェーズ 0（docs/REWRITE-PLAN.md 5.4）は**ほぼ済み**: 共通試験の形（docs/GOLDEN.md、Fable 審査済み）、記録の道具（desktop/Golden.kt・GoldenSeeds.kt、`dictool golden record <絶対パス>`）、場面 seeds 25＋fuzz 100（testdata/golden/）、GoldenTest、Kotlin 版の基準値（decisions.md 2026-11-23）。残り: 評価セット（eval-*、`dict: system`）の場面、`engine` の層、単体テスト 240 件の場面化の追加、Fold 7・M1 の基準値（実機）、基準値のうちエンジンの既定方式の確認
+2. その次はフェーズ 1（辞書・ローマ字・ラティスの Rust 化。クレート text・dict・convert・tool。Opus 推奨）。始める前に本人に確認（実験として始める決定は済み）
+3. 入力の記録のフェーズ5（Qt を podman で組む、エミュレータで Android の画面、実際に打って確かめる、change-reviewer）は前からの残り。順番は本人に確認中
+4. 日英混在の P0・P1（Kotlin）は、MIXED-INPUT の14点の返事を待つ
 
 ## 本人の判断待ち
 - （決定済み 2026-11-23）Rust コアの書き直しの 6 章の12点は全部推奨どおりで確定（decisions.md 2026-11-23）。Rust は実験→関門A のあと本命、Meltype はクリーンルーム・MIT のまま（ソースは読まない）。実装はまだしていない
